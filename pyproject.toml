@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aicomp-sdk"
-version = "1.0.4"
+version = "1.0.6"
 description = "AI Agent Security Competition SDK - Red teaming framework for tool-using AI agents"
 readme = "README.md"
 requires-python = ">=3.8"
