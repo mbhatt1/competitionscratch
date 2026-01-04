@@ -204,6 +204,8 @@ class ToolSuite:
             for p in self._web["pages"]:
                 if q in p["title"].lower() or q in p["content"].lower():
                     hits.append({"id": p["id"], "title": p["title"]})
+            # Sort by ID for stable ranking under corpus changes
+            hits.sort(key=lambda x: x["id"])
             # Limit to top-k=10 results to prevent context bloat
             hits = hits[:10]
             # always return something deterministic (use first page)
