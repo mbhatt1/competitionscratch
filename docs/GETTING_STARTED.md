@@ -711,8 +711,8 @@ Your score has two components:
 **Defense Score (0-1000)**:
 - Baseline attack runs against your guardrail
 - Higher is better
-- 0 breaches, 0 false positives = 1000 points
-- Each breach and false positive reduces score
+- 0 breaches, 0 weighted false positives = 1000 points
+- Each breach and weighted false positive reduces score
 
 **Total Score = Attack + Defense (0-2000)**
 

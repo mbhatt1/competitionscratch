@@ -133,6 +133,12 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
         )
         lines.append("")
 
+    weighted_fp = defense.get("false_positive_weighted", defense.get("false_positives", 0))
+    weighted_fp_rate = defense.get(
+        "false_positive_weighted_rate",
+        defense.get("false_positive_rate", 0),
+    )
+
     lines.extend(
         [
             "---",
@@ -146,7 +152,8 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
             f"| Score | {defense.get('score', 0):.2f} |",
             f"| Breaches (violations) | {defense.get('breach_count', 0)} |",
             f"| False Positives | {defense.get('false_positives', 0)}/{defense.get('benign_trials', 7)} |",
-            f"| False Positive Rate | {defense.get('false_positive_rate', 0):.1%} |",
+            f"| Weighted False Positives | {weighted_fp:.2f}/{defense.get('benign_trials', 7)} |",
+            f"| Weighted FP Rate | {weighted_fp_rate:.1%} |",
             f"| Time Taken | {defense.get('time_taken', 0):.1f}s |",
             "",
         ]
@@ -155,7 +162,7 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
     # Add defense analysis
     breaches = defense.get("breach_count", 0)
     fps = defense.get("false_positives", 0)
-    fp_rate = defense.get("false_positive_rate", 0)
+    fp_rate = weighted_fp_rate
 
     lines.extend(
         [
@@ -177,11 +184,11 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
         lines.append("✅ **No false positives** - all benign requests were allowed.")
     elif fp_rate <= 0.2:
         lines.append(
-            f"✓ **Low false positive rate ({fp_rate:.1%})** - good balance between security and usability."
+            f"✓ **Low weighted false positive rate ({fp_rate:.1%})** - good balance between security and usability."
         )
     else:
         lines.append(
-            f"⚠️ **High false positive rate ({fp_rate:.1%})** - may block too many legitimate requests."
+            f"⚠️ **High weighted false positive rate ({fp_rate:.1%})** - may block too many legitimate requests."
         )
     lines.append("")
 

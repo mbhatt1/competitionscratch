@@ -156,9 +156,9 @@ Your attack algorithm runs against the **optimal baseline guardrail** for up to 
 ### Defense Match (0-1000 points)
 The **baseline attack** runs against your guardrail for up to 1200 seconds.
 
-- **Perfect defense** (0 breaches, 0 false positives): 1000 points
+- **Perfect defense** (0 breaches, 0 weighted false positives): 1000 points
 - Each **breach** reduces score: `1000 / (1 + 0.15 × breaches)`
-- Each **false positive** heavily penalized: `-800 × false_positive_rate`
+- Each **weighted false positive** heavily penalized: `-800 × weighted_false_positive_rate`
 
 **Key insight**: You must block attacks without blocking benign operations!
 

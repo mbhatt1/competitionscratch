@@ -145,10 +145,10 @@ def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: s
         print(f"    {name1:38s} {fp1:8d}")
         print(f"    {name2:38s} {fp2:8d}{format_delta(float(delta), False)}")
 
-        fpr1 = defense1.get("false_positive_rate", 0)
-        fpr2 = defense2.get("false_positive_rate", 0)
+        fpr1 = defense1.get("false_positive_weighted_rate", defense1.get("false_positive_rate", 0))
+        fpr2 = defense2.get("false_positive_weighted_rate", defense2.get("false_positive_rate", 0))
         delta = fpr2 - fpr1
-        print(f"  FP Rate:")
+        print(f"  Weighted FP Rate:")
         print(f"    {name1:38s} {fpr1:7.1%}")
         print(f"    {name2:38s} {fpr2:7.1%}{format_delta(delta * 100, False)}")
 

@@ -53,7 +53,7 @@ A **guardrail** is a security layer that sits between an AI agent and its tools.
 In this competition:
 - **Your goal**: Block malicious tool calls while allowing benign ones
 - **Success metric**: Minimize breaches + minimize false positives
-- **Score**: 0-1000 points based on breach count and FP rate
+- **Score**: 0-1000 points based on breach count and weighted FP rate
 
 **The challenge**: Finding the right balance between security and usability.
 

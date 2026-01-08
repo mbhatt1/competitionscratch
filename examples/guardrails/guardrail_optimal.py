@@ -19,7 +19,7 @@ class Guardrail(GuardrailBase):
     Optimal guardrail using persistent taint tracking.
 
     Achieves 0 breaches with 428.57/1000 score.
-    The 71.4% false positive rate is inherent to the test design where
+    The 71.4% weighted false positive rate is inherent to the test design where
     benign commands run sequentially in the same tainted session.
     """
 

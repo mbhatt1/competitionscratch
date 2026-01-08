@@ -102,8 +102,9 @@ def test_guardrail(name, guardrail_path, attack_seconds=30):
     # Extract metrics
     breaches_found = defense_report["breach_count"]
     false_positives = defense_report["false_positives"]
+    false_positive_weighted = defense_report["false_positive_weighted"]
     benign_trials = defense_report["benign_trials"]
-    fp_rate = false_positives / benign_trials if benign_trials > 0 else 0.0
+    fp_rate = false_positive_weighted / benign_trials if benign_trials > 0 else 0.0
 
     # Calculate defense score
     defense_score = score_defense(defense_report)
@@ -117,7 +118,10 @@ def test_guardrail(name, guardrail_path, attack_seconds=30):
 
     # Display results (defense metrics only)
     md_print(f"- **Breaches:** {breaches_found}")
-    md_print(f"- **False Positives:** {false_positives}/{benign_trials} ({fp_rate:.1%})")
+    md_print(
+        f"- **False Positives:** {false_positives}/{benign_trials} "
+        f"(weighted {false_positive_weighted:.2f}, {fp_rate:.1%})"
+    )
     md_print(f"- **Defense Score:** {defense_score:.1f}/1000")
 
     if attack_types:
@@ -130,6 +134,7 @@ def test_guardrail(name, guardrail_path, attack_seconds=30):
         "name": name,
         "breaches_found": breaches_found,
         "false_positives": false_positives,
+        "false_positive_weighted": false_positive_weighted,
         "fp_rate": fp_rate,
         "benign_trials": benign_trials,
         "attack_types": attack_types,
@@ -198,8 +203,8 @@ def main():
     md_print()
     md_print("## Summary")
     md_print()
-    md_print("| Guardrail | Defense Score | Breaches | FP Rate | Benign Trials |")
-    md_print("|-----------|---------------|----------|---------|---------------|")
+    md_print("| Guardrail | Defense Score | Breaches | Weighted FP Rate | Benign Trials |")
+    md_print("|-----------|---------------|----------|------------------|---------------|")
 
     # Sort by defense score (descending)
     results.sort(key=lambda x: x["defense_score"], reverse=True)
@@ -211,7 +216,7 @@ def main():
         fp_rate_display = f"{result['fp_rate']:.1%}"
         benign_trials = result["benign_trials"]
         md_print(
-            f"| {name:<15} | {defense_score:>7.1f}/1000 | {breaches:<8} | {fp_rate_display:<7} | {benign_trials:<13} |"
+            f"| {name:<15} | {defense_score:>7.1f}/1000 | {breaches:<8} | {fp_rate_display:<16} | {benign_trials:<13} |"
         )
 
     md_print()
@@ -228,7 +233,7 @@ def main():
         md_print()
         md_print(f"- **Defense Score:** {best['defense_score']:.1f}/1000")
         md_print(f"- **Breaches:** {best['breaches_found']}")
-        md_print(f"- **False Positive Rate:** {best['fp_rate']:.1%}")
+        md_print(f"- **Weighted FP Rate:** {best['fp_rate']:.1%}")
         if best["attack_types"]:
             top_attacks = ", ".join([f"`{k}`" for k in list(best["attack_types"].keys())[:3]])
             md_print(f"- **Most common breach types:** {top_attacks}")
@@ -238,7 +243,7 @@ def main():
         md_print()
         md_print(f"- **Defense Score:** {worst['defense_score']:.1f}/1000")
         md_print(f"- **Breaches:** {worst['breaches_found']}")
-        md_print(f"- **False Positive Rate:** {worst['fp_rate']:.1%}")
+        md_print(f"- **Weighted FP Rate:** {worst['fp_rate']:.1%}")
         if worst["attack_types"]:
             top_attacks = ", ".join([f"`{k}`" for k in list(worst["attack_types"].keys())[:3]])
             md_print(f"- **Most common breach types:** {top_attacks}")

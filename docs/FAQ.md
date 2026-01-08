@@ -636,7 +636,7 @@ cat results.json
 
 Contains:
 - Attack: score, raw, findings, predicates by type
-- Defense: score, breaches, false positives, FP rate
+- Defense: score, breaches, false positives, weighted FP rate
 - Final score
 
 ---

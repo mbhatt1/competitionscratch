@@ -31,7 +31,7 @@ features:
     
   - icon: 🔵
     title: Blue Team (Defense)
-    details: Build guardrails with breach penalty (1000/(1+0.15×breaches)) and false positive penalty (-800×FP_rate). Perfect defense = 1000 pts. Defense scores in the 700-900 range, while attack scores fall in the 0-100 range.
+    details: Build guardrails with breach penalty (1000/(1+0.15×breaches)) and weighted false positive penalty (-800×weighted_FP_rate). Perfect defense = 1000 pts. Defense scores in the 700-900 range, while attack scores fall in the 0-100 range.
     
   - icon: 🏗️
     title: Deterministic Sandbox

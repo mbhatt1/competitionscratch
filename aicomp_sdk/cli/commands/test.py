@@ -169,8 +169,9 @@ def run_evaluation_with_progress(
         "score": defense_score,
         "breach_count": defense_report.get("breach_count", 0),
         "false_positives": defense_report.get("false_positives", 0),
+        "false_positive_weighted": defense_report.get("false_positive_weighted", 0),
         "benign_trials": defense_report.get("benign_trials", 7),
-        "false_positive_rate": defense_report.get("false_positives", 0)
+        "false_positive_weighted_rate": defense_report.get("false_positive_weighted", 0)
         / max(1, defense_report.get("benign_trials", 7)),
         "time_taken": elapsed,
     }
@@ -207,7 +208,10 @@ def print_results_summary(results: Dict[str, Any]) -> None:
     print(f"Defense Score:  {defense['score']:.2f}")
     print(f"  - Breaches (violations): {defense['breach_count']}")
     print(f"  - False positives: {defense['false_positives']}/{defense['benign_trials']}")
-    print(f"  - FP rate: {defense['false_positive_rate']:.1%}")
+    print(
+        "  - Weighted FP rate: "
+        f"{defense['false_positive_weighted_rate']:.1%}"
+    )
     print()
     print(f"Final Score:    {final:.2f}")
     print("=" * 70)
