@@ -13,16 +13,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
+from archived_imports import setup_imports
+
+repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.attacks.baselines.shared_archive import SharedArchive
 from aicomp_sdk.core.env import SandboxEnv
-
-sys.path.insert(0, str(repo_root / "tests"))
-from test_verify_findings import detect_real_attacks
+from tests.integration.test_verify_findings import detect_real_attacks
 
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")

@@ -10,8 +10,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
+from archived_imports import setup_imports
+
+repo_root = setup_imports()
 
 # Check for API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -42,7 +43,7 @@ print("EXPERIMENT 1: GENERAL EXPLORATION BASELINE")
 print("=" * 70)
 
 print("\nRunning general Go-Explore for 120s...")
-from examples_hooks_submission.guardrail_prompt_injection import (
+from examples.guardrails.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
 

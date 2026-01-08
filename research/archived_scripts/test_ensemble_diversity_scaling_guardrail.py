@@ -12,16 +12,15 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
+from archived_imports import setup_imports
 
-from examples_hooks_submission.guardrail_simple import Guardrail as SimpleGuardrail
+repo_root = setup_imports()
+
+from examples.guardrails.guardrail_simple import Guardrail as SimpleGuardrail
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.core.env import SandboxEnv
-
-sys.path.insert(0, str(repo_root / "tests"))
-from test_verify_findings import detect_real_attacks
+from tests.integration.test_verify_findings import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
