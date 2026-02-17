@@ -1084,7 +1084,7 @@ if "pattern" in path.lower():
     ...
 ```
 
-**Timeout**: If your `decide()` takes >5 seconds, it's treated as `Decision.allow()`.
+**Performance note**: Keep `decide()` fast; it runs on every tool call and directly affects evaluation throughput.
 
 ### 7. Handle Edge Cases
 

@@ -17,7 +17,7 @@ Welcome! This guide will take you from zero to your first competition submission
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.9 or higher
 - pip package manager
 - A text editor or IDE
 
