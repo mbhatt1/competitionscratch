@@ -5,7 +5,7 @@ import re
 import shutil
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from ..agents.openai_agent import OpenAIAgent
 from ..guardrails.base import GuardrailBase
@@ -68,6 +68,9 @@ class GPTOSSBackend:
         out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
         text = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True)
         return text
+
+
+AgentMode = Literal["auto", "deterministic", "openai"]
 
 
 class VulnerableDeterministicAgent:
@@ -434,6 +437,7 @@ class SandboxEnv:
         seed: int,
         fixtures_dir: Path,
         agent=None,
+        agent_mode: AgentMode = "auto",
         guardrail: Optional[GuardrailBase] = None,
         hook_registry: Optional[HookRegistry] = None,
     ):
@@ -445,39 +449,47 @@ class SandboxEnv:
         self._last_tool_output: Optional[str] = None
         self.hook_registry = hook_registry or get_hook_registry()
 
+        if agent_mode not in ("auto", "deterministic", "openai"):
+            raise ValueError(f"Unsupported agent_mode: {agent_mode}")
+
         # Choose agent: Use provided agent, or fallback to environment-based selection
         if agent is not None:
             self.agent = agent
         else:
-            # Choose agent: Prefer gpt-oss-20b, fallback to OpenAI for testing
-            model_path = os.environ.get("GPT_OSS_MODEL_PATH", "").strip()
+            verbose = os.environ.get("DEBUG_AGENT", "").lower() in ("1", "true", "yes")
 
-            if model_path:
-                # Use gpt-oss-20b if path provided
-                backend = GPTOSSBackend(model_path)
-                if not backend.ready():
-                    raise RuntimeError(
-                        "Failed to load gpt-oss-20b from GPT_OSS_MODEL_PATH='{}'. "
-                        "Ensure the weights are present locally and Transformers/Torch are available.".format(
-                            model_path
-                        )
-                    )
-                self.agent = GPTOSSAgent(backend)
-            else:
-                # Fallback: Try OpenAI API, then deterministic
+            if agent_mode == "deterministic":
+                print("[INFO] Using deterministic vulnerable agent (forced mode)")
+                self.agent = VulnerableDeterministicAgent(self.tools)
+            elif agent_mode == "openai":
                 api_key = os.environ.get("OPENAI_API_KEY")
-                if api_key:
-                    print("[INFO] Using OpenAI API (gpt-4o-mini) for testing")
-                    # Enable verbose mode for debugging
-                    verbose = os.environ.get("DEBUG_AGENT", "").lower() in (
-                        "1",
-                        "true",
-                        "yes",
-                    )
-                    self.agent = OpenAIAgent(verbose=verbose)
+                if not api_key:
+                    raise RuntimeError("OPENAI_API_KEY must be set when agent_mode='openai'.")
+                print("[INFO] Using OpenAI API (gpt-4o-mini) (forced mode)")
+                self.agent = OpenAIAgent(verbose=verbose)
+            else:
+                # Choose agent: Prefer gpt-oss-20b, fallback to OpenAI for testing
+                model_path = os.environ.get("GPT_OSS_MODEL_PATH", "").strip()
+                if model_path:
+                    # Use gpt-oss-20b if path provided
+                    backend = GPTOSSBackend(model_path)
+                    if not backend.ready():
+                        raise RuntimeError(
+                            "Failed to load gpt-oss-20b from GPT_OSS_MODEL_PATH='{}'. "
+                            "Ensure the weights are present locally and Transformers/Torch are available.".format(
+                                model_path
+                            )
+                        )
+                    self.agent = GPTOSSAgent(backend)
                 else:
-                    print("[INFO] Using deterministic vulnerable agent (testing mode)")
-                    self.agent = VulnerableDeterministicAgent(self.tools)
+                    # Fallback: Try OpenAI API, then deterministic
+                    api_key = os.environ.get("OPENAI_API_KEY")
+                    if api_key:
+                        print("[INFO] Using OpenAI API (gpt-4o-mini) for testing")
+                        self.agent = OpenAIAgent(verbose=verbose)
+                    else:
+                        print("[INFO] Using deterministic vulnerable agent (testing mode)")
+                        self.agent = VulnerableDeterministicAgent(self.tools)
 
     def reset(self):
         self.tools.reset(self.seed)

@@ -10,6 +10,11 @@ This package provides a comprehensive framework for:
 __version__ = "1.0.1"
 
 # Core SDK
+from .attacks import (
+    AttackAlgorithmBase,
+    AttackCandidate,
+    AttackRunConfig,
+)
 from .core.env import SandboxEnv
 from .guardrails.base import Decision, GuardrailBase
 
@@ -44,6 +49,9 @@ __all__ = [
     "SandboxEnv",
     "GuardrailBase",
     "Decision",
+    "AttackAlgorithmBase",
+    "AttackCandidate",
+    "AttackRunConfig",
     # Simple Hooks API (recommended)
     "attack_hook",
     "defense_hook",

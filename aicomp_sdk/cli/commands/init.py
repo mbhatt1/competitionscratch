@@ -24,11 +24,13 @@ import time
 from collections.abc import Mapping
 from typing import Any, Optional
 
+from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+
 # TODO: Choose your approach - you can use hooks, direct exploration, or both
 # from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
 
 
-class AttackAlgorithm:
+class AttackAlgorithm(AttackAlgorithmBase):
     """
     Attack algorithm to find security vulnerabilities.
     
@@ -51,23 +53,22 @@ class AttackAlgorithm:
         # - Initialize exploration algorithm (e.g., GO-EXPLORE)
         # - Configure search parameters
     
-    def run(self, env, budget: Mapping[str, Any]) -> list[dict[str, Any]]:
+    def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
         """
         Run the attack algorithm within the given budget.
         
         Args:
             env: SandboxEnv instance - the target environment
-            budget: Time/step budget dict with keys like 'seconds', 'steps'
+            config: AttackRunConfig with time/step limits
         
         Returns:
-            List of findings, each containing:
-            - trace: The full execution trace dict
-            - Any other metadata you want to include
+            List of AttackCandidate chains.
         
-        The trace will be automatically validated for security predicate violations.
+        The evaluator replays each candidate chain, recomputes predicates/cell signatures,
+        and scores only replayed traces.
         """
-        max_seconds = budget.get('seconds', 60)
-        findings = []
+        max_seconds = config.seconds
+        findings: list[AttackCandidate] = []
         start_time = time.time()
         
         # TODO: Implement your attack strategy
@@ -106,10 +107,9 @@ class AttackAlgorithm:
                 
                 # TODO: Implement your own breach detection logic
                 if self._is_interesting(trace):
-                    findings.append({
-                        "trace": trace,
-                        "prompt": prompt,
-                    })
+                    findings.append(
+                        AttackCandidate(user_messages=tuple(trace.get("user_messages", [])))
+                    )
             
             except Exception:
                 # TODO: Decide how to handle errors

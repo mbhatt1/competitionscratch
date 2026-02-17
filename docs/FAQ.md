@@ -54,16 +54,16 @@ pip install numpy pandas  # For data processing
 
 ### Q: Installation works but imports fail
 
-**A:** Check Python version (need 3.8+):
+**A:** Check Python version (need 3.9+):
 
 ```bash
-python --version  # Should be 3.8 or higher
+python --version  # Should be 3.9 or higher
 ```
 
 If using multiple Python versions:
 ```bash
-python3.8 -m pip install aicomp-sdk
-python3.8 your_script.py
+python3.9 -m pip install aicomp-sdk
+python3.9 your_script.py
 ```
 
 ### Q: Permission denied during installation
@@ -294,7 +294,7 @@ class Guardrail(GuardrailBase):
 
 **Important:** State is maintained across multiple interactions in the same environment.
 
-### Q: My guardrail times out (>5 seconds per call)
+### Q: My guardrail is slow during evaluation
 
 **A:** Optimize your `decide()` method:
 
@@ -369,11 +369,11 @@ else:
 ### Q: What's a good raw attack score?
 
 **A:** Benchmarks:
-- **0-100**: Very weak, need more attacks
-- **100-200**: Weak, below baseline
-- **200-300**: Baseline level (≈500 normalized)
-- **300-400**: Good, above baseline (≈750 normalized)
-- **400+**: Elite (1000 normalized, capped)
+- **0-10,000 raw**: Early-stage attack (typically low normalized score)
+- **10,000-30,000 raw**: Solid performance
+- **30,000-80,000 raw**: Strong performance
+- **80,000+ raw**: Very strong performance
+- **200,000 raw**: 1000 normalized (cap)
 
 Test with 30-second runs and extrapolate:
 ```bash
@@ -388,7 +388,7 @@ python test_my_attack.py  # Shows estimated full score
 import time
 
 def run(self, env, config):
-    max_seconds = config.get("seconds", 1200)
+    max_seconds = config.get("seconds", 1800)
     start_time = time.time()
     findings = []
     
@@ -454,7 +454,7 @@ submission.zip
 Verify:
 ```bash
 unzip -l submission.zip
-# Should show exactly 2 files: attack.py and guardrail.py
+# Must include attack.py and guardrail.py
 ```
 
 ### Q: "Class not found: AttackAlgorithm" error
@@ -560,18 +560,18 @@ This simulates the competition evaluation.
 raw = (predicates × weights) + (unique_cells × 2)
 
 # Normalized (default)
-normalized = min(1000, (raw / 400) × 1000)
+normalized = min(1000, (raw / 200000) × 1000)
 ```
 
-- Baseline: ~200 raw → ~500 normalized
-- Elite: ~400 raw → 1000 normalized
+- Baseline target: ~100,000 raw → ~500 normalized
+- Elite target: ~200,000 raw → 1000 normalized
 
 Check both in results:
 ```json
 {
   "attack": {
-    "score": 685.5,      // Normalized (used for leaderboard)
-    "score_raw": 274.2   // Raw (for understanding)
+    "score": 84.5,        // Normalized (used for leaderboard)
+    "score_raw": 16900.0  // Raw (for understanding)
   }
 }
 ```
@@ -615,10 +615,10 @@ Both components are equally weighted (0-1000 each).
 
 **A:** Rough guidelines:
 - **0-800**: Need significant improvement
-- **800-1200**: Below baseline
-- **1200-1400**: Competitive
-- **1400-1600**: Strong
-- **1600-1800**: Elite
+- **800-1000**: Below baseline
+- **1000-1200**: Competitive
+- **1200-1500**: Strong
+- **1500-1800**: Elite
 - **1800-2000**: Exceptional (rare)
 
 ### Q: Can I see my score breakdown?
@@ -880,7 +880,7 @@ During competition: Report issues but don't submit PRs (to avoid giving unfair a
 ## Quick Troubleshooting Checklist
 
 **Installation Problems:**
-- [ ] Python 3.8+?
+- [ ] Python 3.9+?
 - [ ] SDK installed? (`pip list | grep aicomp`)
 - [ ] Virtual environment active?
 - [ ] Dependencies installed?
@@ -906,7 +906,7 @@ During competition: Report issues but don't submit PRs (to avoid giving unfair a
 - [ ] Managing time budget?
 
 **Submission Problems:**
-- [ ] ZIP contains exactly 2 files?
+- [ ] ZIP includes `attack.py` and `guardrail.py`?
 - [ ] File names correct (attack.py, guardrail.py)?
 - [ ] Classes named correctly?
 - [ ] No external dependencies?

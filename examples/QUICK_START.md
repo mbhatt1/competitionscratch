@@ -27,7 +27,7 @@ zip submission_hooks.zip attack.py guardrail.py
 
 # 4. Evaluate (from project root)
 cd ..
-python evaluation.py --submission_zip examples_hooks_submission/submission_hooks.zip --seconds 60
+python evaluation.py --submission_zip examples_hooks_submission/submission_hooks.zip --seconds 60 --agent_mode deterministic
 ```
 
 ## 🎯 What You Get

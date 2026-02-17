@@ -84,7 +84,7 @@ Create `submission.zip` with `attack.py` and `guardrail.py` in the root.
 
 ```bash
 # Test with evaluation script (from project root)
-python evaluation.py --submission_zip submission.zip --seconds 60
+python evaluation.py --submission_zip submission.zip --seconds 60 --agent_mode deterministic
 ```
 
 ## 🏆 Choosing the Right Example

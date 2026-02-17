@@ -7,6 +7,7 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
+from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
 
 
@@ -48,7 +49,7 @@ def poison_tool_arguments(tool_name, tool_args, **context):
     return {}
 
 
-class AttackAlgorithm:
+class AttackAlgorithm(AttackAlgorithmBase):
     """Simple attacker using decorator-based hooks"""
 
     def __init__(self, config=None):
@@ -64,10 +65,10 @@ class AttackAlgorithm:
         module = sys.modules[__name__]
         importlib.reload(module)
 
-    def run(self, env, budget: Mapping[str, Any]) -> list[dict[str, Any]]:
+    def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
         """Run attack with simple hook-based approach"""
-        max_seconds = budget.get("seconds", 60)
-        findings = []
+        max_seconds = config.seconds
+        findings: list[AttackCandidate] = []
         start_time = time.time()
 
         # Test cases that trigger our hooks
@@ -95,7 +96,9 @@ class AttackAlgorithm:
                 trace = env.export_trace_dict()
 
                 if self._check_breach(trace):
-                    findings.append({"trace": trace, "prompt": msg})
+                    findings.append(
+                        AttackCandidate(user_messages=tuple(trace.get("user_messages", [])))
+                    )
             except Exception:
                 pass
 

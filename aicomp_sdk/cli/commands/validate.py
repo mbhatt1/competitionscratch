@@ -13,6 +13,16 @@ import ast
 from pathlib import Path
 
 
+def _class_base_names(node: ast.ClassDef) -> set[str]:
+    names: set[str] = set()
+    for base in node.bases:
+        if isinstance(base, ast.Name):
+            names.add(base.id)
+        elif isinstance(base, ast.Attribute):
+            names.add(base.attr)
+    return names
+
+
 def validate_python_syntax(filepath: Path) -> tuple[bool, str]:
     """Check if file has valid Python syntax."""
     try:
@@ -46,6 +56,7 @@ def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
                         if len(parts) > 1:
                             # Check common valid imports
                             valid_imports = [
+                                "aicomp_sdk.attacks",
                                 "aicomp_sdk.core.env",
                                 "aicomp_sdk.guardrails.hooks",
                                 "aicomp_sdk.guardrails.hooks_simple",
@@ -64,7 +75,23 @@ def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
                 if node.module and node.module.startswith("aicomp_sdk"):
                     # Validate common imports
                     valid_from = {
-                        "aicomp_sdk": ["GuardrailBase", "Decision"],
+                        "aicomp_sdk": [
+                            "AttackAlgorithmBase",
+                            "AttackCandidate",
+                            "AttackRunConfig",
+                            "GuardrailBase",
+                            "Decision",
+                        ],
+                        "aicomp_sdk.attacks": [
+                            "AttackAlgorithmBase",
+                            "AttackCandidate",
+                            "AttackRunConfig",
+                        ],
+                        "aicomp_sdk.attacks.contracts": [
+                            "AttackAlgorithmBase",
+                            "AttackCandidate",
+                            "AttackRunConfig",
+                        ],
                         "aicomp_sdk.core.env": ["SandboxEnv"],
                         "aicomp_sdk.guardrails.base": ["GuardrailBase", "Decision"],
                         "aicomp_sdk.guardrails.hooks_simple": [
@@ -104,6 +131,9 @@ def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
             if isinstance(node, ast.ClassDef):
                 if node.name == "AttackAlgorithm":
                     has_attack_class = True
+                    base_names = _class_base_names(node)
+                    if "AttackAlgorithmBase" not in base_names:
+                        issues.append("AttackAlgorithm must inherit from AttackAlgorithmBase")
 
                     # Check for run method
                     for item in node.body:
@@ -120,8 +150,8 @@ def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
                                 )
                             if "env" not in arg_names:
                                 issues.append("run() method missing required 'env' parameter")
-                            if "budget" not in arg_names:
-                                issues.append("run() method missing required 'budget' parameter")
+                            if "config" not in arg_names:
+                                issues.append("run() method missing required 'config' parameter")
 
         if not has_attack_class:
             issues.append("Missing 'AttackAlgorithm' class")
