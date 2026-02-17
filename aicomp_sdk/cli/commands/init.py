@@ -21,7 +21,8 @@ Your goal: Find sequences of agent actions that violate security predicates
 """
 
 import time
-from typing import Any, Dict, List
+from collections.abc import Mapping
+from typing import Any, Optional
 
 # TODO: Choose your approach - you can use hooks, direct exploration, or both
 # from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
@@ -35,7 +36,7 @@ class AttackAlgorithm:
     You have a time budget to find as many unique vulnerabilities as possible.
     """
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Optional[Mapping[str, Any]] = None):
         """
         Initialize the attack algorithm.
         
@@ -50,7 +51,7 @@ class AttackAlgorithm:
         # - Initialize exploration algorithm (e.g., GO-EXPLORE)
         # - Configure search parameters
     
-    def run(self, env, budget: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def run(self, env, budget: Mapping[str, Any]) -> list[dict[str, Any]]:
         """
         Run the attack algorithm within the given budget.
         
@@ -116,7 +117,7 @@ class AttackAlgorithm:
         
         return findings
     
-    def _is_interesting(self, trace: Dict[str, Any]) -> bool:
+    def _is_interesting(self, trace: Mapping[str, Any]) -> bool:
         """
         Check if a trace might contain a security violation.
         
@@ -168,7 +169,8 @@ Your goal: Prevent security violations while minimizing false positives
 on benign user requests.
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 from aicomp_sdk import GuardrailBase, Decision
 
 # TODO: Choose your approach - you can use hooks, rules, or both
@@ -200,8 +202,8 @@ class Guardrail(GuardrailBase):
     def decide(
         self, 
         tool_name: str, 
-        tool_args: Dict[str, Any], 
-        context: Dict[str, Any]
+        tool_args: Mapping[str, Any], 
+        context: Mapping[str, Any]
     ) -> Decision:
         """
         Make a decision about whether to allow a tool call.
@@ -288,7 +290,7 @@ class Guardrail(GuardrailBase):
 
 def run_init(args) -> int:
     """Execute init command."""
-    from aicomp_sdk.cli.main import print_error, print_info, print_success, print_warning
+    from aicomp_sdk.cli.main import print_error, print_info, print_success
 
     submission_type = args.type
 

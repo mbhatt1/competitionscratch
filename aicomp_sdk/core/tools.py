@@ -1,13 +1,14 @@
 import json
-import os
 import re
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 PRIVATE_NET_RE = re.compile(
-    r"(^|://)(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)", re.IGNORECASE
+    r"(^|://)(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)",
+    re.IGNORECASE,
 )
 
 
@@ -16,7 +17,7 @@ class ToolSpec:
     name: str
     side_effect: str  # READ|WRITE|EXEC|NETWORK|SHARE|AUTH
     scope: str  # public|internal|local|secrets|external
-    schema: Dict[str, Any]
+    schema: dict[str, Any]
 
 
 class ToolSuite:
@@ -29,7 +30,7 @@ class ToolSuite:
         self._mail = json.loads((fixtures_dir / "mail_seed.json").read_text())
         self._fs_root = fixtures_dir / "file_seed"
         self._fs_backup = {}  # Backup of original files
-        self._egress_sink: List[Dict[str, Any]] = []
+        self._egress_sink: list[dict[str, Any]] = []
         self._last_source = "user"
 
         # Backup original file contents
@@ -37,7 +38,7 @@ class ToolSuite:
             if fpath.is_file():
                 self._fs_backup[fpath.name] = fpath.read_text(encoding="utf-8")
 
-        self.specs: Dict[str, ToolSpec] = {
+        self.specs: dict[str, ToolSpec] = {
             "web.search": ToolSpec(
                 "web.search",
                 "NETWORK",
@@ -77,7 +78,10 @@ class ToolSuite:
                 "local",
                 {
                     "type": "object",
-                    "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                    "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"},
+                    },
                     "required": ["path", "content"],
                     "additionalProperties": False,
                 },
@@ -147,7 +151,10 @@ class ToolSuite:
                 "external",
                 {
                     "type": "object",
-                    "properties": {"url": {"type": "string"}, "data": {"type": "string"}},
+                    "properties": {
+                        "url": {"type": "string"},
+                        "data": {"type": "string"},
+                    },
                     "required": ["url", "data"],
                     "additionalProperties": False,
                 },
@@ -180,7 +187,7 @@ class ToolSuite:
     def last_source(self) -> str:
         return self._last_source
 
-    def validate(self, tool_name: str, args: Dict[str, Any]):
+    def validate(self, tool_name: str, args: Mapping[str, Any]):
         if tool_name not in self.specs:
             raise ValueError(f"Unknown tool: {tool_name}")
         spec = self.specs[tool_name].schema
@@ -195,7 +202,7 @@ class ToolSuite:
             if extra:
                 raise ValueError(f"Extra keys: {extra}")
 
-    def call(self, tool_name: str, args: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
+    def call(self, tool_name: str, args: Mapping[str, Any]) -> tuple[bool, str, Optional[str]]:
         self.validate(tool_name, args)
         if tool_name == "web.search":
             self._last_source = "web"
@@ -312,5 +319,5 @@ class ToolSuite:
 
         return False, "", "unknown_tool"
 
-    def get_egress(self) -> List[Dict[str, Any]]:
+    def get_egress(self) -> list[dict[str, Any]]:
         return list(self._egress_sink)

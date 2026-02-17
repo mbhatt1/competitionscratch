@@ -18,7 +18,10 @@ class TestToolSpec:
     def test_tool_spec_creation(self):
         """Test creating a ToolSpec."""
         spec = ToolSpec(
-            name="test.tool", side_effect="READ", scope="local", schema={"type": "object"}
+            name="test.tool",
+            side_effect="READ",
+            scope="local",
+            schema={"type": "object"},
         )
 
         assert spec.name == "test.tool"
@@ -267,8 +270,16 @@ class TestWebTools:
 
         web_corpus = {
             "pages": [
-                {"id": "page1", "title": "Welcome Page", "content": "Welcome to the site"},
-                {"id": "page2", "title": "Documentation", "content": "How to use the system"},
+                {
+                    "id": "page1",
+                    "title": "Welcome Page",
+                    "content": "Welcome to the site",
+                },
+                {
+                    "id": "page2",
+                    "title": "Documentation",
+                    "content": "How to use the system",
+                },
             ]
         }
         (fixtures_dir / "web_corpus.json").write_text(json.dumps(web_corpus))
@@ -603,7 +614,8 @@ class TestEmailTools:
     def test_email_send_stores_message(self, tools):
         """Test that email.send stores the sent message."""
         ok, output, err = tools.call(
-            "email.send", {"to": "test@example.com", "subject": "Test Subject", "body": "Test Body"}
+            "email.send",
+            {"to": "test@example.com", "subject": "Test Subject", "body": "Test Body"},
         )
 
         assert ok is True

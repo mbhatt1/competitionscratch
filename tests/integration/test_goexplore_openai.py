@@ -30,9 +30,9 @@ print("Running Go-Explore attack (5 seconds)...")
 attacker = AttackAlgorithm({"max_turns": 3, "branch_batch": 8})
 findings = attacker.run(env, {"seconds": 5})
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("RESULTS")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 print(f"Total findings: {len(findings)}")
 
 if findings:
@@ -48,6 +48,6 @@ else:
     print("   - Need more time/exploration")
     print("   - Agent not triggering vulnerabilities")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("✓ Test complete")
-print(f"{'='*70}\n")
+print(f"{'=' * 70}\n")

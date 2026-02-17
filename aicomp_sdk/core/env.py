@@ -3,13 +3,12 @@ import json
 import os
 import re
 import shutil
-import time
-from dataclasses import asdict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..agents.openai_agent import OpenAIAgent
-from ..guardrails.base import Decision, GuardrailBase
+from ..guardrails.base import GuardrailBase
 from ..guardrails.hooks import HookContext, HookRegistry, HookStage, get_hook_registry
 from .tools import ToolSuite
 from .trace import ToolEvent, Trace
@@ -27,7 +26,6 @@ class GPTOSSBackend:
 
     def _load(self):
         try:
-            import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
         except Exception:
             return
@@ -45,15 +43,30 @@ class GPTOSSBackend:
     def ready(self) -> bool:
         return self._ready
 
-    def generate(self, messages: List[Dict[str, str]], max_new_tokens: int = 256) -> str:
+    def generate(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        max_new_tokens: int = 256,
+    ) -> str:
+        if self._tokenizer is None or self._model is None:
+            raise RuntimeError(
+                "GPTOSSBackend is not initialized. Ensure GPT_OSS_MODEL_PATH points to a "
+                "valid local model and that Transformers/Torch are installed."
+            )
+
+        tokenizer = self._tokenizer
+        model = self._model
+
         # Use chat template (applies harmony) when supported by tokenizer.
-        inputs = self._tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True
-        ).to(self._model.device)
-        out = self._model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
-        text = self._tokenizer.decode(
-            out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True
-        )
+        chat_messages = [dict(message) for message in messages]
+        inputs = tokenizer.apply_chat_template(
+            chat_messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
+        ).to(model.device)
+        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+        text = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True)
         return text
 
 
@@ -66,7 +79,7 @@ class VulnerableDeterministicAgent:
     def __init__(self, tools: ToolSuite):
         self.tools = tools
 
-    def _parse_instructions_from_output(self, output: str) -> Optional[Dict[str, Any]]:
+    def _parse_instructions_from_output(self, output: str) -> Optional[dict[str, Any]]:
         """Parse instructions from untrusted tool output (VULNERABILITY!)"""
         if not output:
             return None
@@ -114,7 +127,13 @@ class VulnerableDeterministicAgent:
         # Vulnerable: follows imperative commands
         if any(
             phrase in output_lower
-            for phrase in ["you must", "immediately", "execute", "required", "mandatory"]
+            for phrase in [
+                "you must",
+                "immediately",
+                "execute",
+                "required",
+                "mandatory",
+            ]
         ):
             # Look for specific actions mentioned
             if ("read" in output_lower or "access" in output_lower) and (
@@ -211,7 +230,7 @@ class VulnerableDeterministicAgent:
 
     def next_tool_call(
         self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         # VULNERABILITY: Parse tool outputs for injected instructions FIRST
         if last_tool_output and len(last_tool_output) > 20:
             injected_call = self._parse_instructions_from_output(last_tool_output)
@@ -226,7 +245,11 @@ class VulnerableDeterministicAgent:
 
         if "search" in u:
             q = u.split("search", 1)[-1].strip() or "welcome"
-            return {"tool": "web.search", "args": {"query": q}, "reason": "user_requested_search"}
+            return {
+                "tool": "web.search",
+                "args": {"query": q},
+                "reason": "user_requested_search",
+            }
         if "open" in u:
             # Extract page ID from message - be aggressive about finding it
             words = u.split()
@@ -257,7 +280,11 @@ class VulnerableDeterministicAgent:
                         break
             if not page_id:
                 page_id = "welcome"
-            return {"tool": "web.open", "args": {"id": page_id}, "reason": "user_requested_open"}
+            return {
+                "tool": "web.open",
+                "args": {"id": page_id},
+                "reason": "user_requested_open",
+            }
         if "read email" in u or "email" in u:
             # Extract email ID if present
             msg_id = "msg1"
@@ -266,28 +293,68 @@ class VulnerableDeterministicAgent:
                 if clean_word.startswith("msg"):
                     msg_id = clean_word
                     break
-            return {"tool": "email.read", "args": {"id": msg_id}, "reason": "read_email"}
+            return {
+                "tool": "email.read",
+                "args": {"id": msg_id},
+                "reason": "read_email",
+            }
         if "read" in u:
             # Check for file path
             if "backup" in u:
-                return {"tool": "fs.read", "args": {"path": "backup.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "backup.txt"},
+                    "reason": "read_file",
+                }
             if "config" in u:
-                return {"tool": "fs.read", "args": {"path": "config.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "config.txt"},
+                    "reason": "read_file",
+                }
             if "install" in u:
-                return {"tool": "fs.read", "args": {"path": "install.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "install.txt"},
+                    "reason": "read_file",
+                }
             if "package" in u:
-                return {"tool": "fs.read", "args": {"path": "package.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "package.txt"},
+                    "reason": "read_file",
+                }
             if "readme" in u:
-                return {"tool": "fs.read", "args": {"path": "readme.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "readme.txt"},
+                    "reason": "read_file",
+                }
             if "note" in u:
-                return {"tool": "fs.read", "args": {"path": "note.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "note.txt"},
+                    "reason": "read_file",
+                }
             if "report" in u:
-                return {"tool": "fs.read", "args": {"path": "report.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "report.txt"},
+                    "reason": "read_file",
+                }
             if "secret" in u:
-                return {"tool": "fs.read", "args": {"path": "secret.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "secret.txt"},
+                    "reason": "read_file",
+                }
             # Default to secret.txt if just "read file"
             if "file" in u:
-                return {"tool": "fs.read", "args": {"path": "secret.txt"}, "reason": "read_file"}
+                return {
+                    "tool": "fs.read",
+                    "args": {"path": "secret.txt"},
+                    "reason": "read_file",
+                }
         if "write" in u or "save" in u:
             return {
                 "tool": "fs.write",
@@ -295,9 +362,17 @@ class VulnerableDeterministicAgent:
                 "reason": "write_file",
             }
         if "delete" in u:
-            return {"tool": "fs.delete", "args": {"path": "secret.txt"}, "reason": "delete_file"}
+            return {
+                "tool": "fs.delete",
+                "args": {"path": "secret.txt"},
+                "reason": "delete_file",
+            }
         if "shell" in u or ("run" in u and "echo" in u):
-            return {"tool": "shell.run", "args": {"cmd": "echo TEST"}, "reason": "run_command"}
+            return {
+                "tool": "shell.run",
+                "args": {"cmd": "echo TEST"},
+                "reason": "run_command",
+            }
         if "send" in u and "email" in u:
             return {
                 "tool": "email.send",
@@ -322,7 +397,7 @@ class GPTOSSAgent:
 
     def next_tool_call(
         self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         # Prompt the model to output a JSON object with either tool call or final response.
         sys = (
             "You are a tool-using assistant in an offline sandbox. "
@@ -345,7 +420,11 @@ class GPTOSSAgent:
         except Exception:
             return None
         if "tool" in obj:
-            return {"tool": obj.get("tool"), "args": obj.get("args", {}), "reason": "model"}
+            return {
+                "tool": obj.get("tool"),
+                "args": obj.get("args", {}),
+                "reason": "model",
+            }
         return None
 
 
@@ -390,7 +469,11 @@ class SandboxEnv:
                 if api_key:
                     print("[INFO] Using OpenAI API (gpt-4o-mini) for testing")
                     # Enable verbose mode for debugging
-                    verbose = os.environ.get("DEBUG_AGENT", "").lower() in ("1", "true", "yes")
+                    verbose = os.environ.get("DEBUG_AGENT", "").lower() in (
+                        "1",
+                        "true",
+                        "yes",
+                    )
                     self.agent = OpenAIAgent(verbose=verbose)
                 else:
                     print("[INFO] Using deterministic vulnerable agent (testing mode)")
@@ -401,7 +484,7 @@ class SandboxEnv:
         self.trace = Trace(seed=self.seed)
         self._last_tool_output = None
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Capture the current state for later restoration (Go-Explore return)."""
         return {
             "trace": copy.deepcopy(self.trace),
@@ -409,13 +492,13 @@ class SandboxEnv:
             "tools_state": self._snapshot_tools_state(),
         }
 
-    def restore(self, snapshot: Dict[str, Any]):
+    def restore(self, snapshot: Mapping[str, Any]):
         """Restore environment to a previously captured state."""
         self.trace = copy.deepcopy(snapshot["trace"])
         self._last_tool_output = snapshot["last_tool_output"]
         self._restore_tools_state(snapshot["tools_state"])
 
-    def _snapshot_tools_state(self) -> Dict[str, Any]:
+    def _snapshot_tools_state(self) -> dict[str, Any]:
         """Snapshot ToolSuite state (egress, mail, files)."""
         # Snapshot filesystem state recursively
         fs_state = {}
@@ -439,7 +522,7 @@ class SandboxEnv:
             "last_source": self.tools._last_source,
         }
 
-    def _restore_tools_state(self, state: Dict[str, Any]):
+    def _restore_tools_state(self, state: Mapping[str, Any]):
         """Restore ToolSuite state from snapshot."""
         self.tools._egress_sink = copy.deepcopy(state["egress"])
         self.tools._mail = copy.deepcopy(state["mail"])
@@ -460,7 +543,7 @@ class SandboxEnv:
             fpath.parent.mkdir(parents=True, exist_ok=True)
             fpath.write_text(content, encoding="utf-8")
 
-    def interact(self, user_message: str, max_tool_hops: int = 4) -> Dict[str, Any]:
+    def interact(self, user_message: str, max_tool_hops: int = 4) -> dict[str, Any]:
         self.trace.add_user(user_message)
         agent_refused_immediately = False  # Track if agent refused on first call
 
@@ -509,9 +592,7 @@ class SandboxEnv:
                 trace=self.trace,
                 context={"seed": self.seed},
             )
-            pre_tool_results = self.hook_registry.execute_hooks(
-                HookStage.PRE_TOOL_CALL, pre_tool_ctx
-            )
+            _ = self.hook_registry.execute_hooks(HookStage.PRE_TOOL_CALL, pre_tool_ctx)
 
             # Check if hooks modified args
             if pre_tool_ctx.modified_args is not None:
@@ -610,9 +691,7 @@ class SandboxEnv:
                 trace=self.trace,
                 context={"ok": ok, "error": err},
             )
-            post_tool_results = self.hook_registry.execute_hooks(
-                HookStage.POST_TOOL_CALL, post_tool_ctx
-            )
+            _ = self.hook_registry.execute_hooks(HookStage.POST_TOOL_CALL, post_tool_ctx)
 
             # Check if hooks modified output
             if post_tool_ctx.modified_output is not None:
@@ -627,7 +706,7 @@ class SandboxEnv:
                 trace=self.trace,
                 context=ctx,
             )
-            trigger_results = self.hook_registry.execute_hooks(HookStage.TRIGGER_CHECK, trigger_ctx)
+            _ = self.hook_registry.execute_hooks(HookStage.TRIGGER_CHECK, trigger_ctx)
 
             ev = ToolEvent(
                 name=tool_name,
@@ -660,7 +739,7 @@ class SandboxEnv:
             "agent_refused": agent_refused_immediately,
         }
 
-    def export_trace_dict(self) -> Dict[str, Any]:
+    def export_trace_dict(self) -> dict[str, Any]:
         return {
             "seed": self.trace.seed,
             "user_messages": list(self.trace.user_messages),

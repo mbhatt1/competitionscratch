@@ -14,17 +14,18 @@ against the baseline attack) is separate and uses evaluate_all_guardrails.py.
 Output: attack_evaluation_results.md
 """
 
-from examples.guardrails.guardrail_optimal import Guardrail as BaselineGuardrail
-from evaluation import eval_attack
-from aicomp_sdk.scoring import score_attack
-from aicomp_sdk.core.predicates import eval_predicates
-from aicomp_sdk.core.env import SandboxEnv
 import contextlib
 import importlib.util
 import io
 import sys
 from datetime import datetime
 from pathlib import Path
+
+from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.scoring import score_attack
+from evaluation import eval_attack
+from examples.guardrails.guardrail_optimal import Guardrail as BaselineGuardrail
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent

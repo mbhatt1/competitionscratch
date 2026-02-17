@@ -16,10 +16,9 @@ from archived_imports import setup_imports
 
 repo_root = setup_imports()
 
-from examples.guardrails.guardrail_simple import Guardrail as SimpleGuardrail
-
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.core.env import SandboxEnv
+from examples.guardrails.guardrail_simple import Guardrail as SimpleGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
 # Verify API key
@@ -105,7 +104,7 @@ async def run_all_ensembles_concurrent(ensemble_sizes, time_per_agent=60, max_pa
     for n in ensemble_sizes:
         seeds = [base_seed + i * 100 for i in range(n)]
         for seed in seeds:
-            agent_id = f"N={n:3d} Agent#{len([m for m in task_metadata if m['n']==n])+1:3d}"
+            agent_id = f"N={n:3d} Agent#{len([m for m in task_metadata if m['n'] == n]) + 1:3d}"
             task = run_simple_agent_async(seed, time_per_agent, agent_id)
             all_tasks.append(task)
             task_metadata.append({"n": n, "seed": seed})

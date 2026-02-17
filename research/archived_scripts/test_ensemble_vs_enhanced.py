@@ -141,7 +141,12 @@ print("[3/4] Ensemble: 3 Different Strategies (60s each, seed=42)...")
 strategies = [
     (
         "tools_only",
-        {"use_args": False, "use_outputs": False, "use_intent": False, "causality_bonus": 0},
+        {
+            "use_args": False,
+            "use_outputs": False,
+            "use_intent": False,
+            "causality_bonus": 0,
+        },
     ),
     (
         "with_targeting",

@@ -3,6 +3,7 @@
 Add more injection sources to web_corpus.json and mail_seed.json
 to improve attack discoverability.
 """
+
 import json
 from pathlib import Path
 

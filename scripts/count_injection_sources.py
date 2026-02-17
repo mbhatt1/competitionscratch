@@ -2,6 +2,7 @@
 """
 Count and analyze injection sources in fixtures.
 """
+
 import json
 import re
 from pathlib import Path

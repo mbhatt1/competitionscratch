@@ -51,7 +51,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     print(f"\nExpected Normalization:")
     print(f"  Baseline Raw Target: {ATTACK_BASELINE_RAW} → ~500 normalized")
     print(f"  Elite Raw Target: {ATTACK_ELITE_RAW} → 1000 normalized")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("RUNNING ATTACK...")
     print("=" * 70)
 
@@ -116,7 +116,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
         }
 
     # Print results
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("RESULTS")
     print("=" * 70)
 
@@ -154,7 +154,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
         print(f"  Normalization Ratio: N/A (no findings)")
 
     # Compare to expected
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("CALIBRATION ANALYSIS")
     print("=" * 70)
 
@@ -214,7 +214,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
         print(f"  {normalized_score:.0f}/1000 = Elite attack (near maximum)")
 
     # Important note about agent behavior
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("IMPORTANT NOTES")
     print("=" * 70)
     print("\n1. Agent Behavior Matters:")
@@ -233,7 +233,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     print("   - Conservative agents → very low normalized scores (OK!)")
     print("   - This reflects real difficulty of attacking safe agents")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("TEST COMPLETE")
     print("=" * 70)
 
@@ -256,7 +256,9 @@ if __name__ == "__main__":
     parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
     parser.add_argument("--seed", type=int, default=123, help="Random seed (default: 123)")
     parser.add_argument(
-        "--no-openai", action="store_true", help="Use deterministic agent (not recommended)"
+        "--no-openai",
+        action="store_true",
+        help="Use deterministic agent (not recommended)",
     )
     args = parser.parse_args()
 

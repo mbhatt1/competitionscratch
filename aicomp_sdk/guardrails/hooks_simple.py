@@ -4,7 +4,8 @@ Simple decorator-based API for LPCI hooks
 Makes it easy to add hooks with just @attack_hook or @defense_hook decorators.
 """
 
-from typing import Any, Callable, Optional
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, cast
 
 from .hooks import HookContext, HookResult, HookStage, get_hook_registry
 
@@ -50,7 +51,7 @@ def attack_hook(stage: str = "post_tool", priority: int = 10):
 
     hook_stage = stage_map.get(stage, HookStage.POST_TOOL_CALL)
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(context: HookContext) -> HookResult:
             # Extract simple parameters
             kwargs = {
@@ -95,11 +96,11 @@ def attack_hook(stage: str = "post_tool", priority: int = 10):
         registry.register_hook(hook_stage, wrapper, priority)
 
         # Store original function for reference
-        wrapper.__wrapped__ = func
-        wrapper.__hook_stage__ = hook_stage
-        wrapper.__hook_priority__ = priority
+        setattr(wrapper, "__wrapped__", func)
+        setattr(wrapper, "__hook_stage__", hook_stage)
+        setattr(wrapper, "__hook_priority__", priority)
 
-        return wrapper
+        return cast(Callable[..., Any], wrapper)
 
     return decorator
 
@@ -145,7 +146,7 @@ def defense_hook(stage: str = "post_tool", priority: int = 10):
 
     hook_stage = stage_map.get(stage, HookStage.POST_TOOL_CALL)
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(context: HookContext) -> HookResult:
             # Extract simple parameters
             kwargs = {
@@ -189,11 +190,11 @@ def defense_hook(stage: str = "post_tool", priority: int = 10):
         registry = get_hook_registry()
         registry.register_hook(hook_stage, wrapper, priority)
 
-        wrapper.__wrapped__ = func
-        wrapper.__hook_stage__ = hook_stage
-        wrapper.__hook_priority__ = priority
+        setattr(wrapper, "__wrapped__", func)
+        setattr(wrapper, "__hook_stage__", hook_stage)
+        setattr(wrapper, "__hook_priority__", priority)
 
-        return wrapper
+        return cast(Callable[..., Any], wrapper)
 
     return decorator
 
@@ -206,7 +207,7 @@ def clear_hooks():
 
 
 # Convenience function to store attack payloads
-def store_payload(payload_id: str, content: str, triggers: list):
+def store_payload(payload_id: str, content: str, triggers: Sequence[str]):
     """
     Store a payload that activates on triggers
 
@@ -217,12 +218,13 @@ def store_payload(payload_id: str, content: str, triggers: list):
     """
     registry = get_hook_registry()
     registry.store_payload(
-        payload_id, {"content": content, "triggers": [{"type": "keyword", "keywords": triggers}]}
+        payload_id,
+        {"content": content, "triggers": [{"type": "keyword", "keywords": triggers}]},
     )
 
 
 # Convenience function to poison tools
-def poison_tool(tool_name: str, arg_modifications: dict):
+def poison_tool(tool_name: str, arg_modifications: Mapping[str, Any]):
     """
     Poison a tool to always use specific arguments
 

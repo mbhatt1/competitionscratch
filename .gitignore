@@ -137,3 +137,7 @@ research/*.pdf
 research/*.aux
 research/*.out
 research/*.txt
+
+# Other
+plans/
+fixtures/file_seed/secret.txt

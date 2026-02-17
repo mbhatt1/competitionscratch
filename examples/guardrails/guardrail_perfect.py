@@ -12,7 +12,8 @@ Strategy: The key insight is that ALL predicates follow the pattern:
 So we simply block dangerous operations after untrusted source access.
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -41,7 +42,7 @@ class Guardrail(GuardrailBase):
         self.untrusted_operations = {"web.open", "web.search", "email.read"}
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """
         Decide whether to allow or block a tool call.

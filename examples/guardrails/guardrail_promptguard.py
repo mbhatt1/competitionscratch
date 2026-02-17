@@ -18,7 +18,8 @@ To use this guardrail:
 Alternative: Use guardrail_prompt_injection.py (no model required)
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -47,7 +48,9 @@ class Guardrail(GuardrailBase):
 
             print("[PROMPT-GUARD] Loading meta-llama/Prompt-Guard-86M model...")
             self.classifier = pipeline(
-                "text-classification", model="meta-llama/Prompt-Guard-86M", device=-1  # Use CPU
+                "text-classification",
+                model="meta-llama/Prompt-Guard-86M",
+                device=-1,  # Use CPU
             )
             print("[PROMPT-GUARD] Model loaded successfully")
         except ImportError:
@@ -96,7 +99,7 @@ class Guardrail(GuardrailBase):
             return False, "ERROR", 0.0
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """
         Decide whether to allow, deny, or modify a tool call.

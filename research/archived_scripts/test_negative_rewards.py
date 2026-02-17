@@ -69,7 +69,12 @@ results = {
 configs = [
     (
         "baseline",
-        {"use_intent": False, "use_args": False, "use_outputs": False, "causality_bonus": 0},
+        {
+            "use_intent": False,
+            "use_args": False,
+            "use_outputs": False,
+            "causality_bonus": 0,
+        },
     ),
     (
         "positive_rewards",
@@ -125,9 +130,9 @@ output_file = repo_root / "negative_rewards_results.json"
 with open(output_file, "w") as f:
     json.dump(results, f, indent=2, default=str)
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUMMARY")
-print(f"{'='*70}\n")
+print(f"{'=' * 70}\n")
 
 for name, stats in results.items():
     if name != "metadata":
@@ -144,8 +149,7 @@ print(f"✅ Complete at {datetime.now().strftime('%H:%M:%S')}\n")
 print("\n" + "=" * 70)
 print("NEXT STEPS TO IMPLEMENT NEGATIVE REWARDS:")
 print("=" * 70)
-print(
-    """
+print("""
 1. Modify aicomp_sdk/baselines/attacker_goexplore.py scoring:
    
    # Instead of:
@@ -167,6 +171,5 @@ print(
    - Small penalties (-10 to -25)
    - Medium penalties (-50 to -75)
    - Large penalties (-100 to -200)
-"""
-)
+""")
 print("=" * 70 + "\n")

@@ -12,13 +12,10 @@ from archived_imports import setup_imports
 
 repo_root = setup_imports()
 
-from examples.guardrails.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
-
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
+from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
 # Check for OpenAI API key
@@ -52,7 +49,7 @@ for idx, f in enumerate(findings_no_guard):
     attacks = detect_real_attacks(events)
     if attacks:
         real_attacks_no_guard.append({"finding": f, "attacks": attacks})
-        print(f"  [Finding {idx+1}] REAL ATTACK DETECTED:")
+        print(f"  [Finding {idx + 1}] REAL ATTACK DETECTED:")
         for attack in attacks:
             print(f"    Type: {attack['type']} | Impact: {attack['impact']}")
             print(f"    {attack['description']}")
@@ -60,7 +57,7 @@ for idx, f in enumerate(findings_no_guard):
 print(f"  Total findings: {len(findings_no_guard)}")
 print(f"  Real attacks: {len(real_attacks_no_guard)}")
 print(
-    f"  Detection rate: {len(real_attacks_no_guard)/len(findings_no_guard)*100:.1f}%"
+    f"  Detection rate: {len(real_attacks_no_guard) / len(findings_no_guard) * 100:.1f}%"
     if findings_no_guard
     else "  Detection rate: N/A"
 )
@@ -85,7 +82,7 @@ for idx, f in enumerate(findings_with_guard):
     attacks = detect_real_attacks(events)
     if attacks:
         real_attacks_with_guard.append({"finding": f, "attacks": attacks})
-        print(f"  [Finding {idx+1}] REAL ATTACK DETECTED:")
+        print(f"  [Finding {idx + 1}] REAL ATTACK DETECTED:")
         for attack in attacks:
             print(f"    Type: {attack['type']} | Impact: {attack['impact']}")
             print(f"    {attack['description']}")
@@ -93,7 +90,7 @@ for idx, f in enumerate(findings_with_guard):
 print(f"  Total findings: {len(findings_with_guard)}")
 print(f"  Real attacks: {len(real_attacks_with_guard)}")
 print(
-    f"  Detection rate: {len(real_attacks_with_guard)/len(findings_with_guard)*100:.1f}%"
+    f"  Detection rate: {len(real_attacks_with_guard) / len(findings_with_guard) * 100:.1f}%"
     if findings_with_guard
     else "  Detection rate: N/A"
 )
@@ -106,9 +103,9 @@ for breach in real_attacks_with_guard:
         attack_types_with_guard[atype] = attack_types_with_guard.get(atype, 0) + 1
 
 # Summary
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("COMPARISON SUMMARY")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 print(f"\nNo Guardrail:")
 print(f"  Total findings: {len(findings_no_guard)}")
@@ -131,9 +128,9 @@ if len(real_attacks_no_guard) > 0:
         (len(real_attacks_no_guard) - len(real_attacks_with_guard)) / len(real_attacks_no_guard)
     ) * 100
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("EFFECTIVENESS")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 print(f"Attacks blocked: {len(real_attacks_no_guard) - len(real_attacks_with_guard)}")
 print(f"Reduction: {reduction_pct:.1f}%")
 
@@ -147,9 +144,9 @@ else:
     print(f"\n✗ INEFFECTIVE: Guardrail only blocks {reduction_pct:.1f}% of attacks")
 
 # Show which attack types were blocked
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("ATTACK TYPES BLOCKED")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 all_types = set(attack_types_no_guard.keys()) | set(attack_types_with_guard.keys())
 for atype in sorted(all_types):
@@ -164,9 +161,9 @@ for atype in sorted(all_types):
     else:
         print(f"  {atype}: 0 → {after} (NEW attacks with guardrail!)")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("CONCLUSION")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 if len(real_attacks_no_guard) == 0:
     print("\n🛡️ No attacks succeeded!")
@@ -176,4 +173,4 @@ elif len(real_attacks_with_guard) < len(real_attacks_no_guard):
 else:
     print(f"\n⚠ Guardrail did not reduce attacks")
 
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

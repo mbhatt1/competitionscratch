@@ -3,7 +3,8 @@ Simple LPCI-Enhanced Defensive Guardrail
 Uses decorator-based API for easy hook setup
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk import Decision, GuardrailBase
 from aicomp_sdk.guardrails.hooks_simple import clear_hooks, defense_hook
@@ -87,7 +88,7 @@ def detect_attack_sequences(tool_name, tool_args, recent_tools, recent_sources, 
             if recent_tools[-(len(pattern) - 1) :] + [tool_name] == pattern:
                 return {
                     "block": True,
-                    "reason": f'Attack sequence detected: {" -> ".join(pattern)}',
+                    "reason": f"Attack sequence detected: {' -> '.join(pattern)}",
                 }
 
     return {}
@@ -110,7 +111,7 @@ class Guardrail(GuardrailBase):
         importlib.reload(module)
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """Make guardrail decisions with simple rules"""
 

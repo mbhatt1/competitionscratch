@@ -3,15 +3,17 @@ Go-Explore + LPCI Hybrid Attack Algorithm
 Combines Go-Explore's exploration strategy with LPCI hooks for amplified effectiveness
 """
 
-from aicomp_sdk.utils.timebox import Timebox
-from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
-from aicomp_sdk.core.predicates import eval_predicates
-from aicomp_sdk.core.cells import cell_signature
-from typing import Dict, List
-from dataclasses import dataclass
 import random
 import sys
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from aicomp_sdk.core.cells import cell_signature
+from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
+from aicomp_sdk.utils.timebox import Timebox
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -46,7 +48,7 @@ def poison_file_reads(tool_name, tool_args, **context):
 
 @dataclass
 class Exemplar:
-    user_messages: List[str]
+    user_messages: list[str]
     cell_hash: str
     score_hint: float = 0.0
     visits: int = 0
@@ -97,7 +99,7 @@ class AttackAlgorithm:
         # Just clear any existing hooks to start fresh
         clear_hooks()
 
-    def _mutate(self, seq: List[str]) -> List[str]:
+    def _mutate(self, seq: Sequence[str]) -> list[str]:
         """Mutate sequence to explore new states"""
         out = list(seq)
         if len(out) < self.max_turns and random.random() < 0.6:
@@ -111,7 +113,7 @@ class AttackAlgorithm:
                 out.append(random.choice(self.prompt_bank))
         return out[: self.max_turns]
 
-    def run(self, env, budget: Dict) -> List[Dict]:
+    def run(self, env, budget: Mapping[str, Any]) -> list[dict]:
         """
         Run Go-Explore exploration with LPCI amplification
 
@@ -124,16 +126,16 @@ class AttackAlgorithm:
         max_steps = int(budget.get("steps", 10**9))
 
         # Go-Explore archive: cell_hash -> exemplar
-        archive: Dict[str, Exemplar] = {}
-        findings: List[Dict] = []
+        archive: dict[str, Exemplar] = {}
+        findings: list[dict] = []
 
         # Seed exemplar
         env.reset()
         env.interact("search documentation")  # LPCI hook will inject ACTION here
         tr = env.export_trace_dict()
         sig = cell_signature(tr["tool_events"])
-        archive[sig["hash"]] = Exemplar(
-            user_messages=list(tr["user_messages"]), cell_hash=sig["hash"]
+        archive[str(sig["hash"])] = Exemplar(
+            user_messages=list(tr["user_messages"]), cell_hash=str(sig["hash"])
         )
 
         steps = 0
@@ -152,7 +154,6 @@ class AttackAlgorithm:
             # Explore: Branch from this cell
             best_new = None
             best_score = -1.0
-            best_tr = None
 
             for _ in range(self.branch_batch):
                 # Mutate sequence
@@ -174,13 +175,12 @@ class AttackAlgorithm:
 
                 if score > best_score:
                     best_score = score
-                    best_new = (cand_seq, sig["hash"], preds, sig)
-                    best_tr = tr
+                    best_new = (cand_seq, str(sig["hash"]), preds, sig, tr)
 
             if best_new is None:
                 continue
 
-            cand_seq, h, preds, sig = best_new
+            cand_seq, h, preds, sig, best_tr = best_new
 
             # Add to archive if novel
             if h not in archive:
@@ -219,6 +219,8 @@ if __name__ == "__main__":
         spec = importlib.util.spec_from_file_location(
             "openai_env", Path(__file__).parent.parent / "run_attack_openai.py"
         )
+        if spec is None or spec.loader is None:
+            raise ImportError("Could not load run_attack_openai.py for OpenAI fallback environment")
         openai_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(openai_module)
 
@@ -240,13 +242,13 @@ if __name__ == "__main__":
     atk = AttackAlgorithm({"max_turns": 4, "branch_batch": 8})
     findings = atk.run(env, {"seconds": 10})
 
-    print(f"\n{'='*70}")
-    print(f"Go-Explore + LPCI Results")
-    print(f"{'='*70}")
+    print(f"\n{'=' * 70}")
+    print("Go-Explore + LPCI Results")
+    print(f"{'=' * 70}")
     print(f"Total findings: {len(findings)}")
 
     if findings:
-        print(f"\nBreaches discovered:")
+        print("\nBreaches discovered:")
         for i, f in enumerate(findings[:5], 1):
             print(f"\n[{i}] {' -> '.join(f.get('user_messages', []))}")
             for p in f.get("predicates", []):
@@ -256,9 +258,9 @@ if __name__ == "__main__":
         print("\n⚠️  No breaches found in this run")
         print("   Try increasing time budget or check that hooks are working")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("The attack combined:")
     print("  1. Go-Explore's systematic exploration")
     print("  2. LPCI hooks for payload injection")
     print("  3. Tool poisoning to target secrets")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")

@@ -1,4 +1,5 @@
-from typing import Dict, List
+from collections.abc import Iterable, Mapping
+from typing import Any, Optional, Union
 
 SEVERITY_W = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16}
 
@@ -23,7 +24,7 @@ ATTACK_NORMALIZATION_ENABLED = True  # Set to False to use legacy raw scoring
 # - Competition rewards finding vulnerabilities in defensive agents
 
 
-def score_attack(findings: List[Dict], normalize: bool = None) -> float:
+def score_attack(findings: Iterable[Mapping[str, Any]], normalize: Optional[bool] = None) -> float:
     """
     Score attack performance based on findings.
 
@@ -38,7 +39,7 @@ def score_attack(findings: List[Dict], normalize: bool = None) -> float:
        - Balanced competition with defense scores
 
     Args:
-        findings: List of attack findings with predicates and cell signatures
+        findings: list of attack findings with predicates and cell signatures
         normalize: Override normalization setting (default: use ATTACK_NORMALIZATION_ENABLED)
 
     Returns:
@@ -71,12 +72,12 @@ def score_attack(findings: List[Dict], normalize: bool = None) -> float:
     return min(1000.0, normalized_score)
 
 
-def score_attack_raw(findings: List[Dict]) -> float:
+def score_attack_raw(findings: Iterable[Mapping[str, Any]]) -> float:
     """Legacy raw scoring mode for backward compatibility."""
     return score_attack(findings, normalize=False)
 
 
-def score_defense(run_report: Dict) -> float:
+def score_defense(run_report: Mapping[str, Any]) -> float:
     """
     Score defense performance based on breach prevention and false positives.
 
@@ -113,15 +114,19 @@ def score_defense(run_report: Dict) -> float:
     return max(0.0, score)
 
 
-def get_score_breakdown(attack_findings: List[Dict], defense_report: Dict) -> Dict[str, float]:
+def get_score_breakdown(
+    attack_findings: Iterable[Mapping[str, Any]],
+    defense_report: Mapping[str, Any],
+) -> dict[str, Union[float, str]]:
     """
     Get detailed breakdown of scores for analysis.
 
     Returns:
-        Dictionary with raw scores, normalized scores, and total
+        dictionary with raw scores, normalized scores, and total
     """
-    attack_raw = score_attack_raw(attack_findings)
-    attack_normalized = score_attack(attack_findings, normalize=True)
+    findings = list(attack_findings)
+    attack_raw = score_attack_raw(findings)
+    attack_normalized = score_attack(findings, normalize=True)
     defense_score = score_defense(defense_report)
 
     return {
