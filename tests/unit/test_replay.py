@@ -113,7 +113,12 @@ class TestReplayHarness:
     def test_replay_returns_trace_dict(self, mock_import, temp_fixtures):
         """Test that replay returns the exported trace dictionary."""
         # Setup mock with expected trace
-        expected_trace = {"seed": 42, "user_messages": ["test"], "tool_events": [], "egress": []}
+        expected_trace = {
+            "seed": 42,
+            "user_messages": ["test"],
+            "tool_events": [],
+            "egress": [],
+        }
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = expected_trace
         mock_module = MagicMock()
@@ -196,21 +201,17 @@ class TestReplayHarnessIntegration:
         fixtures_dir.mkdir()
 
         # Create realistic fixtures
-        (fixtures_dir / "web_corpus.json").write_text(
-            """{
+        (fixtures_dir / "web_corpus.json").write_text("""{
             "pages": [
                 {"id": "page1", "title": "Test Page", "content": "Test content"}
             ]
-        }"""
-        )
+        }""")
 
-        (fixtures_dir / "mail_seed.json").write_text(
-            """{
+        (fixtures_dir / "mail_seed.json").write_text("""{
             "inbox": [
                 {"id": "msg1", "from": "test@example.com", "subject": "Test", "body": "Test email"}
             ]
-        }"""
-        )
+        }""")
 
         file_seed = fixtures_dir / "file_seed"
         file_seed.mkdir()

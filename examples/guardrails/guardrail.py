@@ -41,7 +41,13 @@ class Guardrail(GuardrailBase):
 
             if has_untrusted:
                 # Block dangerous operations
-                if tool_name in ["http.post", "email.send", "shell.run", "fs.delete", "fs.write"]:
+                if tool_name in [
+                    "http.post",
+                    "email.send",
+                    "shell.run",
+                    "fs.delete",
+                    "fs.write",
+                ]:
                     return Decision.deny(
                         f"Blocked potential prompt injection: {tool_name} matches ACTION directive after untrusted source"
                     )
@@ -57,7 +63,7 @@ class Guardrail(GuardrailBase):
                     or "TOKEN" in data.upper()
                 ):
                     return Decision.deny(
-                        f"Blocked potential data exfiltration after untrusted source"
+                        "Blocked potential data exfiltration after untrusted source"
                     )
 
         # Block shell.run after untrusted source

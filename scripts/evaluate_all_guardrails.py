@@ -14,12 +14,6 @@ running YOUR attack algorithm against the baseline (allow-all) guardrail.
 Output: guardrail_evaluation_results.md
 """
 
-from evaluation import eval_defense
-from aicomp_sdk.scoring import score_attack, score_defense
-from aicomp_sdk.core.predicates import eval_predicates
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as GoExploreAttacker
-from aicomp_sdk.agents.openai_agent import OpenAIAgent
 import argparse
 import contextlib
 import importlib.util
@@ -28,6 +22,13 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+
+from aicomp_sdk.agents.openai_agent import OpenAIAgent
+from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as GoExploreAttacker
+from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.scoring import score_attack, score_defense
+from evaluation import eval_defense
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent

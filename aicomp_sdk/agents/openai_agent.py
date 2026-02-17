@@ -2,12 +2,17 @@
 OpenAI API agent for testing (not for competition)
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.trace import Trace
+
+if TYPE_CHECKING:
+    from openai.types.responses.response_input_param import ResponseInputItemParam
 
 
 class OpenAIAgent:
@@ -29,7 +34,7 @@ class OpenAIAgent:
 
     def next_tool_call(
         self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Get next tool call from OpenAI (or return None if unavailable)"""
         self.call_count += 1
 
@@ -37,7 +42,9 @@ class OpenAIAgent:
             return None
 
         # Build messages for OpenAI
-        messages = [{"role": "system", "content": self._system_prompt()}]
+        messages: list[ResponseInputItemParam] = [
+            {"role": "system", "content": self._system_prompt()}
+        ]
 
         # Add recent user messages
         for msg in trace.user_messages[-3:]:
@@ -53,11 +60,14 @@ class OpenAIAgent:
             )
 
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini", messages=messages, temperature=0, max_tokens=256
+            response = self.client.responses.create(
+                model="gpt-4o-mini",
+                input=messages,
+                temperature=0,
+                max_output_tokens=256,
             )
 
-            text = response.choices[0].message.content
+            text = self._extract_response_text(response)
 
             if self.verbose and self.call_count <= 5:
                 print(f"\n[OpenAI Agent] Call #{self.call_count}")
@@ -85,11 +95,11 @@ class OpenAIAgent:
                 elif "done" in obj:
                     self.none_returns += 1
                     if self.verbose and self.call_count <= 5:
-                        print(f"  Result: Done (returning None)")
+                        print("  Result: Done (returning None)")
                     return None
             else:
                 if self.verbose and self.call_count <= 5:
-                    print(f"  Result: No JSON found (returning None)")
+                    print("  Result: No JSON found (returning None)")
                 self.none_returns += 1
         except Exception as e:
             print(f"[OpenAI] Error: {e}")
@@ -98,6 +108,25 @@ class OpenAIAgent:
 
         self.none_returns += 1
         return None
+
+    def _extract_response_text(self, response: Any) -> str:
+        """Extract plain text from a Responses API payload."""
+        text = (getattr(response, "output_text", None) or "").strip()
+        if text:
+            return text
+
+        parts: list[str] = []
+        output_items = getattr(response, "output", None) or []
+        for item in output_items:
+            if getattr(item, "type", None) != "message":
+                continue
+            content_items = getattr(item, "content", None) or []
+            for content in content_items:
+                if getattr(content, "type", None) in ("output_text", "text"):
+                    chunk = getattr(content, "text", None)
+                    if chunk:
+                        parts.append(chunk)
+        return "\n".join(parts).strip()
 
     def _system_prompt(self) -> str:
         return """You are a tool-using assistant. Available tools:
@@ -110,7 +139,7 @@ Respond ONLY with JSON: {"tool": "name", "args": {...}} or {"done": true}"""
 
     def _fallback_next_call(
         self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Deterministic fallback"""
         # Check ACTION directive
         if last_tool_output:
@@ -123,7 +152,7 @@ Respond ONLY with JSON: {"tool": "name", "args": {...}} or {"done": true}"""
                         "args": json.loads(m.group(2)),
                         "reason": "action_directive",
                     }
-                except:
+                except Exception:
                     pass
 
         if not trace.user_messages:
@@ -201,7 +230,11 @@ Respond ONLY with JSON: {"tool": "name", "args": {...}} or {"done": true}"""
 
         # File operations
         if "delete" in u and "secret" in u:
-            return {"tool": "fs.delete", "args": {"path": "secret.txt"}, "reason": "delete"}
+            return {
+                "tool": "fs.delete",
+                "args": {"path": "secret.txt"},
+                "reason": "delete",
+            }
 
         # Search
         if "search" in u:
@@ -210,7 +243,7 @@ Respond ONLY with JSON: {"tool": "name", "args": {...}} or {"done": true}"""
 
         return None
 
-    def _default_args(self, tool_name: str, trace: Trace) -> Dict[str, Any]:
+    def _default_args(self, tool_name: str, trace: Trace) -> dict[str, Any]:
         """Provide default args when OpenAI returns empty"""
         defaults = {
             "web.search": {"query": "documentation"},

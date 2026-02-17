@@ -4,15 +4,17 @@ Find all action chains that successfully execute data exfiltration
 Targets: http.post and email.send operations
 """
 
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
-from examples_hooks_submission.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
 import os
 import sys
 from pathlib import Path
+
+from examples_hooks_submission.guardrail_prompt_injection import (
+    Guardrail as PromptInjectionGuardrail,
+)
+
+from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
+from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
+from aicomp_sdk.core.env import SandboxEnv
 
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
@@ -146,9 +148,9 @@ print(f"With Guardrail: {len(http_chains_guard)} http.post chains")
 print(f"With Guardrail: {len(email_chains_guard)} email.send chains")
 
 # Display HTTP exfiltration results
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("HTTP.POST EXFILTRATION CHAINS (NO GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 for i, chain in enumerate(http_chains[:5], 1):
     print(f"\n[{i}] Depth {chain['depth']}")
@@ -158,9 +160,9 @@ for i, chain in enumerate(http_chains[:5], 1):
     print(f"    Tool sequence: {' -> '.join(chain['tool_sequence'][:6])}")
 
 # Display email exfiltration results
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("EMAIL.SEND EXFILTRATION CHAINS (NO GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 for i, chain in enumerate(email_chains[:5], 1):
     print(f"\n[{i}] Depth {chain['depth']}")
@@ -171,9 +173,9 @@ for i, chain in enumerate(email_chains[:5], 1):
     print(f"    Tool sequence: {' -> '.join(chain['tool_sequence'][:6])}")
 
 # With guardrail results
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("EXFILTRATION CHAINS (WITH GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 print(f"\nHTTP.POST chains: {len(http_chains_guard)}")
 print(f"EMAIL.SEND chains: {len(email_chains_guard)}")
@@ -186,9 +188,9 @@ else:
     print("\n✓ No exfiltration chains bypassed the guardrail!")
 
 # Summary
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUMMARY - DATA EXFILTRATION")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 total_no_guard = len(http_chains) + len(email_chains)
 total_with_guard = len(http_chains_guard) + len(email_chains_guard)
@@ -208,4 +210,4 @@ if total_no_guard > 0:
     block_rate = (blocked / total_no_guard) * 100
     print(f"\nGuardrail blocked {blocked}/{total_no_guard} exfiltration chains ({block_rate:.1f}%)")
 
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

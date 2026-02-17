@@ -9,7 +9,8 @@ except on ultra-dangerous targets (which are ALWAYS blocked).
 """
 
 import re
-from typing import Any, Dict, Set
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -47,9 +48,10 @@ class Guardrail(GuardrailBase):
             "confidential",
             "api_key",
         }
+        self.untrusted_mentions: set[str] = set()
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """
         Decide whether to allow or block a tool call.
@@ -93,7 +95,7 @@ class Guardrail(GuardrailBase):
         # Allow all other operations
         return Decision.allow("Operation allowed")
 
-    def _accesses_untrusted_content(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
+    def _accesses_untrusted_content(self, tool_name: str, tool_args: Mapping[str, Any]) -> bool:
         """
         Check if operation accesses untrusted CONTENT (not just metadata).
 
@@ -124,7 +126,7 @@ class Guardrail(GuardrailBase):
         else:
             return "user"
 
-    def _extract_target(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
+    def _extract_target(self, tool_name: str, tool_args: Mapping[str, Any]) -> str:
         """Extract the target of the operation (file path, URL, etc.)."""
         # Try common argument names
         for key in ["path", "url", "cmd", "data", "body", "content"]:
@@ -141,7 +143,7 @@ class Guardrail(GuardrailBase):
         return any(pattern in target_lower for pattern in self.ultra_dangerous_patterns)
 
     def _is_user_requested(
-        self, tool_name: str, tool_args: Dict[str, Any], user_message: str
+        self, tool_name: str, tool_args: Mapping[str, Any], user_message: str
     ) -> bool:
         """
         Check if the dangerous operation was explicitly requested by the user.
@@ -206,14 +208,14 @@ if __name__ == "__main__":
     print("\n[Test 1] fs.delete without any taint:")
     decision = guard.decide("fs.delete", {"path": "temp.txt"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Operations since taint: inf (no taint)")
+    print("  Operations since taint: inf (no taint)")
 
     # Test 2: Taint via web, then immediate dangerous op
     print("\n[Test 2] web.open, then IMMEDIATE fs.delete secret.txt:")
     guard.decide("web.open", {"id": "demo"}, {})
     decision = guard.decide("fs.delete", {"path": "secret.txt"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Reason: Within taint window + ultra-dangerous target")
+    print("  Reason: Within taint window + ultra-dangerous target")
 
     # Test 3: Taint, then 5 safe operations, then dangerous op
     print("\n[Test 3] web.open, then 5 reads, then fs.delete secret.txt:")
@@ -223,7 +225,7 @@ if __name__ == "__main__":
         guard.decide("fs.read", {"path": f"file{i}.txt"}, {})
     decision = guard.decide("fs.delete", {"path": "secret.txt"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Operations since taint: 6 (outside window, but ultra-dangerous)")
+    print("  Operations since taint: 6 (outside window, but ultra-dangerous)")
 
     # Test 4: Taint, then 6 operations, then delete normal file
     print("\n[Test 4] web.open, then 6 reads, then fs.delete temp.txt:")
@@ -233,7 +235,7 @@ if __name__ == "__main__":
         guard.decide("fs.read", {"path": f"file{i}.txt"}, {})
     decision = guard.decide("fs.delete", {"path": "temp.txt"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Reason: Outside window + not ultra-dangerous")
+    print("  Reason: Outside window + not ultra-dangerous")
 
     # Test 5: Multiple taints (window resets)
     print("\n[Test 5] web.open, 3 reads, another web.open, then fs.delete:")
@@ -244,7 +246,7 @@ if __name__ == "__main__":
     guard.decide("web.open", {"id": "another"}, {})  # Resets taint window
     decision = guard.decide("fs.delete", {"path": "temp.txt"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Reason: Within window of second taint")
+    print("  Reason: Within window of second taint")
 
     # Test 6: Shell command (always ultra-dangerous)
     print("\n[Test 6] web.open, then shell.run immediately:")
@@ -261,13 +263,13 @@ if __name__ == "__main__":
         guard.decide("fs.read", {"path": f"file{i}.txt"}, {})
     decision = guard.decide("shell.run", {"cmd": "echo test"}, {})
     print(f"  Result: {decision.action}")
-    print(f"  Note: Shell is not in ultra-dangerous check, so allowed outside window")
+    print("  Note: Shell is not in ultra-dangerous check, so allowed outside window")
 
     print("\n" + "=" * 70)
     print("TESTS COMPLETE")
     print("=" * 70)
-    print(f"\nKey Features Demonstrated:")
-    print(f"  ✓ Recent taint window (5 operations)")
-    print(f"  ✓ Ultra-dangerous target detection (secret, password, etc.)")
-    print(f"  ✓ Graceful degradation (allows ops outside window)")
-    print(f"  ✓ Reduced false positives vs persistent taint")
+    print("\nKey Features Demonstrated:")
+    print("  ✓ Recent taint window (5 operations)")
+    print("  ✓ Ultra-dangerous target detection (secret, password, etc.)")
+    print("  ✓ Graceful degradation (allows ops outside window)")
+    print("  ✓ Reduced false positives vs persistent taint")

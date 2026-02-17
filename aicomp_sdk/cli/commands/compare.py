@@ -8,16 +8,32 @@ Loads results from .aicomp/history/ and displays:
 """
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional, cast
 
 
-def load_result(run_identifier: str) -> Optional[Dict[str, Any]]:
+def _load_json_result(path: Path) -> Optional[dict[str, Any]]:
+    """Load a JSON object result payload from disk."""
+    try:
+        raw: object = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(raw, dict):
+        return None
+    if not all(isinstance(key, str) for key in raw):
+        return None
+
+    return cast(dict[str, Any], raw)
+
+
+def load_result(run_identifier: str) -> Optional[dict[str, Any]]:
     """Load a result from history by name or path."""
     # Try as direct path first
     path = Path(run_identifier)
     if path.exists() and path.suffix == ".json":
-        return json.loads(path.read_text(encoding="utf-8"))
+        return _load_json_result(path)
 
     # Try in history directory
     history_dir = Path.cwd() / ".aicomp" / "history"
@@ -25,12 +41,12 @@ def load_result(run_identifier: str) -> Optional[Dict[str, Any]]:
     # Try exact match
     result_file = history_dir / f"{run_identifier}.json"
     if result_file.exists():
-        return json.loads(result_file.read_text(encoding="utf-8"))
+        return _load_json_result(result_file)
 
     # Try as filename
     result_file = history_dir / run_identifier
     if result_file.exists():
-        return json.loads(result_file.read_text(encoding="utf-8"))
+        return _load_json_result(result_file)
 
     return None
 
@@ -45,7 +61,7 @@ def format_delta(value: float, higher_is_better: bool = True) -> str:
     try:
         from rich.console import Console
 
-        console = Console()
+        _ = Console()
         if is_improvement:
             return (
                 f"  [green](+{value:.2f} ↑)[/green]"
@@ -62,10 +78,10 @@ def format_delta(value: float, higher_is_better: bool = True) -> str:
         return f"  ({sign}{value:.2f} {symbol})"
 
 
-def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: str = "all") -> None:
+def compare_metrics(
+    run1: Mapping[str, Any], run2: Mapping[str, Any], metric_filter: str = "all"
+) -> None:
     """Compare metrics between two runs."""
-    from aicomp_sdk.cli.main import print_info
-
     name1 = run1.get("run_name", "Run 1")
     name2 = run2.get("run_name", "Run 2")
 
@@ -82,7 +98,7 @@ def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: s
         final2 = run2.get("final_score", 0)
         delta = final2 - final1
 
-        print(f"Final Score:")
+        print("Final Score:")
         print(f"  {name1:40s} {final1:8.2f}")
         print(f"  {name2:40s} {final2:8.2f}{format_delta(delta, True)}")
         print()
@@ -92,26 +108,26 @@ def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: s
         attack1 = run1.get("attack", {})
         attack2 = run2.get("attack", {})
 
-        print(f"Attack Metrics:")
+        print("Attack Metrics:")
 
         score1 = attack1.get("score", 0)
         score2 = attack2.get("score", 0)
         delta = score2 - score1
-        print(f"  Score:")
+        print("  Score:")
         print(f"    {name1:38s} {score1:8.2f}")
         print(f"    {name2:38s} {score2:8.2f}{format_delta(delta, True)}")
 
         findings1 = attack1.get("findings_count", 0)
         findings2 = attack2.get("findings_count", 0)
         delta = findings2 - findings1
-        print(f"  Findings:")
+        print("  Findings:")
         print(f"    {name1:38s} {findings1:8d}")
         print(f"    {name2:38s} {findings2:8d}{format_delta(float(delta), True)}")
 
         cells1 = attack1.get("unique_cells", 0)
         cells2 = attack2.get("unique_cells", 0)
         delta = cells2 - cells1
-        print(f"  Unique Cells:")
+        print("  Unique Cells:")
         print(f"    {name1:38s} {cells1:8d}")
         print(f"    {name2:38s} {cells2:8d}{format_delta(float(delta), True)}")
 
@@ -122,33 +138,33 @@ def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: s
         defense1 = run1.get("defense", {})
         defense2 = run2.get("defense", {})
 
-        print(f"Defense Metrics:")
+        print("Defense Metrics:")
 
         score1 = defense1.get("score", 0)
         score2 = defense2.get("score", 0)
         delta = score2 - score1
-        print(f"  Score:")
+        print("  Score:")
         print(f"    {name1:38s} {score1:8.2f}")
         print(f"    {name2:38s} {score2:8.2f}{format_delta(delta, True)}")
 
         breaches1 = defense1.get("breach_count", 0)
         breaches2 = defense2.get("breach_count", 0)
         delta = breaches2 - breaches1
-        print(f"  Breaches:")
+        print("  Breaches:")
         print(f"    {name1:38s} {breaches1:8d}")
         print(f"    {name2:38s} {breaches2:8d}{format_delta(float(delta), False)}")
 
         fp1 = defense1.get("false_positives", 0)
         fp2 = defense2.get("false_positives", 0)
         delta = fp2 - fp1
-        print(f"  False Positives:")
+        print("  False Positives:")
         print(f"    {name1:38s} {fp1:8d}")
         print(f"    {name2:38s} {fp2:8d}{format_delta(float(delta), False)}")
 
         fpr1 = defense1.get("false_positive_rate", 0)
         fpr2 = defense2.get("false_positive_rate", 0)
         delta = fpr2 - fpr1
-        print(f"  FP Rate:")
+        print("  FP Rate:")
         print(f"    {name1:38s} {fpr1:7.1%}")
         print(f"    {name2:38s} {fpr2:7.1%}{format_delta(delta * 100, False)}")
 
@@ -159,7 +175,7 @@ def compare_metrics(run1: Dict[str, Any], run2: Dict[str, Any], metric_filter: s
 
 def run_compare(args) -> int:
     """Execute compare command."""
-    from aicomp_sdk.cli.main import print_error, print_info, print_warning
+    from aicomp_sdk.cli.main import print_error, print_info
 
     # Load both results
     run1_data = load_result(args.run1)

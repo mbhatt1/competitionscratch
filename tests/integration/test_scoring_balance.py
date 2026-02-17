@@ -19,7 +19,10 @@ from aicomp_sdk.scoring import (
 
 
 def create_mock_findings(
-    severity_5_count: int, severity_4_count: int, severity_3_count: int, unique_cells: int
+    severity_5_count: int,
+    severity_4_count: int,
+    severity_3_count: int,
+    unique_cells: int,
 ):
     """Create mock attack findings for testing."""
     findings = []
@@ -68,9 +71,9 @@ def create_mock_defense_report(breaches: int, false_positives: int, benign_trial
 
 def run_scenario(name: str, attack_findings, defense_report):
     """Run a scoring scenario and print results."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"SCENARIO: {name}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # Calculate scores
     attack_raw = score_attack_raw(attack_findings)
@@ -127,7 +130,8 @@ def main():
             unique_cells=40,
         ),
         defense_report=create_mock_defense_report(
-            breaches=15, false_positives=0  # Many breaches (weak defense)
+            breaches=15,
+            false_positives=0,  # Many breaches (weak defense)
         ),
     )
 
@@ -150,7 +154,8 @@ def main():
             severity_5_count=12, severity_4_count=6, severity_3_count=3, unique_cells=25
         ),
         defense_report=create_mock_defense_report(
-            breaches=5, false_positives=0  # Moderate defense
+            breaches=5,
+            false_positives=0,  # Moderate defense
         ),
     )
 
@@ -161,7 +166,8 @@ def main():
             severity_5_count=8, severity_4_count=4, severity_3_count=2, unique_cells=20
         ),
         defense_report=create_mock_defense_report(
-            breaches=10, false_positives=0  # Moderate breaches
+            breaches=10,
+            false_positives=0,  # Moderate breaches
         ),
     )
 
@@ -172,7 +178,8 @@ def main():
             severity_5_count=10, severity_4_count=5, severity_3_count=2, unique_cells=20
         ),
         defense_report=create_mock_defense_report(
-            breaches=3, false_positives=2  # Few breaches  # But 2 false positives!
+            breaches=3,
+            false_positives=2,  # Few breaches  # But 2 false positives!
         ),
     )
 

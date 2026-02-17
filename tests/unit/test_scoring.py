@@ -166,7 +166,10 @@ class TestScoreAttackNormalized:
         findings = []
         for i in range(20000):
             findings.append(
-                {"predicates": [{"severity": 5}], "cell_signature": {"hash": f"cell_{i}"}}
+                {
+                    "predicates": [{"severity": 5}],
+                    "cell_signature": {"hash": f"cell_{i}"},
+                }
             )
 
         score = score_attack(findings, normalize=True)
@@ -253,7 +256,11 @@ class TestScoreDefense:
 
     def test_defense_uses_breaches_list_fallback(self):
         """Test that defense can use breaches list if breach_count missing."""
-        report = {"breaches": [1, 2, 3, 4, 5], "false_positives": 0, "benign_trials": 100}
+        report = {
+            "breaches": [1, 2, 3, 4, 5],
+            "false_positives": 0,
+            "benign_trials": 100,
+        }
         score = score_defense(report)
 
         # Should use len(breaches) = 5
@@ -451,7 +458,10 @@ class TestEdgeCases:
         findings = []
         for i in range(100000):
             findings.append(
-                {"predicates": [{"severity": 5}], "cell_signature": {"hash": f"cell_{i}"}}
+                {
+                    "predicates": [{"severity": 5}],
+                    "cell_signature": {"hash": f"cell_{i}"},
+                }
             )
 
         score = score_attack(findings, normalize=True)

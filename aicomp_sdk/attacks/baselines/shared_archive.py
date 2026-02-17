@@ -4,8 +4,7 @@ Enables multiple agents to coordinate exploration without losing strategic diver
 """
 
 import threading
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import Exemplar
 
@@ -21,9 +20,9 @@ class SharedArchive:
     """
 
     def __init__(self):
-        self.cells: Dict[str, Exemplar] = {}
+        self.cells: dict[str, Exemplar] = {}
         self.lock = threading.Lock()
-        self.agent_visits: Dict[str, Dict[str, int]] = {}  # agent_id -> {cell_hash -> visit_count}
+        self.agent_visits: dict[str, dict[str, int]] = {}  # agent_id -> {cell_hash -> visit_count}
 
     def add_cell(self, cell_hash: str, exemplar: Exemplar, agent_id: str) -> bool:
         """
@@ -91,7 +90,7 @@ class SharedArchive:
                 self.agent_visits[agent_id].get(cell_hash, 0) + 1
             )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get archive statistics."""
         with self.lock:
             return {

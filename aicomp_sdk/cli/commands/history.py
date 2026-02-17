@@ -1,19 +1,20 @@
 """
 History command - show past evaluation results.
 
-Lists evaluations from .aicomp/history/ with:
+lists evaluations from .aicomp/history/ with:
 - Scores and timestamps
 - Submission names
 - Filtering and sorting options
 """
 
 import json
+from collections.abc import Collection, Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 
-def load_all_results() -> List[Dict[str, Any]]:
+def load_all_results() -> list[dict[str, Any]]:
     """Load all results from history."""
     history_dir = Path.cwd() / ".aicomp" / "history"
 
@@ -38,11 +39,11 @@ def format_timestamp(iso_timestamp: str) -> str:
     try:
         dt = datetime.fromisoformat(iso_timestamp)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         return iso_timestamp
 
 
-def print_results_table(results: List[Dict[str, Any]]) -> None:
+def print_results_table(results: Collection[Mapping[str, Any]]) -> None:
     """Print results in a formatted table."""
     if not results:
         print("No evaluation results found.")
@@ -164,7 +165,7 @@ def run_history(args) -> int:
         print_info(f"Total runs: {len(load_all_results())}")
         print()
         print_info("Commands:")
-        print(f"  Compare runs:  aicomp compare <run1> <run2>")
-        print(f"  Visualize:     aicomp visualize <run_name>")
+        print("  Compare runs:  aicomp compare <run1> <run2>")
+        print("  Visualize:     aicomp visualize <run_name>")
 
     return 0

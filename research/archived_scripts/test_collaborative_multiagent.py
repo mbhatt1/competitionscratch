@@ -142,7 +142,11 @@ with ThreadPoolExecutor(max_workers=3) as executor:
 
 for result in agent_results:
     all_stats_collab.append(
-        {"agent_id": result["agent_id"], "config": result["config_name"], "stats": result["stats"]}
+        {
+            "agent_id": result["agent_id"],
+            "config": result["config_name"],
+            "stats": result["stats"],
+        }
     )
     all_findings_collab.extend(result["findings"])
 

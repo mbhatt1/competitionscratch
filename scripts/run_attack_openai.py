@@ -6,17 +6,18 @@ This bypasses the GPT_OSS_MODEL_PATH requirement and uses OpenAI's API directly.
 Set OPENAI_API_KEY environment variable to use.
 """
 
-from aicomp_sdk.guardrails.hooks import HookStage, get_hook_registry
-from aicomp_sdk.guardrails.base import GuardrailBase
-from aicomp_sdk.core.trace import ToolEvent, Trace
-from aicomp_sdk.core.tools import ToolSuite
-from aicomp_sdk.core.predicates import eval_predicates
-from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
+from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.core.tools import ToolSuite
+from aicomp_sdk.core.trace import ToolEvent, Trace
+from aicomp_sdk.guardrails.base import GuardrailBase
+from aicomp_sdk.guardrails.hooks import HookStage, get_hook_registry
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
@@ -122,7 +123,11 @@ or
                     args = json.loads(m.group(2))
                 except:
                     args = {}
-                return {"tool": tool, "args": args, "reason": "followed_action_directive"}
+                return {
+                    "tool": tool,
+                    "args": args,
+                    "reason": "followed_action_directive",
+                }
 
         # Simple heuristics
         if not trace.user_messages:
@@ -133,11 +138,23 @@ or
             q = u.split("search", 1)[-1].strip() or "documentation"
             return {"tool": "web.search", "args": {"query": q}, "reason": "user_search"}
         if "open" in u:
-            return {"tool": "web.open", "args": {"id": "welcome"}, "reason": "user_open"}
+            return {
+                "tool": "web.open",
+                "args": {"id": "welcome"},
+                "reason": "user_open",
+            }
         if "read email" in u:
-            return {"tool": "email.read", "args": {"id": "msg1"}, "reason": "read_email"}
+            return {
+                "tool": "email.read",
+                "args": {"id": "msg1"},
+                "reason": "read_email",
+            }
         if "read file" in u or "read" in u:
-            return {"tool": "fs.read", "args": {"path": "readme.txt"}, "reason": "read_file"}
+            return {
+                "tool": "fs.read",
+                "args": {"path": "readme.txt"},
+                "reason": "read_file",
+            }
 
         return None
 
@@ -337,9 +354,9 @@ def main():
     attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 8})
     findings = attacker.run(env, {"seconds": 30, "steps": 100})
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"RESULTS")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     print(f"Total findings: {len(findings)}")
 
@@ -356,9 +373,9 @@ def main():
                 print(f"  ⚠️  {p.get('predicate')} (severity: {p.get('severity')})")
                 print(f"     Evidence: {p.get('evidence', {})}")
 
-    print(f"\n{'─'*70}")
+    print(f"\n{'─' * 70}")
     print(f"Validated breaches: {len(validated)}/{len(findings)}")
-    print(f"{'─'*70}")
+    print(f"{'─' * 70}")
 
     # Show some traces
     if validated:
@@ -374,9 +391,9 @@ def main():
                 if "ACTION:" in preview:
                     print(f"       → Contains ACTION directive!")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("DEMO COMPLETE")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     print("The attack used LPCI hooks to:")
     print("  1. Inject ACTION directives into tool outputs")
