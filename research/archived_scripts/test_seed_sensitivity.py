@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from archived_imports import setup_imports
+
 setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
@@ -136,7 +137,12 @@ async def test_signature_across_seeds_async(seeds=[42, 123, 456, 789, 1337], max
         executor.shutdown(wait=True)
 
     # Sort all results by seed for consistency
-    for key in ["tools_only_allow", "tools_only_rules", "full_intent_allow", "full_intent_rules"]:
+    for key in [
+        "tools_only_allow",
+        "tools_only_rules",
+        "full_intent_allow",
+        "full_intent_rules",
+    ]:
         results[key].sort(key=lambda x: x["seed"])
 
     return results

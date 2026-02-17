@@ -10,13 +10,10 @@ Checks:
 """
 
 import ast
-import importlib.util
-import sys
 from pathlib import Path
-from typing import List, Tuple
 
 
-def validate_python_syntax(filepath: Path) -> Tuple[bool, str]:
+def validate_python_syntax(filepath: Path) -> tuple[bool, str]:
     """Check if file has valid Python syntax."""
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -29,7 +26,7 @@ def validate_python_syntax(filepath: Path) -> Tuple[bool, str]:
         return False, f"Error parsing file: {e}"
 
 
-def validate_imports(filepath: Path) -> Tuple[bool, List[str]]:
+def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
     """Check if imports are valid and can be resolved."""
     issues = []
     try:
@@ -89,7 +86,7 @@ def validate_imports(filepath: Path) -> Tuple[bool, List[str]]:
         return False, [f"Error analyzing imports: {e}"]
 
 
-def validate_attack_structure(filepath: Path) -> Tuple[bool, List[str]]:
+def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
     """Validate attack submission structure."""
     issues = []
 
@@ -137,7 +134,7 @@ def validate_attack_structure(filepath: Path) -> Tuple[bool, List[str]]:
         return False, [f"Error analyzing structure: {e}"]
 
 
-def validate_guardrail_structure(filepath: Path) -> Tuple[bool, List[str]]:
+def validate_guardrail_structure(filepath: Path) -> tuple[bool, list[str]]:
     """Validate guardrail submission structure."""
     issues = []
 
@@ -211,7 +208,7 @@ def auto_detect_type(filepath: Path) -> str:
             return "attack"
         elif "class Guardrail" in content:
             return "guardrail"
-    except:
+    except Exception:
         pass
 
     return "unknown"
@@ -219,7 +216,12 @@ def auto_detect_type(filepath: Path) -> str:
 
 def run_validate(args) -> int:
     """Execute validate command."""
-    from aicomp_sdk.cli.main import print_error, print_info, print_success, print_warning
+    from aicomp_sdk.cli.main import (
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+    )
 
     filepath = Path(args.file)
 
@@ -281,5 +283,5 @@ def run_validate(args) -> int:
         print_success(f"✅ Validation passed! {filepath} is ready to test.")
         return 0
     else:
-        print_error(f"❌ Validation failed. Please fix the issues above.")
+        print_error("❌ Validation failed. Please fix the issues above.")
         return 1

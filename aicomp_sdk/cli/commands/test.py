@@ -15,12 +15,12 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     from rich.console import Console
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
     RICH_AVAILABLE = True
 except ImportError:
@@ -41,7 +41,7 @@ def generate_run_name(submission_name: str) -> str:
     return f"{clean_name}_{timestamp}"
 
 
-def save_results(run_name: str, results: Dict[str, Any]) -> Path:
+def save_results(run_name: str, results: MutableMapping[str, Any]) -> Path:
     """Save evaluation results to history."""
     history_dir = ensure_history_dir()
 
@@ -87,8 +87,12 @@ def load_from_zip(zip_path: Path, module_name: str, file_name: str):
 
 
 def run_evaluation_with_progress(
-    attack_cls, guardrail_cls, attack_seconds: float, defense_seconds: float, verbose: bool = False
-) -> Dict[str, Any]:
+    attack_cls,
+    guardrail_cls,
+    attack_seconds: float,
+    defense_seconds: float,
+    verbose: bool = False,
+) -> dict[str, Any]:
     """Run evaluation with progress tracking."""
     from aicomp_sdk.cli.main import print_info, print_success
     from aicomp_sdk.scoring import (
@@ -101,12 +105,12 @@ def run_evaluation_with_progress(
     # Import evaluation functions
     from evaluation import eval_attack, eval_defense
 
-    results = {}
+    results: dict[str, Any] = {}
 
     # Run attack evaluation
     if RICH_AVAILABLE:
         console = Console()
-        with console.status("[bold blue]Running attack evaluation...") as status:
+        with console.status("[bold blue]Running attack evaluation..."):
             print_info(f"Evaluating offense (time budget: {attack_seconds:.1f}s)")
             start = time.time()
             attack_findings = eval_attack(attack_cls, attack_seconds)
@@ -142,7 +146,7 @@ def run_evaluation_with_progress(
 
     # Run defense evaluation
     if RICH_AVAILABLE:
-        with console.status("[bold blue]Running defense evaluation...") as status:
+        with console.status("[bold blue]Running defense evaluation..."):
             print_info(f"Evaluating defense (time budget: {defense_seconds:.1f}s)")
             start = time.time()
             defense_report = eval_defense(guardrail_cls, defense_seconds)
@@ -185,10 +189,8 @@ def run_evaluation_with_progress(
     return results
 
 
-def print_results_summary(results: Dict[str, Any]) -> None:
+def print_results_summary(results: Mapping[str, Any]) -> None:
     """Print formatted results summary."""
-    from aicomp_sdk.cli.main import print_info, print_success
-
     attack = results["attack"]
     defense = results["defense"]
     final = results["final_score"]
@@ -215,7 +217,12 @@ def print_results_summary(results: Dict[str, Any]) -> None:
 
 def run_test(args) -> int:
     """Execute test command."""
-    from aicomp_sdk.cli.main import print_error, print_info, print_success, print_warning
+    from aicomp_sdk.cli.main import (
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+    )
 
     submission_path = Path(args.submission)
 
@@ -335,7 +342,7 @@ def run_test(args) -> int:
         result_file = save_results(run_name, results)
         print()
         print_success(f"Results saved to: {result_file}")
-        print_info(f"View history: aicomp history")
+        print_info("View history: aicomp history")
         print_info(f"Compare runs: aicomp compare {run_name} <other_run>")
     except Exception as e:
         print_warning(f"Could not save results: {e}")

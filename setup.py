@@ -23,7 +23,15 @@ setup(
         "Source Code": "https://github.com/mbhatt1/competitionscratch",
     },
     packages=find_packages(
-        exclude=["tests", "tests.*", "examples", "examples.*", "scripts", "research", "docs"]
+        exclude=[
+            "tests",
+            "tests.*",
+            "examples",
+            "examples.*",
+            "scripts",
+            "research",
+            "docs",
+        ]
     ),
     python_requires=">=3.8",
     install_requires=[

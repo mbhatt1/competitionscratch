@@ -9,14 +9,15 @@ This script runs two attacks back-to-back:
 Shows that hooks amplify attack effectiveness!
 """
 
-# First, import baseline attack
-from examples.attacks.attack_working import AttackAlgorithm
 import sys
 from pathlib import Path
 
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
+
+# First, import baseline attack
+from examples.attacks.attack_working import AttackAlgorithm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
@@ -110,7 +111,7 @@ print("=" * 70)
 print(f"\nBaseline (no hooks):     {len(findings1)} findings")
 print(f"With LPCI hooks:         {len(findings2)} findings")
 print(
-    f"Improvement:             {len(findings2) - len(findings1):+d} ({((len(findings2)/max(1,len(findings1))-1)*100):.1f}%)"
+    f"Improvement:             {len(findings2) - len(findings1):+d} ({((len(findings2) / max(1, len(findings1)) - 1) * 100):.1f}%)"
 )
 
 print(f"\nPredicate types found:")
@@ -121,7 +122,7 @@ new_types = set(pred_types2.keys()) - set(pred_types1.keys())
 if new_types:
     print(f"  NEW types with hooks: {list(new_types)} ✨")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 if len(findings2) > len(findings1):
     print("✓ LPCI HOOKS ENHANCE GO-EXPLORE!")
     print(f"  {len(findings2) - len(findings1)} additional breaches found")
@@ -135,7 +136,7 @@ else:
     print("⚠ Baseline performed better this run")
     print("  (But hooks provide different attack vectors)")
 
-print(f"{'='*70}\n")
+print(f"{'=' * 70}\n")
 
 print("CONCLUSION:")
 print("LPCI hooks provide sophisticated attack patterns that complement")

@@ -9,7 +9,12 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
-from aicomp_sdk.core.env import GPTOSSAgent, GPTOSSBackend, SandboxEnv, VulnerableDeterministicAgent
+from aicomp_sdk.core.env import (
+    GPTOSSAgent,
+    GPTOSSBackend,
+    SandboxEnv,
+    VulnerableDeterministicAgent,
+)
 from aicomp_sdk.core.tools import ToolSuite
 from aicomp_sdk.core.trace import ToolEvent, Trace
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
@@ -142,7 +147,10 @@ class TestVulnerableDeterministicAgent:
 
         assert call is not None
         assert call["tool"] == "web.open"
-        assert call["args"]["id"] in ["welcome", "ignore_prev_1"]  # Could extract various IDs
+        assert call["args"]["id"] in [
+            "welcome",
+            "ignore_prev_1",
+        ]  # Could extract various IDs
 
     def test_agent_handles_file_read_requests(self, agent, mock_trace):
         """Test that agent handles file read requests."""
@@ -460,7 +468,10 @@ class TestHookIntegration:
         mock_registry.execute_hooks.return_value = []
 
         env = SandboxEnv(
-            seed=42, fixtures_dir=temp_fixtures, agent=mock_agent, hook_registry=mock_registry
+            seed=42,
+            fixtures_dir=temp_fixtures,
+            agent=mock_agent,
+            hook_registry=mock_registry,
         )
 
         env.interact("Test message")

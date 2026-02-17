@@ -20,13 +20,10 @@ from archived_imports import setup_imports
 
 repo_root = setup_imports()
 
-from examples.guardrails.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
-
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
+from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
 # Verify API key
@@ -77,7 +74,7 @@ def extract_tool_stats(findings):
 
         events = f.get("trace", {}).get("tool_events", [])
         stats["total_tool_calls"] += len(events)
-        
+
         for evt in events:
             tool = evt.get("name", "")
             if evt.get("ok"):
@@ -105,7 +102,7 @@ def extract_tool_stats(findings):
     stats["tool_calls"] = stats["total_tool_calls"]
     stats["real_attacks"] = sum(stats["real_attacks_by_type"].values())
     stats["unique_attack_types"] = len(stats["real_attacks_by_type"])
-    
+
     return dict(stats)
 
 
@@ -113,25 +110,27 @@ def average_stats(stats_list):
     """Average statistics across multiple runs"""
     if not stats_list:
         return {}
-    
+
     avg = {
         "total_findings": round(sum(s["total_findings"] for s in stats_list) / len(stats_list), 1),
         "real_attacks": round(sum(s["real_attacks"] for s in stats_list) / len(stats_list), 1),
-        "unique_attack_types": round(sum(s["unique_attack_types"] for s in stats_list) / len(stats_list), 1),
+        "unique_attack_types": round(
+            sum(s["unique_attack_types"] for s in stats_list) / len(stats_list), 1
+        ),
         "tool_calls": round(sum(s["tool_calls"] for s in stats_list) / len(stats_list), 1),
         "individual_runs": stats_list,
     }
-    
+
     return avg
 
 
 def run_experiment(name, seed, fixtures, guardrail_cls, attack_config, budget, model):
     """Run a single experiment (for parallel execution)"""
     print(f"[{name}-seed{seed}] Starting with {model}...")
-    
+
     # Set model in environment
     os.environ["OPENAI_MODEL"] = model
-    
+
     env = SandboxEnv(seed=seed, fixtures_dir=fixtures, guardrail=guardrail_cls())
     atk = AttackAlgorithm(attack_config)
     findings = atk.run(env, budget)
@@ -369,7 +368,9 @@ async def run_all_experiments_async(model, seeds):
         for seed in seeds:
             all_experiments.append((f"{name}_seed{seed}", seed, guard, config, budget))
 
-    print(f"\nRunning {len(base_experiments)} base configs × {len(seeds)} seeds = {len(all_experiments)} total experiments...")
+    print(
+        f"\nRunning {len(base_experiments)} base configs × {len(seeds)} seeds = {len(all_experiments)} total experiments..."
+    )
     print(f"Parallelization: 4 workers\n")
 
     # Run in parallel using ThreadPoolExecutor
@@ -377,7 +378,15 @@ async def run_all_experiments_async(model, seeds):
     with ThreadPoolExecutor(max_workers=4) as executor:
         tasks = [
             loop.run_in_executor(
-                executor, run_experiment, name, seed, fixtures, guard, config, budget, model
+                executor,
+                run_experiment,
+                name,
+                seed,
+                fixtures,
+                guard,
+                config,
+                budget,
+                model,
             )
             for name, seed, guard, config, budget in all_experiments
         ]
@@ -390,7 +399,7 @@ async def run_all_experiments_async(model, seeds):
         if base_name not in exp_map:
             exp_map[base_name] = []
         exp_map[base_name].append(stats)
-    
+
     # Average results for each base experiment
     averaged_results = {name: average_stats(stats_list) for name, stats_list in exp_map.items()}
 
@@ -488,7 +497,7 @@ async def main():
     print(
         f"✅ All {len(exp_results)} base experiments (averaged over {len(SEEDS)} seeds) complete at {datetime.now().strftime('%H:%M:%S')}"
     )
-    print(f"\n{'='*70}\n")
+    print(f"\n{'=' * 70}\n")
 
 
 if __name__ == "__main__":

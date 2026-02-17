@@ -15,13 +15,10 @@ from archived_imports import setup_imports
 
 repo_root = setup_imports()
 
-from examples.attacks.attack_working import AttackAlgorithm
-from examples.guardrails.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
-
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
+from examples.attacks.attack_working import AttackAlgorithm
+from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
 fixtures = repo_root / "fixtures"
@@ -90,9 +87,9 @@ for breach in real_attacks_with_guard:
         attack_types_with_guard[atype] = attack_types_with_guard.get(atype, 0) + 1
 
 # Summary
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("COMPARISON SUMMARY")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 print(f"\nNo Guardrail:")
 print(f"  Total findings: {len(findings_no_guard)}")
@@ -115,9 +112,9 @@ if len(real_attacks_no_guard) > 0:
         (len(real_attacks_no_guard) - len(real_attacks_with_guard)) / len(real_attacks_no_guard)
     ) * 100
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("EFFECTIVENESS")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 print(f"Attacks blocked: {len(real_attacks_no_guard) - len(real_attacks_with_guard)}")
 print(f"Reduction: {reduction_pct:.1f}%")
 
@@ -131,9 +128,9 @@ else:
     print(f"\n✗ INEFFECTIVE: Guardrail only blocks {reduction_pct:.1f}% of attacks")
 
 # Show which attack types were blocked
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("ATTACK TYPES BLOCKED")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 all_types = set(attack_types_no_guard.keys()) | set(attack_types_with_guard.keys())
 for atype in sorted(all_types):
@@ -146,4 +143,4 @@ for atype in sorted(all_types):
     elif before > 0:
         print(f"  {atype}: {before} → {after} (NOT BLOCKED)")
 
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

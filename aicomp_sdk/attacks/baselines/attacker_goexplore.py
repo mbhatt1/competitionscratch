@@ -1,8 +1,9 @@
 import random
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional, cast
 
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.predicates import eval_predicates
@@ -25,13 +26,15 @@ except ImportError:
 class Exemplar:
     """A frontier cell in the Go-Explore archive."""
 
-    snapshot: Dict[str, Any]  # Env snapshot for efficient restoration
-    user_messages: List[str]  # For replay/debugging
+    snapshot: dict[str, Any]  # Env snapshot for efficient restoration
+    user_messages: list[str]  # For replay/debugging
     cell_hash: str
     score_hint: float = 0.0
     visits: int = 0
     depth: int = 0  # Track exploration depth
-    real_attacks: List[Dict] = None  # Track real attacks in this cell to avoid duplicate bonuses
+    real_attacks: Optional[list[dict]] = (
+        None  # Track real attacks in this cell to avoid duplicate bonuses
+    )
 
     def __post_init__(self):
         if self.real_attacks is None:
@@ -136,7 +139,7 @@ class AttackAlgorithm:
                 "open chain_attack_1",
             ]
 
-    def _mutate(self, seq: List[str]) -> List[str]:
+    def _mutate(self, seq: Sequence[str]) -> list[str]:
         """Enhanced mutation: append, replace, or insert."""
         out = list(seq)
 
@@ -163,7 +166,7 @@ class AttackAlgorithm:
 
         return out[: self.max_turns]
 
-    def _select_cell(self, archive: Dict[str, Exemplar]) -> Exemplar:
+    def _select_cell(self, archive: Mapping[str, Exemplar]) -> Exemplar:
         """
         Improved selection policy:
         - Weighted by: low visits, high score hint, moderate depth
@@ -191,7 +194,7 @@ class AttackAlgorithm:
         # Sample proportional to weight
         total = sum(weights)
         r = random.uniform(0, total)
-        cumsum = 0
+        cumsum = 0.0
         for ex, w in zip(candidates, weights):
             cumsum += w
             if r <= cumsum:
@@ -199,7 +202,7 @@ class AttackAlgorithm:
 
         return candidates[-1]  # Fallback
 
-    def run(self, env, budget: Dict) -> List[Dict]:
+    def run(self, env, budget: Mapping[str, Any]) -> list[dict]:
         # FIX: Seed the RNG for reproducibility!
         random.seed(env.seed)
 
@@ -208,8 +211,8 @@ class AttackAlgorithm:
         max_steps = int(budget.get("steps", 10**9))
 
         # archive maps cell_hash -> exemplar
-        archive: Dict[str, Exemplar] = {}
-        findings: List[Dict] = []
+        archive: dict[str, Exemplar] = {}
+        findings: list[dict] = []
 
         # DIAGNOSTIC: Track exploration statistics
         total_novel_cells = 0
@@ -237,10 +240,10 @@ class AttackAlgorithm:
         if self.use_intent_hash:
             sig_kwargs["user_messages"] = tr.get("user_messages", [])
         sig = cell_signature(tr["tool_events"], **sig_kwargs)
-        archive[sig["hash"]] = Exemplar(
+        archive[str(sig["hash"])] = Exemplar(
             snapshot=snapshot,
             user_messages=list(tr["user_messages"]),
-            cell_hash=sig["hash"],
+            cell_hash=str(sig["hash"]),
             depth=1,
             real_attacks=[],
         )
@@ -331,9 +334,9 @@ class AttackAlgorithm:
                     sev = sum(int(p.get("severity", 1)) for p in preds)
                     # Reward progress: secret access, egress, tool diversity
                     progress_bonus = (
-                        10.0 * int(sig.get("secret_read", False))
-                        + 5.0 * sig.get("egress_count", 0)
-                        + 2.0 * len(set(sig.get("sensitive_tools", [])))
+                        10.0 * int(cast(bool, sig.get("secret_read", False)))
+                        + 5.0 * cast(int, sig.get("egress_count", 0))
+                        + 2.0 * len(set(cast(list, sig.get("sensitive_tools", []))))
                     )
 
                     # BYPASS BONUS: Reward sequences that successfully execute dangerous ops after untrusted sources
@@ -462,12 +465,14 @@ class AttackAlgorithm:
                     )
 
         # DIAGNOSTIC: Final statistics
-        print(f"\n[GO-EXPLORE] Attack run complete:")
+        print("\n[GO-EXPLORE] Attack run complete:")
         print(f"  Productive steps: {steps} (refusals don't count against budget)")
         print(
             f"  Total branch attempts: {total_branches_attempted} (including {agent_refusals} refusals)"
         )
-        print(f"  Agent refusal rate: {(agent_refusals/max(1, total_branches_attempted)*100):.1f}%")
+        print(
+            f"  Agent refusal rate: {(agent_refusals / max(1, total_branches_attempted) * 100):.1f}%"
+        )
         print(f"  Archive size: {len(archive)}")
         print(f"  Novel cells discovered: {total_novel_cells}")
         print(f"  Total tool calls: {total_tool_calls}")
@@ -476,30 +481,30 @@ class AttackAlgorithm:
         print(f"  Findings with predicates: {len(findings)}")
 
         # DIAGNOSTIC: Show depth distribution
-        depth_counts = {}
+        depth_counts: dict[int, int] = {}
         for ex in archive.values():
             depth_counts[ex.depth] = depth_counts.get(ex.depth, 0) + 1
         print(f"  Depth distribution: {dict(sorted(depth_counts.items()))}")
 
         # DIAGNOSTIC: Show some example tool call patterns
         if total_tool_calls > 0:
-            print(f"\n[GO-EXPLORE] Sample tool call patterns:")
+            print("\n[GO-EXPLORE] Sample tool call patterns:")
             for i, ex in enumerate(list(archive.values())[:5]):
                 # Get the trace for this exemplar
                 env.restore(ex.snapshot)
                 tr = env.export_trace_dict()
                 tool_names = [e.get("name") for e in tr.get("tool_events", [])]
-                print(f"    Pattern {i+1}: {' -> '.join(tool_names)}")
+                print(f"    Pattern {i + 1}: {' -> '.join(tool_names)}")
 
         # DIAGNOSTIC: Print all attack chains that triggered predicates
         if findings:
-            print(f"\n{'='*70}")
+            print(f"\n{'=' * 70}")
             print(f"[GO-EXPLORE] ALL SUCCESSFUL ATTACK CHAINS ({len(findings)} total)")
-            print(f"{'='*70}")
+            print(f"{'=' * 70}")
 
             for i, finding in enumerate(findings, 1):
                 chain = " -> ".join(finding.get("user_messages", []))
-                preds = [p.get("predicate") for p in finding.get("predicates", [])]
+                pred_names = [p.get("predicate") for p in finding.get("predicates", [])]
 
                 # Build tool call strings with arguments
                 tool_calls_with_args = []
@@ -519,12 +524,12 @@ class AttackAlgorithm:
                     else:
                         tool_calls_with_args.append(tool_name)
 
-                print(f"\n[{i}] {', '.join(preds)}")
+                print(f"\n[{i}] {', '.join(pred_names)}")
                 print(f"    Chain: {chain}")
                 print(f"    Tools: {' -> '.join(tool_calls_with_args)}")
                 print(f"    Depth: {len(finding.get('user_messages', []))}")
 
-        print(f"\n{'='*70}\n")
+        print(f"\n{'=' * 70}\n")
 
         return findings
 

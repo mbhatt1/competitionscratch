@@ -9,7 +9,8 @@ This guardrail implements:
 Strategy: Track taint state across the entire session, not just a sliding window.
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -48,7 +49,7 @@ class Guardrail(GuardrailBase):
         self.operation_log = []
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """
         Decide whether to allow or block a tool call based on taint state.
@@ -140,7 +141,7 @@ if __name__ == "__main__":
 
     # Test 1: Normal operation without untrusted access
     print("\n[Test 1] Normal fs.delete from user (no taint):")
-    context = {"recent_sources": ["user", "file"]}
+    context: dict[str, Any] = {"recent_sources": ["user", "file"]}
     decision = guard.decide("fs.delete", {"path": "temp.txt"}, context)
     print(f"  Result: {decision.action} - {decision.reason}")
     print(f"  Tainted: {guard.tainted}")

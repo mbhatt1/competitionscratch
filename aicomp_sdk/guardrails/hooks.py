@@ -5,9 +5,10 @@ Provides multiple interception points for attack detection, payload injection,
 and security testing similar to the LPCI framework.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional, TypedDict
 
 
 class HookStage(Enum):
@@ -31,15 +32,15 @@ class HookContext:
 
     stage: HookStage
     tool_name: Optional[str] = None
-    tool_args: Optional[Dict[str, Any]] = None
+    tool_args: Optional[dict[str, Any]] = None
     tool_output: Optional[str] = None
     guardrail_decision: Optional[Any] = None
     trace: Optional[Any] = None
-    context: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Allow hooks to modify the flow
-    modified_args: Optional[Dict[str, Any]] = None
+    modified_args: Optional[dict[str, Any]] = None
     modified_output: Optional[str] = None
     injected_content: Optional[str] = None
     should_block: bool = False
@@ -54,21 +55,26 @@ class HookResult:
     modified_context: Optional[HookContext] = None
     payload_detected: bool = False
     trigger_activated: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Type alias for hook callbacks
 HookCallback = Callable[[HookContext], HookResult]
 
 
+class HookEntry(TypedDict):
+    callback: HookCallback
+    priority: int
+
+
 class HookRegistry:
     """Central registry for all hooks, similar to LPCI's attack registry"""
 
     def __init__(self):
-        self._hooks: Dict[HookStage, List[HookCallback]] = {stage: [] for stage in HookStage}
-        self._persistent_state: Dict[str, Any] = {}
-        self._trigger_conditions: List[Dict[str, Any]] = []
-        self._payload_storage: List[Dict[str, Any]] = []
+        self._hooks: dict[HookStage, list[HookEntry]] = {stage: [] for stage in HookStage}
+        self._persistent_state: dict[str, Any] = {}
+        self._trigger_conditions: list[Mapping[str, Any]] = []
+        self._payload_storage: list[dict[str, Any]] = []
 
     def register_hook(self, stage: HookStage, callback: HookCallback, priority: int = 0):
         """Register a hook at a specific stage"""
@@ -80,7 +86,7 @@ class HookRegistry:
         """Remove a hook"""
         self._hooks[stage] = [h for h in self._hooks[stage] if h["callback"] != callback]
 
-    def execute_hooks(self, stage: HookStage, context: HookContext) -> List[HookResult]:
+    def execute_hooks(self, stage: HookStage, context: HookContext) -> list[HookResult]:
         """Execute all hooks at a given stage"""
         results = []
         for hook_data in self._hooks[stage]:
@@ -102,13 +108,17 @@ class HookRegistry:
 
         return results
 
-    def store_payload(self, payload_id: str, payload: Dict[str, Any]):
+    def store_payload(self, payload_id: str, payload: Mapping[str, Any]):
         """Store a payload (like LPCI vector store poisoning)"""
         self._payload_storage.append(
-            {"id": payload_id, "payload": payload, "stored_at": None}  # Could add timestamp
+            {
+                "id": payload_id,
+                "payload": payload,
+                "stored_at": None,
+            }  # Could add timestamp
         )
 
-    def retrieve_payloads(self, trigger_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def retrieve_payloads(self, trigger_context: Mapping[str, Any]) -> list[dict[str, Any]]:
         """Retrieve payloads matching trigger conditions"""
         matching = []
         for stored in self._payload_storage:
@@ -123,19 +133,19 @@ class HookRegistry:
 
         return matching
 
-    def add_trigger_condition(self, condition: Dict[str, Any]):
+    def add_trigger_condition(self, condition: Mapping[str, Any]):
         """Add a trigger condition (like LPCI cross-session bombs)"""
         self._trigger_conditions.append(condition)
 
-    def check_triggers(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def check_triggers(self, context: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         """Check if any trigger conditions are met"""
-        activated = []
+        activated: list[Mapping[str, Any]] = []
         for condition in self._trigger_conditions:
             if self._check_trigger(condition, context):
                 activated.append(condition)
         return activated
 
-    def _check_trigger(self, trigger: Dict[str, Any], context: Dict[str, Any]) -> bool:
+    def _check_trigger(self, trigger: Mapping[str, Any], context: Mapping[str, Any]) -> bool:
         """Check if a trigger condition matches context"""
         trigger_type = trigger.get("type")
 
@@ -218,7 +228,9 @@ def create_trigger_hook(
         if trigger_condition(context):
             modified = on_trigger(context)
             return HookResult(
-                continue_execution=True, modified_context=modified, trigger_activated=True
+                continue_execution=True,
+                modified_context=modified,
+                trigger_activated=True,
             )
         return HookResult(continue_execution=True)
 
@@ -301,7 +313,8 @@ def create_lpci_tool_poisoning_hook() -> HookCallback:
 
                 # Modify tool arguments
                 if "arg_modifications" in poison_config:
-                    modified_args = {**context.tool_args}
+                    existing_args = context.tool_args or {}
+                    modified_args = {**existing_args}
                     modified_args.update(poison_config["arg_modifications"])
                     context.modified_args = modified_args
 
@@ -335,7 +348,6 @@ def create_lpci_cross_session_hook() -> HookCallback:
             if triggered:
                 # Activate cross-session payload
                 for trigger in triggered:
-                    payload_id = trigger.get("payload_id")
                     context.should_trigger = True
 
                 return HookResult(

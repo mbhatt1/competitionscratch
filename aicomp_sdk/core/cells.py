@@ -1,6 +1,7 @@
 import hashlib
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Optional
 
 
 def _h(s: str) -> str:
@@ -21,14 +22,14 @@ def _bucket_url(url: str) -> str:
 
 
 def cell_signature(
-    tool_events: List[Dict],
+    tool_events: Sequence[Mapping[str, Any]],
     n_tool: int = 5,
-    egress_data: List[Dict] = None,
-    user_messages: List[str] = None,
+    egress_data: Optional[Collection[Mapping[str, Any]]] = None,
+    user_messages: Optional[Sequence[str]] = None,
     use_args: bool = True,
     use_outputs: bool = True,
     args_count: int = 5,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """
     Enhanced cell signature that tracks meaningful attack progress:
     - Tool sequences and sources
@@ -149,6 +150,8 @@ def cell_signature(
     )
     sig_str = "|".join(sig_parts)
 
+    # TODO: We could use a dataclass here to help with typing or pydantic if
+    # we want to support serialization and validation.
     return {
         "tool_seq_ngram": seq,
         "side_effects": se,

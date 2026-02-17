@@ -43,13 +43,10 @@ print("EXPERIMENT 1: GENERAL EXPLORATION BASELINE")
 print("=" * 70)
 
 print("\nRunning general Go-Explore for 120s...")
-from examples.guardrails.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
-
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
+from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 
 fixtures = repo_root / "fixtures"
 
@@ -153,7 +150,10 @@ for f in findings1:
                 secret_read_count_no_guard += 1
                 # Check for exfil
                 for later_evt in tool_events[i + 1 :]:
-                    if later_evt.get("name") in ["http.post", "email.send"] and later_evt.get("ok"):
+                    if later_evt.get("name") in [
+                        "http.post",
+                        "email.send",
+                    ] and later_evt.get("ok"):
                         secret_read_with_exfil_no_guard += 1
                         break
                 break
@@ -251,4 +251,4 @@ with open(output_file, "w") as f:
 print(f"\n💾 Results saved to: {output_file}")
 print(f"\n✅ All experiments complete!")
 print(f"Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

@@ -3,10 +3,11 @@
 Comprehensive test for data-flow guardrail with extensive benign test suite.
 """
 
-from examples.guardrails.guardrail_pattern import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
 import sys
 from pathlib import Path
+
+from aicomp_sdk.core.env import SandboxEnv
+from examples.guardrails.guardrail_pattern import Guardrail
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))

@@ -9,12 +9,28 @@ Creates:
 """
 
 import json
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional, cast
 
 
-def load_result(run_identifier: str) -> Optional[Dict[str, Any]]:
+def _load_json_result(path: Path) -> Optional[dict[str, Any]]:
+    """Load a JSON object result payload from disk."""
+    try:
+        raw: object = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(raw, dict):
+        return None
+    if not all(isinstance(key, str) for key in raw):
+        return None
+
+    return cast(dict[str, Any], raw)
+
+
+def load_result(run_identifier: str) -> Optional[dict[str, Any]]:
     """Load a result from history by name or path."""
     # Handle "latest" special case
     if run_identifier.lower() == "latest":
@@ -28,12 +44,12 @@ def load_result(run_identifier: str) -> Optional[Dict[str, Any]]:
             return None
 
         latest_file = max(json_files, key=lambda p: p.stat().st_mtime)
-        return json.loads(latest_file.read_text(encoding="utf-8"))
+        return _load_json_result(latest_file)
 
     # Try as direct path first
     path = Path(run_identifier)
     if path.exists() and path.suffix == ".json":
-        return json.loads(path.read_text(encoding="utf-8"))
+        return _load_json_result(path)
 
     # Try in history directory
     history_dir = Path.cwd() / ".aicomp" / "history"
@@ -41,17 +57,17 @@ def load_result(run_identifier: str) -> Optional[Dict[str, Any]]:
     # Try exact match
     result_file = history_dir / f"{run_identifier}.json"
     if result_file.exists():
-        return json.loads(result_file.read_text(encoding="utf-8"))
+        return _load_json_result(result_file)
 
     # Try as filename
     result_file = history_dir / run_identifier
     if result_file.exists():
-        return json.loads(result_file.read_text(encoding="utf-8"))
+        return _load_json_result(result_file)
 
     return None
 
 
-def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
+def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None:
     """Create a markdown report from evaluation results."""
     run_name = result.get("run_name", "Unknown")
     timestamp = result.get("timestamp", "N/A")
@@ -65,7 +81,7 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
     try:
         dt = datetime.fromisoformat(timestamp)
         formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         formatted_time = timestamp
 
     # Build markdown report
@@ -78,8 +94,8 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
         "",
         "## Summary",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| **Final Score** | **{final_score:.2f}** |",
         f"| Attack Score | {attack.get('score', 0):.2f} |",
         f"| Defense Score | {defense.get('score', 0):.2f} |",
@@ -91,8 +107,8 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
         "",
         "### Overview",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Score | {attack.get('score', 0):.2f} |",
         f"| Raw Score | {attack.get('score_raw', 0):.2f} |",
         f"| Total Findings | {attack.get('findings_count', 0)} |",
@@ -125,7 +141,9 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
         elif unique_cells >= 2:
             lines.append("✓ **Good coverage** - found several different vulnerabilities.")
         else:
-            lines.append("⚠️ **Limited coverage** - consider exploring more diverse attack vectors.")
+            lines.append(
+                "⚠️ **Limited coverage** - consider exploring more diverse attack vectors."
+            )
         lines.append("")
     else:
         lines.append(
@@ -141,8 +159,8 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
             "",
             "### Overview",
             "",
-            f"| Metric | Value |",
-            f"|--------|-------|",
+            "| Metric | Value |",
+            "|--------|-------|",
             f"| Score | {defense.get('score', 0):.2f} |",
             f"| Breaches (violations) | {defense.get('breach_count', 0)} |",
             f"| False Positives | {defense.get('false_positives', 0)}/{defense.get('benign_trials', 7)} |",
@@ -154,7 +172,6 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
 
     # Add defense analysis
     breaches = defense.get("breach_count", 0)
-    fps = defense.get("false_positives", 0)
     fp_rate = defense.get("false_positive_rate", 0)
 
     lines.extend(
@@ -231,7 +248,7 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
             "- View history: `aicomp history`",
             "- Run new evaluation: `aicomp test <submission>`",
             "",
-            f"*Report generated by aicomp CLI v1.0*",
+            "*Report generated by aicomp CLI v1.0*",
         ]
     )
 
@@ -239,7 +256,7 @@ def create_markdown_report(result: Dict[str, Any], output_path: Path) -> None:
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def create_matplotlib_visualizations(result: Dict[str, Any], output_dir: Path) -> bool:
+def create_matplotlib_visualizations(result: Mapping[str, Any], output_dir: Path) -> bool:
     """Create matplotlib charts from results."""
     try:
         import matplotlib
@@ -255,7 +272,9 @@ def create_matplotlib_visualizations(result: Dict[str, Any], output_dir: Path) -
     # Create figure with subplots
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     fig.suptitle(
-        f"Evaluation Results: {result.get('run_name', 'Unknown')}", fontsize=16, fontweight="bold"
+        f"Evaluation Results: {result.get('run_name', 'Unknown')}",
+        fontsize=16,
+        fontweight="bold",
     )
 
     # 1. Score breakdown (top-left)
@@ -305,9 +324,7 @@ def create_matplotlib_visualizations(result: Dict[str, Any], output_dir: Path) -
     # 3. Defense effectiveness (bottom-left)
     ax3 = axes[1, 0]
     breaches = defense.get("breach_count", 0)
-    benign = defense.get("benign_trials", 7)
     fps = defense.get("false_positives", 0)
-    blocked = benign - fps
 
     categories = ["Breaches\n(Lower Better)", "Benign Blocked\n(Lower Better)"]
     values = [breaches, fps]
@@ -367,7 +384,12 @@ def create_matplotlib_visualizations(result: Dict[str, Any], output_dir: Path) -
 
 def run_visualize(args) -> int:
     """Execute visualize command."""
-    from aicomp_sdk.cli.main import print_error, print_info, print_success, print_warning
+    from aicomp_sdk.cli.main import (
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+    )
 
     # Load result
     result = load_result(args.run)

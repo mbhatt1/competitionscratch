@@ -6,54 +6,51 @@ Provides subcommands for common operations on competition submissions.
 
 import argparse
 import sys
-from typing import Optional
+from typing import Callable, Optional, TextIO
 
-# Try to import rich for beautiful output, fall back to basic colors
+# Try to import rich for beautiful output, fall back to plain output.
+RICH_PRINT: Optional[Callable[[str], None]]
 try:
     from rich.console import Console
-    from rich.panel import Panel
-    from rich.text import Text
 
-    RICH_AVAILABLE = True
+    RICH_PRINT = Console().print
 except ImportError:
-    RICH_AVAILABLE = False
-    Console = None
+    RICH_PRINT = None
+
+
+def _print_message(
+    icon: str,
+    color: str,
+    message: str,
+    *,
+    fallback_file: Optional[TextIO] = None,
+) -> None:
+    """Print with rich formatting when available, else plain text."""
+    if RICH_PRINT is not None:
+        RICH_PRINT(f"[{color}]{icon}[/{color}] {message}")
+        return
+
+    print(f"{icon} {message}", file=fallback_file)
 
 
 def print_success(message: str) -> None:
     """Print success message with color."""
-    if RICH_AVAILABLE:
-        console = Console()
-        console.print(f"[green]✓[/green] {message}")
-    else:
-        print(f"✓ {message}")
+    _print_message("✓", "green", message)
 
 
 def print_error(message: str) -> None:
     """Print error message with color."""
-    if RICH_AVAILABLE:
-        console = Console()
-        console.print(f"[red]✗[/red] {message}")
-    else:
-        print(f"✗ {message}", file=sys.stderr)
+    _print_message("✗", "red", message, fallback_file=sys.stderr)
 
 
 def print_info(message: str) -> None:
     """Print info message with color."""
-    if RICH_AVAILABLE:
-        console = Console()
-        console.print(f"[blue]ℹ[/blue] {message}")
-    else:
-        print(f"ℹ {message}")
+    _print_message("ℹ", "blue", message)
 
 
 def print_warning(message: str) -> None:
     """Print warning message with color."""
-    if RICH_AVAILABLE:
-        console = Console()
-        console.print(f"[yellow]⚠[/yellow] {message}")
-    else:
-        print(f"⚠ {message}")
+    _print_message("⚠", "yellow", message)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -115,7 +112,10 @@ For more help on a command: aicomp <command> --help
     )
     test_parser.add_argument("submission", help="Path to submission file or zip")
     test_parser.add_argument(
-        "--seconds", type=float, default=3600.0, help="Total time budget in seconds (default: 3600)"
+        "--seconds",
+        type=float,
+        default=3600.0,
+        help="Total time budget in seconds (default: 3600)",
     )
     test_parser.add_argument(
         "--quick", action="store_true", help="Quick test with reduced time budget"
@@ -163,7 +163,8 @@ For more help on a command: aicomp <command> --help
     )
     visualize_parser.add_argument("run", help='Run name or "latest" for most recent')
     visualize_parser.add_argument(
-        "--output", help="Output directory for charts (default: .aicomp/visualizations/)"
+        "--output",
+        help="Output directory for charts (default: .aicomp/visualizations/)",
     )
     visualize_parser.add_argument(
         "--format",

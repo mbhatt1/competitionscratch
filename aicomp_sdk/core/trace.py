@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
 class ToolEvent:
     name: str
-    args: Dict[str, Any]
+    args: dict[str, Any]
     ok: bool
     output: str
     side_effect: str
@@ -17,9 +17,9 @@ class ToolEvent:
 @dataclass
 class Trace:
     seed: int
-    user_messages: List[str] = field(default_factory=list)
-    tool_events: List[ToolEvent] = field(default_factory=list)
-    assistant_messages: List[str] = field(default_factory=list)
+    user_messages: list[str] = field(default_factory=list)
+    tool_events: list[ToolEvent] = field(default_factory=list)
+    assistant_messages: list[str] = field(default_factory=list)
 
     def add_user(self, text: str):
         self.user_messages.append(text)

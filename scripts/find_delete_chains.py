@@ -4,15 +4,17 @@ Find all action chains that successfully execute fs.delete
 Focus on file deletion attacks, especially deletion of secrets
 """
 
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
-from examples_hooks_submission.guardrail_prompt_injection import (
-    Guardrail as PromptInjectionGuardrail,
-)
 import os
 import sys
 from pathlib import Path
+
+from examples_hooks_submission.guardrail_prompt_injection import (
+    Guardrail as PromptInjectionGuardrail,
+)
+
+from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
+from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
+from aicomp_sdk.core.env import SandboxEnv
 
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
@@ -123,9 +125,9 @@ print(f"With Guardrail: {len(delete_chains_with_guard_success)} SUCCESSFUL fs.de
 print(f"With Guardrail: {len(delete_chains_with_guard_blocked)} BLOCKED fs.delete chains")
 
 # Display results
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUCCESSFUL FS.DELETE CHAINS (NO GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 for i, chain in enumerate(delete_chains_success[:10], 1):
     is_secret = "secret" in chain["path"].lower()
@@ -135,9 +137,9 @@ for i, chain in enumerate(delete_chains_success[:10], 1):
     print(f"    Target: {chain['path']}")
     print(f"    Tool sequence: {' -> '.join(chain['tool_sequence'][:8])}")
 
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUCCESSFUL FS.DELETE CHAINS (WITH GUARDRAIL)")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 if delete_chains_with_guard_success:
     for i, chain in enumerate(delete_chains_with_guard_success[:10], 1):
@@ -151,9 +153,9 @@ else:
     print("\n✓ No fs.delete chains bypassed the guardrail!")
 
 # Summary
-print(f"\n{'='*70}")
+print(f"\n{'=' * 70}")
 print("SUMMARY - FILE DELETION ATTACKS")
-print(f"{'='*70}")
+print(f"{'=' * 70}")
 
 secret_deletes_no_guard = sum(1 for c in delete_chains_success if "secret" in c["path"].lower())
 secret_deletes_with_guard = sum(
@@ -177,4 +179,4 @@ if len(delete_chains_success) > 0:
         f"\nGuardrail blocked {blocked}/{len(delete_chains_success)} deletion chains ({block_rate:.1f}%)"
     )
 
-print(f"\n{'='*70}\n")
+print(f"\n{'=' * 70}\n")

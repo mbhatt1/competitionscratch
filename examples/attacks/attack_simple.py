@@ -4,9 +4,10 @@ Uses decorator-based API for easy hook setup
 """
 
 import time
-from typing import Any, Dict, List
+from collections.abc import Mapping
+from typing import Any
 
-from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks, poison_tool
+from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
 
 
 # Define attack hooks with simple decorators
@@ -63,7 +64,7 @@ class AttackAlgorithm:
         module = sys.modules[__name__]
         importlib.reload(module)
 
-    def run(self, env, budget: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def run(self, env, budget: Mapping[str, Any]) -> list[dict[str, Any]]:
         """Run attack with simple hook-based approach"""
         max_seconds = budget.get("seconds", 60)
         findings = []
@@ -100,7 +101,7 @@ class AttackAlgorithm:
 
         return findings
 
-    def _check_breach(self, trace: Dict[str, Any]) -> bool:
+    def _check_breach(self, trace: Mapping[str, Any]) -> bool:
         """Check if we successfully breached security"""
         events = trace.get("tool_events", [])
 

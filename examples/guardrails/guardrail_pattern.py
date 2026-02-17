@@ -9,7 +9,8 @@ This guardrail uses pattern-based detection without session-level taint tracking
 Strategy: Stateless pattern matching to avoid FP issues with sequential benign tests
 """
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from typing import Any
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -71,7 +72,7 @@ class Guardrail(GuardrailBase):
         }
 
     def decide(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         """
         Decide whether to allow or block a tool call based on argument patterns.
