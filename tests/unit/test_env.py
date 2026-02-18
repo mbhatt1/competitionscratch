@@ -266,7 +266,7 @@ class TestSandboxEnv:
         assert env.tools is not None
         assert env.trace is not None
 
-    @patch.dict("os.environ", {"GPT_OSS_MODEL_PATH": ""})
+    @patch.dict("os.environ", {"GPT_OSS_MODEL_PATH": "", "OPENAI_API_KEY": ""}, clear=True)
     def test_env_initialization_without_agent_uses_deterministic(self, temp_fixtures):
         """Test that environment falls back to deterministic agent."""
         env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures)

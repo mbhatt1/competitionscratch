@@ -9,7 +9,14 @@ from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate
 
 
 class _FakeSandboxEnv:
-    def __init__(self, seed: int, fixtures_dir, guardrail, agent=None):  # noqa: ANN001
+    def __init__(  # noqa: ANN001
+        self,
+        seed: int,
+        fixtures_dir,
+        guardrail,
+        agent=None,
+        agent_mode: str = "auto",
+    ):
         self.seed = seed
         self._messages: list[str] = []
 
