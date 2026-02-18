@@ -36,4 +36,5 @@ class AttackAlgorithmBase(ABC):
         self.config: dict[str, Any] = dict(config or {})
 
     @abstractmethod
-    def run(self, env: "SandboxEnv", config: AttackRunConfig) -> list[AttackCandidate]: ...
+    def run(self, env: "SandboxEnv", config: AttackRunConfig) -> list[AttackCandidate]:
+        pass

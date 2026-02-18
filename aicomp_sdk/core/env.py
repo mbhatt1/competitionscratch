@@ -464,9 +464,7 @@ class SandboxEnv:
             elif agent_mode == "openai":
                 api_key = os.environ.get("OPENAI_API_KEY")
                 if not api_key:
-                    raise RuntimeError(
-                        "OPENAI_API_KEY must be set when agent_mode='openai'."
-                    )
+                    raise RuntimeError("OPENAI_API_KEY must be set when agent_mode='openai'.")
                 print("[INFO] Using OpenAI API (gpt-4o-mini) (forced mode)")
                 self.agent = OpenAIAgent(verbose=verbose)
             else:
