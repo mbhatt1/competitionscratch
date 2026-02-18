@@ -9,14 +9,14 @@ from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from types import ModuleType
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import (
     AttackAlgorithm as BaselineAttacker,
 )
 from aicomp_sdk.core.cells import cell_signature
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env import AgentMode, SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.scoring import (
     get_score_breakdown,
@@ -188,10 +188,15 @@ def eval_defense(
     agent=None,
     attack_seed: int = 123,
     benign_seed: int = 999,
+    agent_mode: AgentMode = "auto",
 ) -> dict[str, Any]:
     # baseline attacker vs user guardrail
     env = SandboxEnv(
-        seed=attack_seed, fixtures_dir=FIXTURES, agent=agent, guardrail=user_guardrail_cls()
+        seed=attack_seed,
+        fixtures_dir=FIXTURES,
+        agent=agent,
+        agent_mode=agent_mode,
+        guardrail=user_guardrail_cls(),
     )
     env.reset()
 
@@ -213,7 +218,11 @@ def eval_defense(
     for p in benign:
         # Create fresh environment for EACH benign test (simulates independent user sessions)
         env2 = SandboxEnv(
-            seed=benign_seed, fixtures_dir=FIXTURES, agent=agent, guardrail=user_guardrail_cls()
+            seed=benign_seed,
+            fixtures_dir=FIXTURES,
+            agent=agent,
+            agent_mode=agent_mode,
+            guardrail=user_guardrail_cls(),
         )
         env2.reset()
         env2.interact(p)
@@ -234,13 +243,19 @@ def eval_defense(
 
 
 def eval_attack(
-    user_attack_cls, seconds: float, attack_seed: int = 123
+    user_attack_cls,
+    seconds: float,
+    attack_seed: int = 123,
+    agent_mode: AgentMode = "auto",
 ) -> list[dict[str, Any]]:
     # user attacker vs optimal guardrail (0 breaches baseline)
     attack_cls = _require_attack_class(user_attack_cls)
 
     run_env = SandboxEnv(
-        seed=attack_seed, fixtures_dir=FIXTURES, guardrail=OptimalGuardrail()
+        seed=attack_seed,
+        fixtures_dir=FIXTURES,
+        agent_mode=agent_mode,
+        guardrail=OptimalGuardrail(),
     )
     run_env.reset()
     attacker = attack_cls(config={})
@@ -260,7 +275,10 @@ def eval_attack(
 
         replay_messages = _validate_candidate_messages(candidate, idx)
         replay_env = SandboxEnv(
-            seed=attack_seed, fixtures_dir=FIXTURES, guardrail=OptimalGuardrail()
+            seed=attack_seed,
+            fixtures_dir=FIXTURES,
+            agent_mode=agent_mode,
+            guardrail=OptimalGuardrail(),
         )
         replay_env.reset()
         for user_message in replay_messages:
@@ -297,7 +315,15 @@ def main():
     )
     ap.add_argument("--seconds", type=float, default=3600.0)  # 1 hour
     ap.add_argument("--verbose", action="store_true", help="Print detailed breakdown")
+    ap.add_argument(
+        "--agent_mode",
+        type=str,
+        default="auto",
+        choices=["auto", "deterministic", "openai"],
+        help="Agent selection mode for both offense and defense eval.",
+    )
     args = ap.parse_args()
+    agent_mode = cast(AgentMode, args.agent_mode)
 
     zip_path = Path(args.submission_zip).resolve()
     total_seconds = float(args.seconds)
@@ -321,7 +347,7 @@ def main():
         print("\n" + "=" * 70)
         print("EVALUATING OFFENSE (Your Attack vs Data-Flow Guardrail)")
         print("=" * 70)
-        attack_findings = eval_attack(attack_cls, offense_seconds)
+        attack_findings = eval_attack(attack_cls, offense_seconds, agent_mode=agent_mode)
         attack_score = score_attack(attack_findings)
         attack_raw = score_attack_raw(attack_findings)
 
@@ -329,7 +355,11 @@ def main():
         print("\n" + "=" * 70)
         print("EVALUATING DEFENSE (Baseline Attack vs Your Guardrail)")
         print("=" * 70)
-        defense_report = eval_defense(guard_mod.Guardrail, defense_seconds)
+        defense_report = eval_defense(
+            guard_mod.Guardrail,
+            defense_seconds,
+            agent_mode=agent_mode,
+        )
         defense_score = score_defense(defense_report)
 
         # Calculate final score

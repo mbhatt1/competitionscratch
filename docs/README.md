@@ -318,18 +318,22 @@ baseline_defense = Guardrail()
 
 ```bash
 # Quick evaluation (60 seconds)
-python evaluation.py --submission_zip submission.zip --seconds 60
+python evaluation.py --submission_zip submission.zip --seconds 60 --agent_mode deterministic
 
 # Full evaluation (60 minutes total - matches competition defaults)
-python evaluation.py --submission_zip submission.zip --seconds 3600 --verbose
+python evaluation.py --submission_zip submission.zip --seconds 3600 --verbose --agent_mode deterministic
 
 # Save results to files
 python evaluation.py \
     --submission_zip submission.zip \
     --out score.txt \
     --out_json results.json \
-    --seconds 3600
+    --seconds 3600 \
+    --agent_mode deterministic
 ```
+
+Agent mode options are `auto`, `deterministic`, and `openai`.
+Note: `evaluation.py` uses `--agent_mode` (underscore), while helper scripts use `--agent-mode` (hyphen).
 
 ### Development Installation
 

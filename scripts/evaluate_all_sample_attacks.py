@@ -16,16 +16,18 @@ import argparse
 import contextlib
 import importlib.util
 import io
+import os
 import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
 
+from aicomp_sdk.core.env import AgentMode  # noqa: E402
 from aicomp_sdk.scoring import score_attack  # noqa: E402
 from evaluation import eval_attack  # noqa: E402
 
@@ -69,6 +71,13 @@ def parse_args() -> argparse.Namespace:
         default=str(DEFAULT_OUTPUT),
         help=f"Output markdown path (default: {DEFAULT_OUTPUT}).",
     )
+    parser.add_argument(
+        "--agent-mode",
+        type=str,
+        default="deterministic",
+        choices=["auto", "deterministic", "openai"],
+        help="Agent mode for evaluation runs (default: deterministic).",
+    )
     return parser.parse_args()
 
 
@@ -82,6 +91,14 @@ def parse_seeds(raw: str) -> list[int]:
     if not seeds:
         return list(DEFAULT_SEEDS)
     return seeds
+
+
+def format_agent_mode(agent_mode: AgentMode) -> str:
+    if agent_mode == "deterministic":
+        return "Deterministic vulnerable agent (forced)"
+    if agent_mode == "openai":
+        return "OpenAI API agent (forced)"
+    return "Auto selection (gpt-oss -> OpenAI if key -> deterministic)"
 
 
 def mean_std(values: list[float]) -> tuple[float, float]:
@@ -147,6 +164,7 @@ def test_attack(
     attack_path: Path,
     attack_seconds: float,
     seeds: list[int],
+    agent_mode: AgentMode,
 ) -> dict[str, Any]:
     """Test one attack algorithm against the optimal guardrail across seeds."""
     md_print(f"\n### Testing: **{name}**")
@@ -155,6 +173,7 @@ def test_attack(
     attack_class = load_attack_class(attack_path)
     md_print(f"- **Attack budget per run:** {attack_seconds:.1f}s")
     md_print("- **Budget semantics:** passed directly to eval_attack as AttackRunConfig.seconds")
+    md_print(f"- **Agent mode:** {format_agent_mode(agent_mode)}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
 
     scores_per_run: list[float] = []
@@ -165,7 +184,12 @@ def test_attack(
     for seed in seeds:
         captured_output = io.StringIO()
         with contextlib.redirect_stdout(captured_output):
-            findings = eval_attack(attack_class, attack_seconds, attack_seed=seed)
+            findings = eval_attack(
+                attack_class,
+                attack_seconds,
+                attack_seed=seed,
+                agent_mode=agent_mode,
+            )
 
         breach_count = len(findings)
         attack_score = score_attack(findings)
@@ -215,6 +239,10 @@ def main() -> None:
     args = parse_args()
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
+    agent_mode = cast(AgentMode, args.agent_mode)
+
+    if agent_mode == "openai" and not os.environ.get("OPENAI_API_KEY"):
+        raise SystemExit("OPENAI_API_KEY must be set when --agent-mode openai")
 
     ensure_secret_file()
 
@@ -233,7 +261,7 @@ def main() -> None:
     md_print()
     md_print("- **Evaluation Type:** Attack (user attacks vs. optimal guardrail)")
     md_print("- **Guardrail:** Optimal guardrail")
-    md_print("- **Agent:** Deterministic (testing mode, no API keys)")
+    md_print(f"- **Agent:** {format_agent_mode(agent_mode)}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
     md_print(f"- **Attack budget per run:** {args.seconds:.1f}s")
     md_print("- **Budget semantics:** eval_attack uses AttackRunConfig.seconds directly")
@@ -250,6 +278,7 @@ def main() -> None:
                 repo_root / rel_path,
                 attack_seconds=args.seconds,
                 seeds=seeds,
+                agent_mode=agent_mode,
             )
             results.append(result)
         except Exception as err:

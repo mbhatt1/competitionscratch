@@ -17,16 +17,18 @@ import argparse
 import contextlib
 import importlib.util
 import io
+import os
 import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
 
+from aicomp_sdk.core.env import AgentMode  # noqa: E402
 from aicomp_sdk.scoring import score_defense  # noqa: E402
 from evaluation import eval_defense  # noqa: E402
 
@@ -82,6 +84,13 @@ def parse_args() -> argparse.Namespace:
         default=str(DEFAULT_OUTPUT),
         help=f"Output markdown path (default: {DEFAULT_OUTPUT}).",
     )
+    parser.add_argument(
+        "--agent-mode",
+        type=str,
+        default="deterministic",
+        choices=["auto", "deterministic", "openai"],
+        help="Agent mode for evaluation runs (default: deterministic).",
+    )
     return parser.parse_args()
 
 
@@ -95,6 +104,14 @@ def parse_seeds(raw: str) -> list[int]:
     if not seeds:
         return list(DEFAULT_SEEDS)
     return seeds
+
+
+def format_agent_mode(agent_mode: AgentMode) -> str:
+    if agent_mode == "deterministic":
+        return "Deterministic vulnerable agent (forced)"
+    if agent_mode == "openai":
+        return "OpenAI API agent (forced)"
+    return "Auto selection (gpt-oss -> OpenAI if key -> deterministic)"
 
 
 def mean_std(values: list[float]) -> tuple[float, float]:
@@ -156,11 +173,17 @@ def effective_attack_budget(eval_seconds: float) -> float:
     return max(10.0, eval_seconds * 0.7)
 
 
-def test_guardrail(name: str, guardrail_path: Path, eval_seconds: float, seeds: list[int]) -> dict[str, Any]:
+def test_guardrail(
+    name: str,
+    guardrail_path: Path,
+    eval_seconds: float,
+    seeds: list[int],
+    agent_mode: AgentMode,
+) -> dict[str, Any]:
     """Test a guardrail against baseline attacker across one or more seeds."""
     md_print(f"\n### Testing: **{name}**")
     md_print()
-    md_print("[INFO] Using deterministic vulnerable agent (testing mode)")
+    md_print(f"[INFO] Agent mode: {format_agent_mode(agent_mode)}")
 
     guardrail_class = load_guardrail_class(guardrail_path)
     effective_seconds = effective_attack_budget(eval_seconds)
@@ -188,6 +211,7 @@ def test_guardrail(name: str, guardrail_path: Path, eval_seconds: float, seeds: 
                 eval_seconds,
                 attack_seed=seed,
                 benign_seed=seed + BENIGN_SEED_OFFSET,
+                agent_mode=agent_mode,
             )
 
         breaches_found = int(defense_report["breach_count"])
@@ -260,6 +284,10 @@ def main() -> None:
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
     pattern_seconds = args.pattern_seconds if args.pattern_seconds is not None else args.seconds
+    agent_mode = cast(AgentMode, args.agent_mode)
+
+    if agent_mode == "openai" and not os.environ.get("OPENAI_API_KEY"):
+        raise SystemExit("OPENAI_API_KEY must be set when --agent-mode openai")
 
     ensure_secret_file()
 
@@ -278,7 +306,7 @@ def main() -> None:
     md_print()
     md_print("- **Evaluation Type:** Defense (baseline attack vs. user guardrails)")
     md_print("- **Attacker:** Go-Explore baseline")
-    md_print("- **Agent:** Deterministic (testing mode, no API keys)")
+    md_print(f"- **Agent:** {format_agent_mode(agent_mode)}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
     md_print(
         f"- **Standard guardrail evaluation budget:** {args.seconds:.1f}s "
@@ -298,7 +326,13 @@ def main() -> None:
 
     for name, rel_path in GUARDRAILS:
         try:
-            result = test_guardrail(name, repo_root / rel_path, eval_seconds=args.seconds, seeds=seeds)
+            result = test_guardrail(
+                name,
+                repo_root / rel_path,
+                eval_seconds=args.seconds,
+                seeds=seeds,
+                agent_mode=agent_mode,
+            )
             results.append(result)
         except Exception as err:
             md_print(f"\n❌ **Error testing {name}:** {err}")
@@ -321,6 +355,7 @@ def main() -> None:
             repo_root / pattern_rel_path,
             eval_seconds=pattern_seconds,
             seeds=seeds,
+            agent_mode=agent_mode,
         )
         results.append(pattern_result)
     except Exception as err:

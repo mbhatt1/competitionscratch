@@ -302,11 +302,13 @@ Upload to the competition platform and check the leaderboard!
 
 ```bash
 # Quick test (60 seconds)
-python evaluation.py --submission_zip submission.zip --seconds 60
+python evaluation.py --submission_zip submission.zip --seconds 60 --agent_mode deterministic
 
 # Full test suite
 pytest tests/ -v
 ```
+
+`evaluation.py` supports `--agent_mode {auto,deterministic,openai}`.
 
 👉 **[Complete Testing Guide](docs/TESTING_GUIDE.md)** - All tests, fixtures, debugging tips
 
