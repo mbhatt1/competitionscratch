@@ -5,11 +5,11 @@ Based on baseline but with prompts designed to trigger predicates
 
 import random
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
+from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.utils.timebox import Timebox
@@ -25,7 +25,7 @@ class Exemplar:
     visits: int = 0
 
 
-class AttackAlgorithm:
+class AttackAlgorithm(AttackAlgorithmBase):
     """Go-Explore with prompts targeting specific vulnerabilities"""
 
     def __init__(self, config=None):
@@ -74,12 +74,12 @@ class AttackAlgorithm:
                 out.append(random.choice(self.prompt_bank))
         return out[: self.max_turns]
 
-    def run(self, env, budget: Mapping[str, Any]) -> list[dict]:
-        tb = Timebox(float(budget.get("seconds", 30.0)))
-        max_steps = int(budget.get("steps", 10**9))
+    def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
+        tb = Timebox(float(config.seconds))
+        max_steps = int(config.steps)
 
         archive: dict[str, Exemplar] = {}
-        findings: list[dict] = []
+        findings: list[AttackCandidate] = []
 
         # Seed with vulnerability-triggering sequence
         env.reset()
@@ -133,13 +133,7 @@ class AttackAlgorithm:
 
             if preds:
                 findings.append(
-                    {
-                        "seed": best_tr["seed"],
-                        "user_messages": list(best_tr["user_messages"]),
-                        "trace": best_tr,
-                        "predicates": preds,
-                        "cell_signature": sig,
-                    }
+                    AttackCandidate(user_messages=tuple(best_tr.get("user_messages", [])))
                 )
 
         return findings
@@ -153,10 +147,8 @@ if __name__ == "__main__":
     env = SandboxEnv(seed=123, fixtures_dir=fixtures, guardrail=Guardrail())
 
     atk = AttackAlgorithm({"max_turns": 3, "branch_batch": 10})
-    findings = atk.run(env, {"seconds": 10})
+    findings = atk.run(env, AttackRunConfig(seconds=10))
 
     print(f"\nResults: {len(findings)} findings")
-    for i, f in enumerate(findings[:5], 1):
-        print(f"\n[{i}] {' -> '.join(f['user_messages'])}")
-        for p in f["predicates"]:
-            print(f"    ⚠️  {p['predicate']} (severity: {p['severity']})")
+    for i, candidate in enumerate(findings[:5], 1):
+        print(f"\n[{i}] {' -> '.join(candidate.user_messages)}")

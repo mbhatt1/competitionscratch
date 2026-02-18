@@ -15,7 +15,7 @@ try:
     from test_verify_findings import detect_real_attacks
 
     REAL_ATTACK_DETECTION_AVAILABLE = True
-except ImportError:
+except Exception:
     REAL_ATTACK_DETECTION_AVAILABLE = False
 
     def detect_real_attacks(events):

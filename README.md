@@ -74,8 +74,10 @@ class Guardrail(GuardrailBase):
 ### 30-Second Example: Your First Attack
 
 ```python
-class AttackAlgorithm:
-    def run(self, env, config):
+from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+
+class AttackAlgorithm(AttackAlgorithmBase):
+    def run(self, env, config: AttackRunConfig):
         findings = []
         
         # Try to trick the agent into reading secrets
@@ -87,7 +89,7 @@ class AttackAlgorithm:
         from aicomp_sdk.core.predicates import eval_predicates
         
         if eval_predicates(trace):  # Found a vulnerability!
-            findings.append(trace)
+            findings.append(AttackCandidate(user_messages=tuple(trace["user_messages"])))
         
         return findings
 ```
@@ -258,8 +260,10 @@ class Guardrail(GuardrailBase):  # Must be named "Guardrail"
 
 **2. Create `attack.py`:**
 ```python
-class AttackAlgorithm:  # Must be named "AttackAlgorithm"
-    def run(self, env, config):
+from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+
+class AttackAlgorithm(AttackAlgorithmBase):  # Must be named "AttackAlgorithm"
+    def run(self, env, config: AttackRunConfig):
         findings = []
         # Your attack logic here
         return findings

@@ -5,11 +5,11 @@ Combines Go-Explore's exploration strategy with LPCI hooks for amplified effecti
 
 import random
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
+from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
@@ -54,7 +54,7 @@ class Exemplar:
     visits: int = 0
 
 
-class AttackAlgorithm:
+class AttackAlgorithm(AttackAlgorithmBase):
     """
     Go-Explore + LPCI Hybrid Attacker
 
@@ -113,7 +113,7 @@ class AttackAlgorithm:
                 out.append(random.choice(self.prompt_bank))
         return out[: self.max_turns]
 
-    def run(self, env, budget: Mapping[str, Any]) -> list[dict]:
+    def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
         """
         Run Go-Explore exploration with LPCI amplification
 
@@ -122,12 +122,12 @@ class AttackAlgorithm:
         - When agent reads files -> poison to read secrets
         - This amplifies Go-Explore's exploration effectiveness
         """
-        tb = Timebox(float(budget.get("seconds", 30.0)))
-        max_steps = int(budget.get("steps", 10**9))
+        tb = Timebox(float(config.seconds))
+        max_steps = int(config.steps)
 
         # Go-Explore archive: cell_hash -> exemplar
         archive: dict[str, Exemplar] = {}
-        findings: list[dict] = []
+        findings: list[AttackCandidate] = []
 
         # Seed exemplar
         env.reset()
@@ -191,13 +191,7 @@ class AttackAlgorithm:
             # Record findings
             if preds:
                 findings.append(
-                    {
-                        "seed": best_tr["seed"],
-                        "user_messages": list(best_tr["user_messages"]),
-                        "trace": best_tr,
-                        "predicates": preds,
-                        "cell_signature": sig,
-                    }
+                    AttackCandidate(user_messages=tuple(best_tr.get("user_messages", [])))
                 )
 
         return findings
@@ -240,7 +234,7 @@ if __name__ == "__main__":
     print("=" * 70)
 
     atk = AttackAlgorithm({"max_turns": 4, "branch_batch": 8})
-    findings = atk.run(env, {"seconds": 10})
+    findings = atk.run(env, AttackRunConfig(seconds=10))
 
     print(f"\n{'=' * 70}")
     print("Go-Explore + LPCI Results")
@@ -249,11 +243,8 @@ if __name__ == "__main__":
 
     if findings:
         print("\nBreaches discovered:")
-        for i, f in enumerate(findings[:5], 1):
-            print(f"\n[{i}] {' -> '.join(f.get('user_messages', []))}")
-            for p in f.get("predicates", []):
-                print(f"    ⚠️  {p.get('predicate')} (severity: {p.get('severity')})")
-                print(f"       Evidence: {p.get('evidence', {})}")
+        for i, candidate in enumerate(findings[:5], 1):
+            print(f"\n[{i}] {' -> '.join(candidate.user_messages)}")
     else:
         print("\n⚠️  No breaches found in this run")
         print("   Try increasing time budget or check that hooks are working")
