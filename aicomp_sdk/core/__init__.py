@@ -3,8 +3,8 @@
 from typing import Any
 
 from .cells import *
-from .env_api import AttackEnvProtocol, EnvSelection, parse_env_selection
 from .env import SandboxEnv
+from .env_api import AttackEnvProtocol, EnvSelection, parse_env_selection
 
 try:
     from .gym_env import GymAttackEnv as _GymAttackEnv

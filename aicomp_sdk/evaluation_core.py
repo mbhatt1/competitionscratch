@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
 import importlib
+import importlib.util
 import inspect
 import os
 import sys
@@ -14,9 +14,7 @@ from typing import Any, Optional
 
 from aicomp_sdk.agents import AgentFactory
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
-from aicomp_sdk.attacks.baselines.attacker_goexplore import (
-    AttackAlgorithm as BaselineAttacker,
-)
+from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as BaselineAttacker
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.env_api import MAX_USER_MESSAGE_CHARS, EnvSelection, parse_env_selection

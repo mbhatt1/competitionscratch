@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from aicomp_sdk.core.env_api import AttackEnvProtocol, DEFAULT_MAX_TOOL_HOPS
+from aicomp_sdk.core.env_api import DEFAULT_MAX_TOOL_HOPS, AttackEnvProtocol
 
 
 @dataclass(frozen=True)

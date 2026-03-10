@@ -11,8 +11,8 @@ This demonstrates how to use the hook system for:
 from pathlib import Path
 from typing import Optional
 
-from aicomp_sdk.agents import build_agent
 from aicomp_sdk import SandboxEnv
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.guardrails.hooks import (
     HookContext,
     HookResult,
