@@ -10,14 +10,15 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import create_archived_sandbox_env, get_fixtures_dir, setup_imports
 
 setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail as RulesGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 
 
 def run_single_test(seed, signature_type, guardrail_type, fixtures_path):
@@ -46,9 +47,14 @@ def run_single_test(seed, signature_type, guardrail_type, fixtures_path):
     # Select guardrail
     guardrail = AllowGuardrail() if guardrail_type == "allow" else RulesGuardrail()
 
-    env = SandboxEnv(seed=seed, fixtures_dir=fixtures_path, guardrail=guardrail)
+    env = create_archived_sandbox_env(
+        seed=seed,
+        fixtures_dir=fixtures_path,
+        guardrail=guardrail,
+        agent_selection="deterministic",
+    )
     attacker = AttackAlgorithm(config)
-    findings = attacker.run(env, {"seconds": 90})
+    findings = attacker.run(env, {"time_budget_s": 90})
 
     # Count unique attack types
     attack_types = set()
@@ -94,7 +100,7 @@ async def test_signature_across_seeds_async(seeds=[42, 123, 456, 789, 1337], max
         "full_intent_rules": [],
     }
 
-    fixtures = Path(__file__).resolve().parents[1] / "fixtures"
+    fixtures = get_fixtures_dir()
 
     # Create all tasks (4 per seed: 2 signatures × 2 guardrails)
     tasks = []

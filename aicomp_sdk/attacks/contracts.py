@@ -3,19 +3,23 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
-if TYPE_CHECKING:
-    from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env_api import AttackEnvProtocol, DEFAULT_MAX_TOOL_HOPS
 
 
 @dataclass(frozen=True)
 class AttackRunConfig:
-    """Runtime constraints and knobs for an attack submission run."""
+    """Runtime constraints and knobs for an attack submission run.
 
-    seconds: float
-    steps: int = 10**9
-    max_tool_hops: int = 8
+    ``time_budget_s`` is the wall-clock budget for the full attack run.
+    ``max_steps`` caps the attack algorithm's outer-loop search steps.
+    ``max_tool_hops`` caps the blue-agent/tool loop for each attacker message.
+    """
+
+    time_budget_s: float
+    max_steps: int = 10**9
+    max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
 
 
 @dataclass(frozen=True)
@@ -36,5 +40,5 @@ class AttackAlgorithmBase(ABC):
         self.config: dict[str, Any] = dict(config or {})
 
     @abstractmethod
-    def run(self, env: "SandboxEnv", config: AttackRunConfig) -> list[AttackCandidate]:
+    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
         pass

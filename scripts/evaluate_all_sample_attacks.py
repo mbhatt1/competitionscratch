@@ -21,13 +21,20 @@ import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
 
-from aicomp_sdk.core.env import AgentMode  # noqa: E402
+from aicomp_sdk.agents import (  # noqa: E402
+    AgentSelection,
+    build_agent_factory,
+    format_agent_selection,
+    parse_agent_selection,
+    require_agent_selection_configuration,
+)
+from aicomp_sdk.core.env_api import EnvSelection, parse_env_selection  # noqa: E402
 from aicomp_sdk.scoring import score_attack  # noqa: E402
 from evaluation import eval_attack  # noqa: E402
 
@@ -54,7 +61,7 @@ def md_print(text: str = "") -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate attacks (offense-only).")
     parser.add_argument(
-        "--seconds",
+        "--budget-s",
         type=float,
         default=60.0,
         help="Attack budget (seconds) for each run (default: 60).",
@@ -72,11 +79,18 @@ def parse_args() -> argparse.Namespace:
         help=f"Output markdown path (default: {DEFAULT_OUTPUT}).",
     )
     parser.add_argument(
-        "--agent-mode",
+        "--agent",
         type=str,
         default="deterministic",
-        choices=["auto", "deterministic", "openai"],
-        help="Agent mode for evaluation runs (default: deterministic).",
+        choices=[member.value for member in AgentSelection],
+        help="Agent selection for evaluation runs (default: deterministic).",
+    )
+    parser.add_argument(
+        "--env",
+        type=str,
+        default="sandbox",
+        choices=[member.value for member in EnvSelection],
+        help="Evaluation environment selection (default: sandbox).",
     )
     return parser.parse_args()
 
@@ -91,14 +105,6 @@ def parse_seeds(raw: str) -> list[int]:
     if not seeds:
         return list(DEFAULT_SEEDS)
     return seeds
-
-
-def format_agent_mode(agent_mode: AgentMode) -> str:
-    if agent_mode == "deterministic":
-        return "Deterministic vulnerable agent (forced)"
-    if agent_mode == "openai":
-        return "OpenAI API agent (forced)"
-    return "Auto selection (gpt-oss -> OpenAI if key -> deterministic)"
 
 
 def mean_std(values: list[float]) -> tuple[float, float]:
@@ -162,19 +168,24 @@ def merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
 def test_attack(
     name: str,
     attack_path: Path,
-    attack_seconds: float,
+    attack_budget_s: float,
     seeds: list[int],
-    agent_mode: AgentMode,
+    agent_selection: AgentSelection,
+    env_selection: EnvSelection,
 ) -> dict[str, Any]:
     """Test one attack algorithm against the optimal guardrail across seeds."""
     md_print(f"\n### Testing: **{name}**")
     md_print()
 
     attack_class = load_attack_class(attack_path)
-    md_print(f"- **Attack budget per run:** {attack_seconds:.1f}s")
-    md_print("- **Budget semantics:** passed directly to eval_attack as AttackRunConfig.seconds")
-    md_print(f"- **Agent mode:** {format_agent_mode(agent_mode)}")
+    md_print(f"- **Attack budget per run:** {attack_budget_s:.1f}s")
+    md_print(
+        "- **Budget semantics:** passed directly to eval_attack as " "AttackRunConfig.time_budget_s"
+    )
+    md_print(f"- **Agent selection:** {format_agent_selection(agent_selection)}")
+    md_print(f"- **Env selection:** {env_selection.value}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
+    agent_factory = build_agent_factory(agent_selection)
 
     scores_per_run: list[float] = []
     breaches_per_run: list[float] = []
@@ -186,9 +197,10 @@ def test_attack(
         with contextlib.redirect_stdout(captured_output):
             findings = eval_attack(
                 attack_class,
-                attack_seconds,
+                attack_budget_s,
+                agent_factory=agent_factory,
+                env_selection=env_selection,
                 attack_seed=seed,
-                agent_mode=agent_mode,
             )
 
         breach_count = len(findings)
@@ -204,7 +216,9 @@ def test_attack(
     score_mean, score_std = mean_std(scores_per_run)
     breaches_mean, breaches_std = mean_std(breaches_per_run)
 
-    md_print(f"- **Breaches found:** {fmt_mean_std(breaches_mean, breaches_std, precision=1)} (n={len(seeds)})")
+    md_print(
+        f"- **Breaches found:** {fmt_mean_std(breaches_mean, breaches_std, precision=1)} (n={len(seeds)})"
+    )
     md_print(f"- **Attack Score:** {fmt_mean_std(score_mean, score_std, precision=1)}/1000")
 
     if predicate_occurrence_counts:
@@ -225,13 +239,14 @@ def test_attack(
     return {
         "name": name,
         "runs": len(seeds),
-        "attack_seconds": attack_seconds,
+        "attack_budget_s": attack_budget_s,
         "score_mean": score_mean,
         "score_std": score_std,
         "breaches_mean": breaches_mean,
         "breaches_std": breaches_std,
         "predicate_occurrence_counts": predicate_occurrence_counts,
         "predicate_breach_counts": predicate_breach_counts,
+        "env_selection": env_selection.value,
     }
 
 
@@ -239,10 +254,13 @@ def main() -> None:
     args = parse_args()
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
-    agent_mode = cast(AgentMode, args.agent_mode)
+    agent_selection = parse_agent_selection(args.agent)
+    env_selection = parse_env_selection(args.env)
 
-    if agent_mode == "openai" and not os.environ.get("OPENAI_API_KEY"):
-        raise SystemExit("OPENAI_API_KEY must be set when --agent-mode openai")
+    try:
+        require_agent_selection_configuration(agent_selection)
+    except RuntimeError as err:
+        raise SystemExit(str(err)) from err
 
     ensure_secret_file()
 
@@ -253,18 +271,17 @@ def main() -> None:
     md_print(
         "**IMPORTANT:** This is ATTACK evaluation only. It measures how well attacks find vulnerabilities."
     )
-    md_print(
-        "Defense scoring (measuring your guardrail's effectiveness) is evaluated separately."
-    )
+    md_print("Defense scoring (measuring your guardrail's effectiveness) is evaluated separately.")
     md_print()
     md_print("## Test Configuration")
     md_print()
     md_print("- **Evaluation Type:** Attack (user attacks vs. optimal guardrail)")
     md_print("- **Guardrail:** Optimal guardrail")
-    md_print(f"- **Agent:** {format_agent_mode(agent_mode)}")
+    md_print(f"- **Agent:** {format_agent_selection(agent_selection)}")
+    md_print(f"- **Env:** {env_selection.value}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
-    md_print(f"- **Attack budget per run:** {args.seconds:.1f}s")
-    md_print("- **Budget semantics:** eval_attack uses AttackRunConfig.seconds directly")
+    md_print(f"- **Attack budget per run:** {args.budget_s:.1f}s")
+    md_print("- **Budget semantics:** eval_attack uses AttackRunConfig.time_budget_s directly")
     md_print()
 
     md_print("## Attack Results")
@@ -276,9 +293,10 @@ def main() -> None:
             result = test_attack(
                 name,
                 repo_root / rel_path,
-                attack_seconds=args.seconds,
+                attack_budget_s=args.budget_s,
                 seeds=seeds,
-                agent_mode=agent_mode,
+                agent_selection=agent_selection,
+                env_selection=env_selection,
             )
             results.append(result)
         except Exception as err:

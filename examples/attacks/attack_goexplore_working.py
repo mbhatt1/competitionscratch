@@ -67,8 +67,8 @@ class AttackAlgorithm(AttackAlgorithmBase):
         return out[: self.max_turns]
 
     def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
-        tb = Timebox(float(config.seconds))
-        max_steps = int(config.steps)
+        tb = Timebox(float(config.time_budget_s))
+        max_steps = int(config.max_steps)
 
         archive: dict[str, Exemplar] = {}
         findings: list[AttackCandidate] = []
@@ -135,6 +135,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
 
 
 if __name__ == "__main__":
+    from aicomp_sdk.agents import build_agent
     from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
     from aicomp_sdk.core.env import SandboxEnv
 
@@ -145,9 +146,14 @@ if __name__ == "__main__":
     print("=" * 70)
 
     try:
-        env = SandboxEnv(seed=123, fixtures_dir=fixtures, guardrail=Guardrail())
+        env = SandboxEnv(
+            seed=123,
+            fixtures_dir=fixtures,
+            agent=build_agent("auto"),
+            guardrail=Guardrail(),
+        )
         atk = AttackAlgorithm({"max_turns": 3, "branch_batch": 10})
-        findings = atk.run(env, AttackRunConfig(seconds=10))
+        findings = atk.run(env, AttackRunConfig(time_budget_s=10))
 
         print(f"\nResults: {len(findings)} findings")
 

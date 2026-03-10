@@ -7,27 +7,34 @@ Tests: Strategy diversity + State consensus + Coordinated coverage
 import json
 import os
 import sys
-import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    require_openai_key,
+    setup_imports,
+)
 
 repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.attacks.baselines.shared_archive import SharedArchive
-from aicomp_sdk.core.env import SandboxEnv
 from tests.integration.test_verify_findings import detect_real_attacks
 
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")
     sys.exit(1)
+require_openai_key()
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 
 def extract_stats(findings):
@@ -62,9 +69,14 @@ def run_collaborative_agent(agent_id, config, shared_archive, fixtures, duration
     # to actually USE the shared archive during exploration
     # For now, run independently but could theoretically share
 
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+    env = create_archived_sandbox_env(
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail=AllowGuardrail(),
+        agent_selection="openai",
+    )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config["params"]})
-    findings = atk.run(env, {"seconds": duration_s})
+    findings = atk.run(env, {"time_budget_s": duration_s})
 
     stats = extract_stats(findings)
     print(
@@ -169,9 +181,14 @@ all_stats_indep = []
 
 for i, config in enumerate(agent_configs, 1):
     print(f"  [Agent {i}] Running {config['name']} independently...")
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+    env = create_archived_sandbox_env(
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail=AllowGuardrail(),
+        agent_selection="openai",
+    )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config["params"]})
-    findings = atk.run(env, {"seconds": 60})
+    findings = atk.run(env, {"time_budget_s": 60})
     stats = extract_stats(findings)
     all_stats_indep.append({"agent_id": i, "config": config["name"], "stats": stats})
     all_findings_indep.extend(findings)

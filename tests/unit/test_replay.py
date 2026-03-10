@@ -37,18 +37,13 @@ class TestReplayHarness:
         assert harness.fixtures_dir == temp_fixtures
         assert isinstance(harness.fixtures_dir, Path)
 
-    @patch("builtins.__import__")
-    def test_replay_creates_sandbox_env(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_creates_sandbox_env(self, mock_env_class, temp_fixtures):
         """Test that replay creates a SandboxEnv with correct parameters."""
         # Setup mock environment
-        mock_env_class = MagicMock()
         mock_env_instance = MagicMock()
         mock_env_class.return_value = mock_env_instance
         mock_env_instance.export_trace_dict.return_value = {"seed": 42}
-
-        mock_module = MagicMock()
-        mock_module.SandboxEnv = mock_env_class
-        mock_import.return_value = mock_module
 
         # Create harness and replay
         harness = ReplayHarness(temp_fixtures)
@@ -70,15 +65,13 @@ class TestReplayHarness:
         assert call_kwargs["agent"] == mock_agent
         assert call_kwargs["guardrail"] == mock_guardrail
 
-    @patch("builtins.__import__")
-    def test_replay_resets_environment(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_resets_environment(self, mock_env_class, temp_fixtures):
         """Test that replay resets the environment before replaying."""
         # Setup mock
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = {}
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay
         harness = ReplayHarness(temp_fixtures)
@@ -87,15 +80,13 @@ class TestReplayHarness:
         # Verify reset was called
         mock_env_instance.reset.assert_called_once()
 
-    @patch("builtins.__import__")
-    def test_replay_interacts_with_user_messages(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_interacts_with_user_messages(self, mock_env_class, temp_fixtures):
         """Test that replay interacts with all user messages in order."""
         # Setup mock
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = {"messages": []}
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay with multiple messages
         harness = ReplayHarness(temp_fixtures)
@@ -109,8 +100,8 @@ class TestReplayHarness:
         assert calls[1][0][0] == "message2"
         assert calls[2][0][0] == "message3"
 
-    @patch("builtins.__import__")
-    def test_replay_returns_trace_dict(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_returns_trace_dict(self, mock_env_class, temp_fixtures):
         """Test that replay returns the exported trace dictionary."""
         # Setup mock with expected trace
         expected_trace = {
@@ -121,9 +112,7 @@ class TestReplayHarness:
         }
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = expected_trace
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay
         harness = ReplayHarness(temp_fixtures)
@@ -133,15 +122,13 @@ class TestReplayHarness:
         assert result == expected_trace
         mock_env_instance.export_trace_dict.assert_called_once()
 
-    @patch("builtins.__import__")
-    def test_replay_with_empty_messages(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_with_empty_messages(self, mock_env_class, temp_fixtures):
         """Test that replay works with empty user messages list."""
         # Setup mock
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = {}
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay with no messages
         harness = ReplayHarness(temp_fixtures)
@@ -152,15 +139,13 @@ class TestReplayHarness:
         mock_env_instance.interact.assert_not_called()
         mock_env_instance.export_trace_dict.assert_called_once()
 
-    @patch("builtins.__import__")
-    def test_replay_with_single_message(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_with_single_message(self, mock_env_class, temp_fixtures):
         """Test replay with a single user message."""
         # Setup mock
         mock_env_instance = MagicMock()
         mock_env_instance.export_trace_dict.return_value = {}
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay with one message
         harness = ReplayHarness(temp_fixtures)
@@ -169,17 +154,13 @@ class TestReplayHarness:
         # Should interact once
         mock_env_instance.interact.assert_called_once_with("single message")
 
-    @patch("builtins.__import__")
-    def test_replay_preserves_seed(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_preserves_seed(self, mock_env_class, temp_fixtures):
         """Test that replay uses the correct seed value."""
         # Setup mock
-        mock_env_class = MagicMock()
         mock_env_instance = MagicMock()
         mock_env_class.return_value = mock_env_instance
         mock_env_instance.export_trace_dict.return_value = {}
-        mock_module = MagicMock()
-        mock_module.SandboxEnv = mock_env_class
-        mock_import.return_value = mock_module
 
         # Replay with specific seed
         harness = ReplayHarness(temp_fixtures)
@@ -220,8 +201,8 @@ class TestReplayHarnessIntegration:
 
         return fixtures_dir
 
-    @patch("builtins.__import__")
-    def test_replay_complete_attack_scenario(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_complete_attack_scenario(self, mock_env_class, temp_fixtures):
         """Test replaying a complete attack scenario."""
         # Setup mock to track interactions
         interactions = []
@@ -243,9 +224,7 @@ class TestReplayHarnessIntegration:
             "egress": [{"url": "https://attacker.com", "data": "SECRET"}],
         }
 
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay attack scenario
         harness = ReplayHarness(temp_fixtures)
@@ -265,8 +244,8 @@ class TestReplayHarnessIntegration:
         assert len(result["tool_events"]) == 3
         assert len(result["egress"]) == 1
 
-    @patch("builtins.__import__")
-    def test_replay_with_guardrail_blocks(self, mock_import, temp_fixtures):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_with_guardrail_blocks(self, mock_env_class, temp_fixtures):
         """Test replay scenario where guardrail blocks actions."""
         # Setup mock
         mock_env_instance = MagicMock()
@@ -277,9 +256,7 @@ class TestReplayHarnessIntegration:
             "egress": [],
         }
 
-        mock_module = MagicMock()
-        mock_module.SandboxEnv.return_value = mock_env_instance
-        mock_import.return_value = mock_module
+        mock_env_class.return_value = mock_env_instance
 
         # Replay with blocking guardrail
         harness = ReplayHarness(temp_fixtures)
@@ -310,8 +287,8 @@ class TestReplayHarnessEdgeCases:
         assert harness.fixtures_dir == fixtures_path
         assert isinstance(harness.fixtures_dir, Path)
 
-    @patch("builtins.__import__")
-    def test_replay_with_different_seeds(self, mock_import, tmp_path):
+    @patch("aicomp_sdk.core.replay.SandboxEnv")
+    def test_replay_with_different_seeds(self, mock_env_class, tmp_path):
         """Test that different seeds create independent replays."""
         fixtures_dir = tmp_path / "fixtures"
         fixtures_dir.mkdir()
@@ -325,9 +302,7 @@ class TestReplayHarnessEdgeCases:
             created_envs.append(kwargs["seed"])
             return env
 
-        mock_module = MagicMock()
-        mock_module.SandboxEnv = create_env
-        mock_import.return_value = mock_module
+        mock_env_class.side_effect = create_env
 
         # Replay with different seeds
         harness = ReplayHarness(fixtures_dir)

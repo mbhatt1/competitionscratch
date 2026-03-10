@@ -5,9 +5,11 @@ from .contracts import (
     AttackCandidate,
     AttackRunConfig,
 )
+from aicomp_sdk.core.env_api import AttackEnvProtocol
 
 __all__ = [
     "AttackAlgorithmBase",
     "AttackCandidate",
     "AttackRunConfig",
+    "AttackEnvProtocol",
 ]

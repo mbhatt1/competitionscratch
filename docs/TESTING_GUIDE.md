@@ -136,7 +136,12 @@ pytest tests/ --cov=aicomp_sdk --cov-report=html
 ```python
 def test_perfect_guardrail_blocks_attacks():
     """Perfect guardrail should block all attacks."""
-    env = SandboxEnv(seed=42, fixtures_dir=Path("fixtures"), guardrail=PerfectGuardrail())
+    env = SandboxEnv(
+        seed=42,
+        fixtures_dir=Path("fixtures"),
+        agent=build_agent("deterministic"),
+        guardrail=PerfectGuardrail(),
+    )
     # ... run attack ...
     assert breaches == 0, "Perfect guardrail should have 0 breaches"
 ```
@@ -479,9 +484,14 @@ tests/integration/test_perfect_guardrail.py::test_perfect_guardrail_blocks_attac
 __________________________________ test_perfect_guardrail_blocks_attacks __________________________________
 
     def test_perfect_guardrail_blocks_attacks():
-        env = SandboxEnv(seed=42, fixtures_dir=Path("fixtures"), guardrail=PerfectGuardrail())
+        env = SandboxEnv(
+            seed=42,
+            fixtures_dir=Path("fixtures"),
+            agent=build_agent("deterministic"),
+            guardrail=PerfectGuardrail(),
+        )
         attack = AttackAlgorithm()
-        findings = attack.run(env, {"seconds": 30})
+        findings = attack.run(env, {"time_budget_s": 30})
         
         breaches = len([f for f in findings if eval_predicates(f)])
 >       assert breaches == 0, f"Expected 0 breaches, got {breaches}"
@@ -528,6 +538,7 @@ fixtures_dir = Path("fixtures")
 env = SandboxEnv(
     seed=42,
     fixtures_dir=fixtures_dir,
+    agent=build_agent("deterministic"),
     guardrail=None
 )
 ```
@@ -572,11 +583,13 @@ def test_custom_guardrail_with_fixtures():
     """Test custom guardrail against fixture data."""
     from pathlib import Path
     from aicomp_sdk import SandboxEnv
+    from aicomp_sdk.agents import build_agent
     from my_guardrail import Guardrail
     
     env = SandboxEnv(
         seed=42,
         fixtures_dir=Path("fixtures"),
+        agent=build_agent("deterministic"),
         guardrail=Guardrail()
     )
     
@@ -601,6 +614,7 @@ def test_custom_guardrail_with_fixtures():
 import pytest
 from pathlib import Path
 from aicomp_sdk import SandboxEnv
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from my_package.guardrail import MyGuardrail
@@ -611,12 +625,13 @@ def test_my_guardrail_blocks_attacks():
     env = SandboxEnv(
         seed=42,
         fixtures_dir=Path("fixtures"),
+        agent=build_agent("deterministic"),
         guardrail=MyGuardrail()
     )
     
     # Run baseline attack
     attack = AttackAlgorithm({"max_turns": 10})
-    findings = attack.run(env, {"seconds": 30})
+    findings = attack.run(env, {"time_budget_s": 30})
     
     # Count breaches
     breaches = 0
@@ -634,6 +649,7 @@ def test_my_guardrail_allows_benign():
     env = SandboxEnv(
         seed=42,
         fixtures_dir=Path("fixtures"),
+        agent=build_agent("deterministic"),
         guardrail=MyGuardrail()
     )
     
@@ -709,7 +725,7 @@ tests/
 ```python
 # Good: Use fixtures for consistency
 fixtures_dir = Path("fixtures")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir)
+env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir, agent=build_agent("deterministic"))
 
 # Avoid: Creating custom test data every time
 # Creates inconsistency across tests
@@ -719,10 +735,10 @@ env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir)
 
 ```python
 # Good: Fixed seed for reproducible tests
-env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir)
+env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir, agent=build_agent("deterministic"))
 
 # Avoid: Random seed (non-deterministic tests)
-env = SandboxEnv(fixtures_dir=fixtures_dir)
+env = SandboxEnv(seed=42, fixtures_dir=fixtures_dir, agent=build_agent("deterministic"))
 ```
 
 ### 3. Test Both Positive and Negative Cases
@@ -763,10 +779,10 @@ assert breaches == 0
 
 ```python
 # Good: Use short time budgets for quick tests
-findings = attack.run(env, {"seconds": 10})
+findings = attack.run(env, {"time_budget_s": 10})
 
 # Avoid: Long running tests slow down development
-findings = attack.run(env, {"seconds": 1200})
+findings = attack.run(env, {"time_budget_s": 1200})
 ```
 
 ### 7. Test One Thing Per Test

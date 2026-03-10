@@ -67,7 +67,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
 
     def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
         """Run attack with simple hook-based approach"""
-        max_seconds = config.seconds
+        budget_s = config.time_budget_s
         findings: list[AttackCandidate] = []
         start_time = time.time()
 
@@ -87,7 +87,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         ]
 
         for msg in test_cases:
-            if time.time() - start_time >= max_seconds:
+            if time.time() - start_time >= budget_s:
                 break
 
             env.reset()

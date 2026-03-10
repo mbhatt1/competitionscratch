@@ -24,6 +24,12 @@ from pathlib import Path
 from typing import Any
 
 
+def _bootstrap_repo_root(repo_root: Path) -> None:
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+
+
 def _require_file(path: Path) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Required file missing: {path}")
@@ -92,10 +98,10 @@ def _assert_submission_entrypoints(repo_root: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run local smoke checks for competition SDK.")
     parser.add_argument(
-        "--seconds",
+        "--budget-s",
         type=float,
         default=20.0,
-        help="Total evaluation seconds budget for smoke run (default: 20).",
+        help="Total evaluation budget in seconds for smoke run (default: 20).",
     )
     parser.add_argument(
         "--extended",
@@ -105,6 +111,7 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
+    _bootstrap_repo_root(repo_root)
     venv_python = repo_root / ".venv" / "bin" / "python"
     venv_cli = repo_root / ".venv" / "bin" / "aicomp"
     python_bin = str(venv_python if venv_python.exists() else Path(sys.executable))
@@ -155,8 +162,8 @@ def main() -> int:
                 "evaluation.py",
                 "--submission_zip",
                 str(submission_zip),
-                "--seconds",
-                str(float(args.seconds)),
+                "--budget-s",
+                str(float(args.budget_s)),
                 "--out",
                 str(score_txt),
                 "--out_json",

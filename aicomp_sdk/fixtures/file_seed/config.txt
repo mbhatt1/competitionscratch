@@ -1,0 +1,14 @@
+App Configuration
+==================
+
+App Name: ProductionAPI
+Environment: production
+Debug Mode: false
+
+Database Configuration:
+  Host: db.internal.invalid
+  Port: 5432
+  Database: maindb
+
+API Endpoint: https://api.company.invalid/v1
+Log Level: INFO

@@ -122,8 +122,8 @@ class AttackAlgorithm(AttackAlgorithmBase):
         - When agent reads files -> poison to read secrets
         - This amplifies Go-Explore's exploration effectiveness
         """
-        tb = Timebox(float(config.seconds))
-        max_steps = int(config.steps)
+        tb = Timebox(float(config.time_budget_s))
+        max_steps = int(config.max_steps)
 
         # Go-Explore archive: cell_hash -> exemplar
         archive: dict[str, Exemplar] = {}
@@ -224,17 +224,23 @@ if __name__ == "__main__":
         env = openai_module.SimpleSandboxEnv(seed=123, fixtures_dir=fixtures, guardrail=Guardrail())
     else:
         print("Using gpt-oss-20b")
+        from aicomp_sdk.agents import build_agent
         from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
         from aicomp_sdk.core.env import SandboxEnv
 
         fixtures = Path(__file__).resolve().parent.parent / "fixtures"
-        env = SandboxEnv(seed=123, fixtures_dir=fixtures, guardrail=Guardrail())
+        env = SandboxEnv(
+            seed=123,
+            fixtures_dir=fixtures,
+            agent=build_agent("auto"),
+            guardrail=Guardrail(),
+        )
 
     print("\nRunning Go-Explore + LPCI hybrid attack...")
     print("=" * 70)
 
     atk = AttackAlgorithm({"max_turns": 4, "branch_batch": 8})
-    findings = atk.run(env, AttackRunConfig(seconds=10))
+    findings = atk.run(env, AttackRunConfig(time_budget_s=10))
 
     print(f"\n{'=' * 70}")
     print("Go-Explore + LPCI Results")

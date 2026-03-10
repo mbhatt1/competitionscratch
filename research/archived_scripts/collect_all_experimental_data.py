@@ -14,15 +14,22 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    require_openai_key,
+    setup_imports,
+)
 
 repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
@@ -30,8 +37,9 @@ from tests.integration.test_verify_findings import detect_real_attacks
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")
     sys.exit(1)
+require_openai_key()
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Run experimental data collection")
@@ -131,7 +139,12 @@ def run_experiment(name, seed, fixtures, guardrail_cls, attack_config, budget, m
     # Set model in environment
     os.environ["OPENAI_MODEL"] = model
 
-    env = SandboxEnv(seed=seed, fixtures_dir=fixtures, guardrail=guardrail_cls())
+    env = create_archived_sandbox_env(
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail=guardrail_cls(),
+        agent_selection="openai",
+    )
     atk = AttackAlgorithm(attack_config)
     findings = atk.run(env, budget)
     stats = extract_tool_stats(findings)
@@ -157,37 +170,37 @@ async def run_all_experiments_async(model, seeds):
             "1_general_150s_noguard",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"seconds": 150},
+            {"time_budget_s": 150},
         ),
         (
             "2_general_150s_guard",
             PromptInjectionGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"seconds": 150},
+            {"time_budget_s": 150},
         ),
         (
             "3_targeted_120s_noguard",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": True},
-            {"seconds": 120},
+            {"time_budget_s": 120},
         ),
         (
             "4_targeted_120s_guard",
             PromptInjectionGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": True},
-            {"seconds": 120},
+            {"time_budget_s": 120},
         ),
         (
             "5_baseline_20s",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"seconds": 20},
+            {"time_budget_s": 20},
         ),
         (
             "6_intermediate_60s",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"seconds": 60},
+            {"time_budget_s": 60},
         ),
     ]
 
@@ -259,7 +272,7 @@ async def run_all_experiments_async(model, seeds):
         ),
     ]:
         full_config = {"max_turns": 6, "branch_batch": 12, **config}
-        base_experiments.append((variant_name, AllowGuardrail, full_config, {"seconds": 90}))
+        base_experiments.append((variant_name, AllowGuardrail, full_config, {"time_budget_s": 90}))
 
     # RQ3 - Reward ablations (2 configs)
     for variant_name, config in [
@@ -289,7 +302,7 @@ async def run_all_experiments_async(model, seeds):
         ),
     ]:
         full_config = {"max_turns": 6, "branch_batch": 12, **config}
-        base_experiments.append((variant_name, AllowGuardrail, full_config, {"seconds": 90}))
+        base_experiments.append((variant_name, AllowGuardrail, full_config, {"time_budget_s": 90}))
 
     # RQ4 - Individual enhancement ablations (5 configs)
     for variant_name, config in [
@@ -360,7 +373,7 @@ async def run_all_experiments_async(model, seeds):
         ),
     ]:
         full_config = {"max_turns": 6, "branch_batch": 12, **config}
-        base_experiments.append((variant_name, AllowGuardrail, full_config, {"seconds": 90}))
+        base_experiments.append((variant_name, AllowGuardrail, full_config, {"time_budget_s": 90}))
 
     # Expand experiments with all seeds
     all_experiments = []

@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
@@ -35,9 +36,14 @@ print()
 # Run Go-Explore with TARGETED shell exploration
 print("\n[Step 1] Running Go-Explore with SHELL-TARGETED exploration...")
 print("Using shell-focused prompt bank to maximize shell.run discovery")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=AllowGuardrail(),
+)
 attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings = attacker.run(env, {"seconds": 120})  # More time for targeted search
+findings = attacker.run(env, {"time_budget_s": 120})  # More time for targeted search
 
 # Extract all chains that executed shell.run
 shell_chains_success = []
@@ -73,9 +79,14 @@ print("\n[Step 2] Testing SHELL-TARGETED chains against Prompt Injection Guardra
 shell_chains_with_guard_success = []
 shell_chains_with_guard_blocked = []
 
-env_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_guard = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=PromptInjectionGuardrail(),
+)
 attacker_guard = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings_guard = attacker_guard.run(env_guard, {"seconds": 120})
+findings_guard = attacker_guard.run(env_guard, {"time_budget_s": 120})
 
 for f in findings_guard:
     user_messages = f.get("user_messages", [])

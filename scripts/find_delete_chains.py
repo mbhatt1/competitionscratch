@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
@@ -60,9 +61,14 @@ class DeleteTargetedAttacker(AttackAlgorithm):
 
 
 print("\n[Step 1] Running DELETE-TARGETED exploration (No Guardrail)...")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=AllowGuardrail(),
+)
 attacker = DeleteTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings = attacker.run(env, {"seconds": 120})
+findings = attacker.run(env, {"time_budget_s": 120})
 
 delete_chains_success = []
 delete_chains_blocked = []
@@ -93,9 +99,14 @@ print(f"Discovered {len(delete_chains_blocked)} BLOCKED fs.delete chains")
 
 # Test with guardrail
 print("\n[Step 2] Testing DELETE-TARGETED chains with Guardrail...")
-env_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_guard = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=PromptInjectionGuardrail(),
+)
 attacker_guard = DeleteTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings_guard = attacker_guard.run(env_guard, {"seconds": 120})
+findings_guard = attacker_guard.run(env_guard, {"time_budget_s": 120})
 
 delete_chains_with_guard_success = []
 delete_chains_with_guard_blocked = []

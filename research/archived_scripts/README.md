@@ -1,42 +1,74 @@
 # Archived Research Scripts
 
-This directory contains research scripts that have been archived due to outdated dependencies on non-existent code structures.
+This directory contains older research scripts that predate the current public SDK shape.
 
-## Reason for Archival
+They are still archived because they are not part of the supported product surface, but they
+have been updated to run against the current codebase.
 
-These scripts were archived on 2026-01-04 because they import from `examples_hooks_submission/`, a directory structure that no longer exists in the current codebase.
+## Current Status
 
-## Archived Scripts
+These scripts now target the current SDK using:
 
-The following 11 scripts have been moved here:
+- `SandboxEnv` with explicit agent construction
+- the current baseline Go-Explore attacker where applicable
+- current fixture paths via `fixtures/`
 
-1. `compare_guardrails.py` - Root level comparison script
-2. `compare_guardrails.py` - Scripts directory comparison script
-3. `compare_guardrails_openai.py` - OpenAI-based guardrail comparison
-4. `test_collaborative_multiagent.py` - Collaborative multi-agent testing
-5. `test_ensemble_diversity_scaling.py` - Ensemble diversity scaling tests
-6. `test_ensemble_diversity_scaling_guardrail.py` - Guardrail-specific ensemble tests
-7. `test_ensemble_vs_enhanced.py` - Ensemble vs enhanced comparison
-8. `test_negative_rewards.py` - Negative rewards testing
-9. `test_seed_sensitivity.py` - Seed sensitivity analysis
-10. `run_comprehensive_experiments.py` - Comprehensive experiment runner
-11. `collect_all_experimental_data.py` - Experimental data collection
+The scripts intentionally keep their original Sandbox-based research setup. They do not switch
+to the Gymnasium wrapper by default.
 
-## Current Code Structure
+## Important Caveats
 
-The current codebase uses:
-- `examples/guardrails/` for guardrail examples
-- `examples/attacks/` for attack examples
-- `aicomp_sdk/guardrails/` for core guardrail functionality
-- `aicomp_sdk/attacks/` for core attack functionality
+- These are research utilities, not stable public APIs.
+- Most OpenAI-backed scripts require `OPENAI_API_KEY`.
+- `compare_guardrails.py` uses the modern `examples.attacks.attack_working` attack contract and
+  replays returned `AttackCandidate` chains back through `SandboxEnv` to preserve the original
+  comparison semantics.
+- `test_collaborative_multiagent.py` still simulates collaboration. It does not retrofit true
+  shared-archive integration into the baseline attacker.
 
-## Restoration
+## Shared Helper
 
-To restore these scripts, the imports would need to be updated to reference the current code structure:
-- Change `examples_hooks_submission/` imports to appropriate paths in `examples/` or `aicomp_sdk/`
-- Verify all referenced modules and classes exist in the current codebase
-- Update any deprecated API calls to match the current SDK
+The archived scripts rely on `archived_imports.py` for:
 
-## Historical Context
+- repository path setup
+- fixture lookup
+- explicit agent creation
+- current `SandboxEnv` construction
 
-These scripts were part of earlier research experiments that predated the current package reorganization. They may contain valuable research insights but require significant refactoring to work with the current codebase.
+If you need to adjust archived script wiring, change that helper first.
+
+## Script Groups
+
+Deterministic / local-only:
+
+- `compare_guardrails.py`
+- `test_seed_sensitivity.py`
+
+OpenAI-backed:
+
+- `compare_guardrails_openai.py`
+- `run_comprehensive_experiments.py`
+- `collect_all_experimental_data.py`
+- `test_collaborative_multiagent.py`
+- `test_ensemble_diversity_scaling.py`
+- `test_ensemble_diversity_scaling_guardrail.py`
+- `test_ensemble_vs_enhanced.py`
+- `test_negative_rewards.py`
+
+## Recommended Usage
+
+Run these from the repository root so their output files land in predictable locations.
+
+Examples:
+
+```bash
+./.venv/bin/python research/archived_scripts/compare_guardrails.py
+./.venv/bin/python research/archived_scripts/test_seed_sensitivity.py
+```
+
+For the OpenAI-backed scripts:
+
+```bash
+export OPENAI_API_KEY=...
+./.venv/bin/python research/archived_scripts/compare_guardrails_openai.py
+```

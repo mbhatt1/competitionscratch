@@ -5,16 +5,22 @@ Compare guardrail effectiveness using OpenAI agent (gpt-4o-mini)
 
 import os
 import sys
+
 from pathlib import Path
 
-# Add repository root to path
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-repo_root = setup_imports()
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    require_openai_key,
+    setup_imports,
+)
+
+setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
@@ -23,8 +29,9 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY not set!")
     print("Set it with: export OPENAI_API_KEY=your_key")
     sys.exit(1)
+require_openai_key()
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 # Ensure secret.txt exists
 secret_file = fixtures / "file_seed" / "secret.txt"
@@ -38,9 +45,14 @@ print()
 
 # Test 1: No Guardrail (Allow All)
 print("\n[Test 1] Running Go-Explore with NO GUARDRAIL...")
-env_no_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env_no_guard = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=AllowGuardrail(),
+    agent_selection="openai",
+)
 attacker1 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_no_guard = attacker1.run(env_no_guard, {"seconds": 150})
+findings_no_guard = attacker1.run(env_no_guard, {"time_budget_s": 150})
 
 # Analyze findings with detailed logging
 real_attacks_no_guard = []
@@ -71,9 +83,14 @@ for breach in real_attacks_no_guard:
 
 # Test 2: With Prompt Injection Guardrail
 print("\n[Test 2] Running Go-Explore WITH PROMPT INJECTION GUARDRAIL...")
-env_with_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_with_guard = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=PromptInjectionGuardrail(),
+    agent_selection="openai",
+)
 attacker2 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_with_guard = attacker2.run(env_with_guard, {"seconds": 150})
+findings_with_guard = attacker2.run(env_with_guard, {"time_budget_s": 150})
 
 # Analyze findings with detailed logging
 real_attacks_with_guard = []

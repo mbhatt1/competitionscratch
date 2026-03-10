@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.core.tools import ToolSuite
@@ -347,12 +348,17 @@ def main():
     # Setup
     fixtures = repo_root / "fixtures"
     # Use real SandboxEnv (has snapshot/restore methods)
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=BaselineGuardrail())
+    env = SandboxEnv(
+        seed=42,
+        fixtures_dir=fixtures,
+        agent=build_agent("auto"),
+        guardrail=BaselineGuardrail(),
+    )
 
     # Run attack
     print("Running improved Go-Explore with OpenAI agent...\n")
     attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 8})
-    findings = attacker.run(env, {"seconds": 30, "steps": 100})
+    findings = attacker.run(env, {"time_budget_s": 30, "max_steps": 100})
 
     print(f"\n{'=' * 70}")
     print(f"RESULTS")

@@ -5,7 +5,9 @@ Test Perfect Guardrail (Strict Isolation Policy) against baseline attacker.
 
 import sys
 from pathlib import Path
+from typing import Any
 
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_perfect import Guardrail as PerfectGuardrail
@@ -14,7 +16,7 @@ from examples.guardrails.guardrail_perfect import Guardrail as PerfectGuardrail
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
-def test_perfect_guardrail(seconds: float = 30.0):
+def run_perfect_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
     """Test Perfect Guardrail against baseline attacker."""
 
     print("=" * 70)
@@ -24,7 +26,7 @@ def test_perfect_guardrail(seconds: float = 30.0):
     print(f"  Defense: Perfect Guardrail (Strict Isolation)")
     print(f"  Strategy: Block ALL dangerous ops after untrusted source access")
     print(f"  Attack: Go-Explore baseline (max_turns=4, branch_batch=12)")
-    print(f"  Time Budget: {seconds * 0.7:.1f} seconds for attack (70% of {seconds}s)")
+    print(f"  Time Budget: {budget_s * 0.7:.1f} seconds for attack (70% of {budget_s}s)")
     print(f"\nGuardrail Logic:")
     print(f"  1. Track recent tool sources (last 2 operations)")
     print(f"  2. If recent source = web/email → BLOCK dangerous operations")
@@ -38,7 +40,12 @@ def test_perfect_guardrail(seconds: float = 30.0):
     print("=" * 70)
 
     # Run defense evaluation
-    report = eval_defense(PerfectGuardrail, seconds)
+    report = eval_defense(
+        PerfectGuardrail,
+        budget_s,
+        agent_factory=build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
 
     # Calculate defense score
     defense_score = score_defense(report)
@@ -161,15 +168,23 @@ def test_perfect_guardrail(seconds: float = 30.0):
     return report, defense_score
 
 
+def test_perfect_guardrail() -> None:
+    report, defense_score = run_perfect_guardrail()
+    assert report["breach_count"] >= 0
+    assert report["false_positives"] >= 0
+    assert report["benign_trials"] >= 0
+    assert 0.0 <= defense_score <= 1000.0
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Test Perfect Guardrail performance")
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     args = parser.parse_args()
 
     try:
-        report, score = test_perfect_guardrail(seconds=args.seconds)
+        report, score = run_perfect_guardrail(budget_s=args.budget_s)
 
         # Print final summary
         print(f"\n{'=' * 70}")

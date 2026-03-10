@@ -9,10 +9,11 @@ normalization constants are appropriate.
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from aicomp_sdk.agents.openai_agent import OpenAIAgent
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
@@ -28,7 +29,9 @@ from aicomp_sdk.scoring import (
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "fixtures"
 
 
-def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: bool = True):
+def run_baseline_attack(
+    budget_s: float = 30.0, seed: int = 123, use_openai: bool = True
+) -> dict[str, Any]:
     """Test baseline Go-Explore attack against baseline guardrail."""
 
     # Check for OpenAI API key
@@ -46,7 +49,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     print(f"  Agent: {agent_type}")
     print(f"  Attack: Go-Explore baseline (max_turns=8, branch_batch=12)")
     print(f"  Defense: Rule-based baseline guardrail")
-    print(f"  Time Budget: {seconds} seconds")
+    print(f"  Time Budget: {budget_s} seconds")
     print(f"  Seed: {seed}")
     print(f"\nExpected Normalization:")
     print(f"  Baseline Raw Target: {ATTACK_BASELINE_RAW} → ~500 normalized")
@@ -57,26 +60,23 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
 
     # Set up agent
     if use_openai:
-        agent = OpenAIAgent(verbose=False)
+        agent = build_agent("openai")
         print("\n[INFO] Using OpenAI API (gpt-4o-mini)")
         # Set up environment
         env = SandboxEnv(seed=seed, fixtures_dir=FIXTURES, agent=agent, guardrail=Guardrail())
     else:
-        # Temporarily unset API key to force deterministic agent
-        old_key = os.environ.pop("OPENAI_API_KEY", None)
         print("\n[WARNING] Using deterministic vulnerable agent - scores will be inflated!")
-        try:
-            # Set up environment without agent (will default to deterministic)
-            env = SandboxEnv(seed=seed, fixtures_dir=FIXTURES, agent=None, guardrail=Guardrail())
-        finally:
-            # Restore API key
-            if old_key:
-                os.environ["OPENAI_API_KEY"] = old_key
+        env = SandboxEnv(
+            seed=seed,
+            fixtures_dir=FIXTURES,
+            agent=build_agent("deterministic"),
+            guardrail=Guardrail(),
+        )
     env.reset()
 
     # Run baseline attack with typical competition parameters
     attacker = AttackAlgorithm({"max_turns": 8, "branch_batch": 12})
-    findings = attacker.run(env, {"seconds": seconds, "steps": 10**9})
+    findings = attacker.run(env, {"time_budget_s": budget_s, "max_steps": 10**9})
 
     # Validate findings
     validated = []
@@ -175,7 +175,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
         print(f"     - The time budget is too short")
         print(f"\n  Recommendations:")
         print(f"     1. Use allow-all guardrail: Guardrail() from guardrail_allow.py")
-        print(f"     2. Increase time budget: --seconds 60 or more")
+        print(f"     2. Increase time budget: --budget-s 60 or more")
         print(f"     3. Check agent is actually making tool calls (see tool_calls above)")
     elif raw_score < ATTACK_BASELINE_RAW * 0.001:  # Way too low (< 100 when target is 100k)
         print(
@@ -247,13 +247,21 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     }
 
 
+def test_baseline_attack() -> None:
+    results = run_baseline_attack()
+    assert results["findings"] >= 0
+    assert results["unique_cells"] >= 0
+    assert results["raw_score"] >= 0.0
+    assert results["normalized_score"] >= 0.0
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Test baseline Go-Explore performance with OpenAI agent"
     )
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     parser.add_argument("--seed", type=int, default=123, help="Random seed (default: 123)")
     parser.add_argument(
         "--no-openai",
@@ -263,8 +271,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        results = test_baseline_attack(
-            seconds=args.seconds, seed=args.seed, use_openai=not args.no_openai
+        results = run_baseline_attack(
+            budget_s=args.budget_s, seed=args.seed, use_openai=not args.no_openai
         )
         sys.exit(0)
     except Exception as e:

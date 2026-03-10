@@ -12,6 +12,7 @@ Shows that hooks amplify attack effectiveness!
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
@@ -23,11 +24,17 @@ from examples.attacks.attack_working import AttackAlgorithm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+
 def _count_predicates(candidates, fixtures: Path) -> tuple[int, dict[str, int]]:
     total = 0
     pred_types: dict[str, int] = {}
     for candidate in candidates:
-        env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+        env = SandboxEnv(
+            seed=42,
+            fixtures_dir=fixtures,
+            agent=build_agent("deterministic"),
+            guardrail=Guardrail(),
+        )
         env.reset()
         for message in candidate.user_messages:
             env.interact(message)
@@ -55,9 +62,14 @@ def main() -> None:
     print("-" * 70)
 
     clear_hooks()  # Make sure no hooks
-    env1 = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+    env1 = SandboxEnv(
+        seed=42,
+        fixtures_dir=fixtures,
+        agent=build_agent("deterministic"),
+        guardrail=Guardrail(),
+    )
     attacker1 = AttackAlgorithm({"max_turns": 3, "branch_batch": 8})
-    candidates1 = attacker1.run(env1, AttackRunConfig(seconds=5))
+    candidates1 = attacker1.run(env1, AttackRunConfig(time_budget_s=5))
     findings1, pred_types1 = _count_predicates(candidates1, fixtures)
 
     print("✓ Baseline complete")
@@ -95,9 +107,14 @@ def main() -> None:
             }
         return {}
 
-    env2 = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+    env2 = SandboxEnv(
+        seed=42,
+        fixtures_dir=fixtures,
+        agent=build_agent("deterministic"),
+        guardrail=Guardrail(),
+    )
     attacker2 = AttackAlgorithm({"max_turns": 3, "branch_batch": 8})
-    candidates2 = attacker2.run(env2, AttackRunConfig(seconds=5))
+    candidates2 = attacker2.run(env2, AttackRunConfig(time_budget_s=5))
     findings2, pred_types2 = _count_predicates(candidates2, fixtures)
 
     print("✓ With hooks complete")

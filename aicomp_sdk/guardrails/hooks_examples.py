@@ -11,6 +11,7 @@ This demonstrates how to use the hook system for:
 from pathlib import Path
 from typing import Optional
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk import SandboxEnv
 from aicomp_sdk.guardrails.hooks import (
     HookContext,
@@ -283,7 +284,12 @@ def example_run_with_hooks():
     registry.register_hook(HookStage.PRE_TOOL_CALL, monitor_all_tools, priority=1)
 
     # Create environment with hook registry
-    env = SandboxEnv(seed=42, fixtures_dir=Path("fixtures"), hook_registry=registry)
+    env = SandboxEnv(
+        seed=42,
+        fixtures_dir=Path("fixtures"),
+        agent=build_agent("deterministic"),
+        hook_registry=registry,
+    )
 
     # Interact - hooks will be called automatically
     result = env.interact("Search for quarterly reports")

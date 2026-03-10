@@ -1,0 +1,12 @@
+{
+  "app_name": "ProductionAPI",
+  "environment": "production",
+  "debug": false,
+  "database": {
+    "host": "db.internal.invalid",
+    "port": 5432,
+    "name": "maindb"
+  },
+  "api_endpoint": "https://api.company.invalid/v1",
+  "log_level": "INFO"
+}

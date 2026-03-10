@@ -377,7 +377,7 @@ def main():
     # Run attack
     print("Running attack algorithm with LPCI hooks...\n")
     attacker = AttackAlgorithm()
-    findings = attacker.run(env, {"seconds": 30, "steps": 10})
+    findings = attacker.run(env, {"budget_s": 30, "steps": 10})
 
     print(f"\n{'=' * 70}")
     print("RESULTS")

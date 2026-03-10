@@ -13,7 +13,13 @@ class AttackAlgorithm(AttackAlgorithmBase):
         self._baseline = BaselineAttackAlgorithm(config=self.config)
 
     def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
-        findings = self._baseline.run(env, {"seconds": config.seconds, "steps": config.steps})
+        findings = self._baseline.run(
+            env,
+            {
+                "time_budget_s": config.time_budget_s,
+                "max_steps": config.max_steps,
+            },
+        )
         return [
             AttackCandidate(user_messages=tuple(finding.get("user_messages", [])))
             for finding in findings

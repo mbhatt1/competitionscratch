@@ -119,6 +119,43 @@ jobs:
       
       - name: Build package
         run: python -m build
+
+      - name: Verify packaged fixtures in wheel
+        run: |
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          wheels = sorted(glob.glob("dist/*.whl"))
+          if not wheels:
+              raise SystemExit("No wheel found in dist/")
+
+          required = [
+              "aicomp_sdk/fixtures/web_corpus.json",
+              "aicomp_sdk/fixtures/mail_seed.json",
+              "aicomp_sdk/fixtures/file_seed/secret.txt",
+          ]
+          forbidden = [
+              "fixtures/web_corpus.json",
+              "fixtures/mail_seed.json",
+              "fixtures/file_seed/secret.txt",
+          ]
+          with zipfile.ZipFile(wheels[-1]) as wheel:
+              names = set(wheel.namelist())
+
+          missing = [name for name in required if name not in names]
+          if missing:
+              raise SystemExit(
+                  "Wheel is missing required fixtures:\n - " + "\n - ".join(missing)
+              )
+          leaked = [name for name in forbidden if name in names]
+          if leaked:
+              raise SystemExit(
+                  "Wheel contains legacy top-level fixtures:\n - "
+                  + "\n - ".join(leaked)
+              )
+          print("Fixture packaging check passed.")
+          PY
       
       - name: Check package metadata
         run: twine check dist/*

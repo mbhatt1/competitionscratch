@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
-from aicomp_sdk.core.env import (
-    GPTOSSAgent,
-    GPTOSSBackend,
-    SandboxEnv,
-    VulnerableDeterministicAgent,
+from aicomp_sdk.agents import GPTOSSAgent, GPTOSSBackend, VulnerableDeterministicAgent
+from aicomp_sdk.core.env_api import (
+    AttackEnvProtocol,
+    DEFAULT_MAX_TOOL_HOPS,
+    MAX_USER_MESSAGE_CHARS,
 )
-from aicomp_sdk.core.tools import ToolSuite
+from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.trace import ToolEvent, Trace
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -68,15 +68,9 @@ class TestVulnerableDeterministicAgent:
     """Test VulnerableDeterministicAgent behavior and vulnerabilities."""
 
     @pytest.fixture
-    def mock_tools(self):
-        """Create a mock ToolSuite."""
-        tools = Mock(spec=ToolSuite)
-        return tools
-
-    @pytest.fixture
-    def agent(self, mock_tools):
+    def agent(self):
         """Create a VulnerableDeterministicAgent instance."""
-        return VulnerableDeterministicAgent(mock_tools)
+        return VulnerableDeterministicAgent()
 
     @pytest.fixture
     def mock_trace(self):
@@ -266,10 +260,17 @@ class TestSandboxEnv:
         assert env.tools is not None
         assert env.trace is not None
 
-    @patch.dict("os.environ", {"GPT_OSS_MODEL_PATH": "", "OPENAI_API_KEY": ""}, clear=True)
-    def test_env_initialization_without_agent_uses_deterministic(self, temp_fixtures):
-        """Test that environment falls back to deterministic agent."""
-        env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures)
+    def test_env_satisfies_attack_env_protocol(self, temp_fixtures, mock_agent):
+        env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=mock_agent)
+        assert isinstance(env, AttackEnvProtocol)
+
+    def test_env_initialization_with_explicit_deterministic_agent(self, temp_fixtures):
+        """Test that environment accepts an explicit deterministic agent."""
+        env = SandboxEnv(
+            seed=42,
+            fixtures_dir=temp_fixtures,
+            agent=VulnerableDeterministicAgent(),
+        )
 
         assert isinstance(env.agent, VulnerableDeterministicAgent)
 
@@ -406,6 +407,17 @@ class TestSandboxEnv:
         assert env.trace.tool_events[0].ok is False
         assert env.trace.tool_events[0].error == "unknown_tool"
 
+    def test_env_interact_rejects_oversized_message(self, temp_fixtures, mock_agent):
+        """Test that overly long messages are rejected before trace mutation."""
+        env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=mock_agent)
+        long_message = "x" * (MAX_USER_MESSAGE_CHARS + 1)
+
+        with pytest.raises(ValueError, match="max length"):
+            env.interact(long_message)
+
+        assert env.trace.user_messages == []
+        mock_agent.next_tool_call.assert_not_called()
+
     def test_env_interact_max_hops(self, temp_fixtures, mock_agent):
         """Test that interaction respects max_tool_hops limit."""
         # Agent always returns a tool call
@@ -420,6 +432,19 @@ class TestSandboxEnv:
 
         # Should execute exactly 3 tools
         assert result["n_tools"] == 3
+
+    def test_env_interact_default_max_hops_matches_contract(self, temp_fixtures, mock_agent):
+        """Test that the default tool-hop limit matches the shared contract."""
+        mock_agent.next_tool_call.return_value = {
+            "tool": "fs.read",
+            "args": {"path": "readme.txt"},
+            "reason": "test",
+        }
+
+        env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=mock_agent)
+        result = env.interact("Test")
+
+        assert result["n_tools"] == DEFAULT_MAX_TOOL_HOPS
 
     def test_env_export_trace_dict(self, temp_fixtures, mock_agent):
         """Test that trace export includes all necessary data."""

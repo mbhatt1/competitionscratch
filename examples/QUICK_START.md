@@ -1,5 +1,7 @@
 > ⚠️ **Advanced Guide:** This guide uses the LPCI hooks system for fine-grained control.
 >
+> Local note: this example demonstrates the original zip-based `attack.py` + `guardrail.py` workflow, which remains supported for local SDK use. The public Kaggle submission contract is the additional `attack.py`-only path.
+>
 > **New to the competition?** Start with the [Getting Started Guide](../docs/GETTING_STARTED.md) first.
 >
 > **Prerequisites:**
@@ -27,7 +29,7 @@ zip submission_hooks.zip attack.py guardrail.py
 
 # 4. Evaluate (from project root)
 cd ..
-python evaluation.py --submission_zip examples_hooks_submission/submission_hooks.zip --seconds 60 --agent_mode deterministic
+python evaluation.py --submission_zip examples_hooks_submission/submission_hooks.zip --budget-s 60 --agent deterministic --env sandbox
 ```
 
 ## 🎯 What You Get

@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
@@ -62,9 +63,14 @@ class SecretReadTargetedAttacker(AttackAlgorithm):
 
 
 print("\n[Step 1] Running SECRET-READ-TARGETED exploration (No Guardrail)...")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=AllowGuardrail(),
+)
 attacker = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings = attacker.run(env, {"seconds": 120})
+findings = attacker.run(env, {"time_budget_s": 120})
 
 secret_chains_success = []
 secret_chains_blocked = []
@@ -112,9 +118,14 @@ print(f"  Including {exfil_count} with subsequent exfiltration (CRITICAL)")
 
 # Test with guardrail
 print("\n[Step 2] Testing SECRET-READ-TARGETED chains with Guardrail...")
-env_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_guard = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=PromptInjectionGuardrail(),
+)
 attacker_guard = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings_guard = attacker_guard.run(env_guard, {"seconds": 120})
+findings_guard = attacker_guard.run(env_guard, {"time_budget_s": 120})
 
 secret_chains_guard_success = []
 secret_chains_guard_blocked = []

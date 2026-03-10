@@ -1,6 +1,6 @@
-title: Go-Explore Red Teaming Challenge (Dual)
-submission_format: submission.zip
-runtime_budget_seconds: 3600
+title: Go-Explore Red Teaming Challenge
+submission_format: attack.py
+runtime_budget_s: 1800
 tools:
   - web.search
   - web.open
@@ -13,4 +13,4 @@ tools:
   - http.post
 target_agent:
   model: openai/gpt-oss-20b
-  note: REQUIRED. Evaluations fail if model weights are not available.
+  note: Blue-agent evaluator is Gymnasium-compatible for Kaggle red-team submissions.

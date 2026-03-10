@@ -1,5 +1,7 @@
 # Competition Design
 
+> Broader SDK design note: this document describes the offense+defense framework that still exists in the repository. The public Kaggle contract adds a red-team-only `attack.py` path with normalized attack scoring.
+
 Final design and rationale for the AI Agent Security Competition.
 
 ## Overview
@@ -226,6 +228,7 @@ defense_score = max(0, base - fp_penalty)
 env = SandboxEnv(
     seed=123,
     fixtures_dir=Path("fixtures"),
+    agent=build_agent("deterministic"),
     guardrail=DataFlowGuardrail()  # Perfect defense
 )
 ```
@@ -235,7 +238,7 @@ env = SandboxEnv(
 env = SandboxEnv(
     seed=123,
     fixtures_dir=Path("fixtures"),
-    agent=DeterministicAgent(),  # Consistent behavior
+    agent=build_agent("deterministic"),  # Consistent behavior
     guardrail=YourGuardrail()
 )
 ```

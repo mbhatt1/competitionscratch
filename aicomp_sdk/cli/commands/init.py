@@ -58,7 +58,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         Run the attack algorithm within the given budget.
         
         Args:
-            env: SandboxEnv instance - the target environment
+            env: AttackEnvProtocol instance - the target environment
             config: AttackRunConfig with time/step limits
         
         Returns:
@@ -67,7 +67,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         The evaluator replays each candidate chain, recomputes predicates/cell signatures,
         and scores only replayed traces.
         """
-        max_seconds = config.seconds
+        budget_s = config.time_budget_s
         findings: list[AttackCandidate] = []
         start_time = time.time()
         
@@ -94,7 +94,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         ]
         
         for prompt in test_prompts:
-            if time.time() - start_time >= max_seconds:
+            if time.time() - start_time >= budget_s:
                 break
             
             # Reset environment for each test

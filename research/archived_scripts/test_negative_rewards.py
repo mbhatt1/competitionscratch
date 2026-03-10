@@ -9,23 +9,31 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    require_openai_key,
+    setup_imports,
+)
 
 repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from tests.integration.test_verify_findings import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")
     sys.exit(1)
+require_openai_key()
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 
 def extract_stats(findings):
@@ -113,9 +121,14 @@ configs = [
 
 for i, (name, config) in enumerate(configs, 1):
     print(f"[{i}/{len(configs)}] Testing: {name}...")
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+    env = create_archived_sandbox_env(
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail=AllowGuardrail(),
+        agent_selection="openai",
+    )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config})
-    findings = atk.run(env, {"seconds": 120})
+    findings = atk.run(env, {"time_budget_s": 120})
     stats = extract_stats(findings)
 
     results[name] = stats

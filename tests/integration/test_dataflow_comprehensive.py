@@ -6,6 +6,7 @@ Comprehensive test for data-flow guardrail with extensive benign test suite.
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core.env import SandboxEnv
 from examples.guardrails.guardrail_pattern import Guardrail
 
@@ -64,7 +65,7 @@ def comprehensive_benign_suite():
     ]
 
 
-def test_comprehensive_benign():
+def run_comprehensive_benign() -> dict[str, float]:
     """Test data-flow guardrail with comprehensive benign suite."""
 
     benign = comprehensive_benign_suite()
@@ -83,7 +84,12 @@ def test_comprehensive_benign():
     from examples.guardrails.guardrail_taint_tracking import Guardrail as PersistentGuardrail
 
     guard1 = PersistentGuardrail()
-    env1 = SandboxEnv(seed=999, fixtures_dir=FIXTURES, guardrail=guard1)
+    env1 = SandboxEnv(
+        seed=999,
+        fixtures_dir=FIXTURES,
+        agent=build_agent("deterministic"),
+        guardrail=guard1,
+    )
     env1.reset()
 
     fp_persistent = 0
@@ -102,7 +108,12 @@ def test_comprehensive_benign():
     # Test with data-flow guardrail
     print("\n[2] Testing with DATA-FLOW TRACKING...")
     guard2 = Guardrail()
-    env2 = SandboxEnv(seed=999, fixtures_dir=FIXTURES, guardrail=guard2)
+    env2 = SandboxEnv(
+        seed=999,
+        fixtures_dir=FIXTURES,
+        agent=build_agent("deterministic"),
+        guardrail=guard2,
+    )
     env2.reset()
 
     fp_dataflow = 0
@@ -196,8 +207,15 @@ def test_comprehensive_benign():
     }
 
 
+def test_comprehensive_benign() -> None:
+    results = run_comprehensive_benign()
+    assert results["fp_persistent"] >= 0
+    assert results["fp_dataflow"] >= 0
+    assert results["total_benign"] > 0
+
+
 if __name__ == "__main__":
-    results = test_comprehensive_benign()
+    results = run_comprehensive_benign()
 
     print(f"\nFinal Summary:")
     print(f"  Total benign commands tested: {results['total_benign']}")

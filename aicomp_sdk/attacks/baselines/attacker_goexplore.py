@@ -206,9 +206,17 @@ class AttackAlgorithm:
         # FIX: Seed the RNG for reproducibility!
         random.seed(env.seed)
 
-        # Budget supports 'seconds' OR 'steps'
-        tb = Timebox(float(budget.get("seconds", 30.0)))
-        max_steps = int(budget.get("steps", 10**9))
+        budget_s = float(
+            budget.get(
+                "time_budget_s",
+                budget.get("budget_s", budget.get("seconds", 30.0)),
+            )
+        )
+
+        # Budget supports canonical 'time_budget_s' plus legacy 'budget_s'/'seconds',
+        # and canonical 'max_steps' plus legacy 'steps'.
+        tb = Timebox(budget_s)
+        max_steps = int(budget.get("max_steps", budget.get("steps", 10**9)))
 
         # archive maps cell_hash -> exemplar
         archive: dict[str, Exemplar] = {}
@@ -221,9 +229,7 @@ class AttackAlgorithm:
         failed_tool_calls = 0
         agent_refusals = 0  # Track refusals separately
 
-        print(
-            f"[GO-EXPLORE] Starting attack run: {budget.get('seconds', 30.0)}s budget, seed={env.seed}"
-        )
+        print(f"[GO-EXPLORE] Starting attack run: {budget_s}s budget, seed={env.seed}")
 
         # Seed exemplar: start with a simple interaction
         env.reset()
@@ -536,10 +542,16 @@ class AttackAlgorithm:
 
 if __name__ == "__main__":
     fixtures = Path(__file__).resolve().parents[2] / "fixtures"
+    from aicomp_sdk.agents import build_agent
     from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
     from aicomp_sdk.core.env import SandboxEnv
 
-    env = SandboxEnv(seed=123, fixtures_dir=fixtures, guardrail=Guardrail())
+    env = SandboxEnv(
+        seed=123,
+        fixtures_dir=fixtures,
+        agent=build_agent("deterministic"),
+        guardrail=Guardrail(),
+    )
     atk = AttackAlgorithm({"max_turns": 4, "branch_batch": 12})
-    f = atk.run(env, {"seconds": 5})
+    f = atk.run(env, {"time_budget_s": 5})
     print("findings:", len(f))

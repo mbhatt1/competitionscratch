@@ -23,10 +23,12 @@ from .hooks_simple import (
     poison_tool,
     store_payload,
 )
+from .optimal import Guardrail as OptimalGuardrail
 
 __all__ = [
     "GuardrailBase",
     "Decision",
+    "OptimalGuardrail",
     # Simple Hooks API (recommended)
     "attack_hook",
     "defense_hook",

@@ -4,16 +4,13 @@ include README.md
 include pyproject.toml
 
 # Include all documentation
-recursive-include docs *.md *.rst *.txt
+recursive-include docs *.md
 
-# Include fixtures and test data
-recursive-include fixtures *.json *.txt *.yaml
+# Include packaged fixtures and test data
+recursive-include aicomp_sdk/fixtures *.json *.txt *.md
 
 # Include example files
 recursive-include examples *.py *.md
-
-# Include requirements
-include requirements.txt
 
 # Include competition configuration
 include competition.yaml
@@ -29,6 +26,7 @@ global-exclude .git*
 global-exclude .hg*
 
 # Exclude tests and research artifacts from distribution
+prune fixtures
 prune tests
 prune research
 prune scripts
