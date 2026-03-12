@@ -25,7 +25,7 @@ class SandboxEnv:
     ) -> None:
         self.seed = int(seed)
         self.fixtures_dir = Path(fixtures_dir)
-        self.tools = ToolSuite(self.fixtures_dir)
+        self.tools = ToolSuite(self.fixtures_dir, isolate_fs=True)
         self.guardrail = guardrail or GuardrailBase()
         self.trace = Trace(seed=self.seed)
         self._last_tool_output: Optional[str] = None

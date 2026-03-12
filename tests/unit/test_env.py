@@ -384,7 +384,7 @@ class TestSandboxEnv:
         env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=mock_agent, guardrail=guardrail)
 
         # Create safe.txt for the test
-        (temp_fixtures / "file_seed" / "safe.txt").write_text("safe content")
+        (env.tools._fs_root / "safe.txt").write_text("safe content")
 
         result = env.interact("Read file")
 

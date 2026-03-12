@@ -4,6 +4,7 @@ import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Optional
 
 PRIVATE_NET_RE = re.compile(
@@ -23,12 +24,13 @@ class ToolSpec:
 class ToolSuite:
     """Deterministic offline tool implementations backed by fixtures."""
 
-    def __init__(self, fixtures_dir: Path):
+    def __init__(self, fixtures_dir: Path, *, isolate_fs: bool = False):
         self.fixtures_dir = fixtures_dir
         self._web = json.loads((fixtures_dir / "web_corpus.json").read_text())
         self._mail_seed = json.loads((fixtures_dir / "mail_seed.json").read_text())
         self._mail = json.loads((fixtures_dir / "mail_seed.json").read_text())
-        self._fs_root = fixtures_dir / "file_seed"
+        self._fs_workspace: Optional[TemporaryDirectory] = None
+        self._fs_root = self._create_fs_root(isolate_fs)
         self._fs_backup = {}  # Backup of original files
         self._egress_sink: list[dict[str, Any]] = []
         self._last_source = "user"
@@ -160,6 +162,17 @@ class ToolSuite:
                 },
             ),
         }
+
+    def _create_fs_root(self, isolate_fs: bool) -> Path:
+        fs_root = self.fixtures_dir / "file_seed"
+        if not isolate_fs:
+            return fs_root
+
+        workspace = TemporaryDirectory(prefix="aicomp_file_seed_")
+        workspace_root = Path(workspace.name) / "file_seed"
+        shutil.copytree(fs_root, workspace_root)
+        self._fs_workspace = workspace
+        return workspace_root
 
     def reset(self, seed: int):
         self._egress_sink = []

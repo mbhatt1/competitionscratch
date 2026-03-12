@@ -191,7 +191,7 @@ class SimpleSandboxEnv:
     def __init__(self, seed: int, fixtures_dir: Path, guardrail: GuardrailBase):
         self.seed = seed
         self.fixtures_dir = fixtures_dir
-        self.tools = ToolSuite(fixtures_dir)
+        self.tools = ToolSuite(fixtures_dir, isolate_fs=True)
         self.guardrail = guardrail
         self.trace = Trace(seed=seed)
         self._last_tool_output: Optional[str] = None
