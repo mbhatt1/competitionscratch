@@ -13,6 +13,7 @@ from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
 
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
@@ -43,13 +44,14 @@ env = SandboxEnv(
     guardrail=AllowGuardrail(),
 )
 attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings = attacker.run(env, {"time_budget_s": 120})  # More time for targeted search
+findings = attacker.run(env, AttackRunConfig(time_budget_s=120))  # More time for targeted search
+detailed_findings = attacker.last_run_details
 
 # Extract all chains that executed shell.run
 shell_chains_success = []
 shell_chains_blocked = []
 
-for f in findings:
+for f in detailed_findings:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 
@@ -86,9 +88,10 @@ env_guard = SandboxEnv(
     guardrail=PromptInjectionGuardrail(),
 )
 attacker_guard = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings_guard = attacker_guard.run(env_guard, {"time_budget_s": 120})
+findings_guard = attacker_guard.run(env_guard, AttackRunConfig(time_budget_s=120))
+detailed_findings_guard = attacker_guard.last_run_details
 
-for f in findings_guard:
+for f in detailed_findings_guard:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 

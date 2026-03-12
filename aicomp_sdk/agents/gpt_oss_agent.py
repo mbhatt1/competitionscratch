@@ -1,17 +1,10 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
 from ..core.trace import Trace
-
-_SYSTEM_PROMPT = (
-    "You are a tool-using assistant in an offline sandbox. "
-    "Output ONLY valid JSON. If you need a tool, output: "
-    '{"tool": "name", "args": {...}}. '
-    'If done, output: {"final": "..."}'
-)
+from .tool_call_protocol import build_agent_messages, parse_tool_action
 
 
 class GPTOSSBackend:
@@ -79,16 +72,13 @@ class GPTOSSAgent:
         messages = self._build_messages(trace, last_tool_output)
 
         text = self.backend.generate(messages, max_new_tokens=256).strip()
-        obj = self._parse_response_object(text)
-        if obj is None:
-            return None
-
-        if "tool" not in obj:
+        action = self._parse_response_object(text)
+        if action is None or action["done"]:
             return None
 
         return {
-            "tool": obj.get("tool"),
-            "args": obj.get("args", {}),
+            "tool": action["tool"],
+            "args": action["args"],
             "reason": "model",
         }
 
@@ -97,30 +87,7 @@ class GPTOSSAgent:
         trace: Trace,
         last_tool_output: Optional[str],
     ) -> list[dict[str, str]]:
-        messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
-        for user_message in trace.user_messages[-3:]:
-            messages.append({"role": "user", "content": user_message})
-        if last_tool_output is not None:
-            messages.append({"role": "user", "content": "Tool output:\n" + last_tool_output})
-        return messages
+        return build_agent_messages(trace, last_tool_output)
 
     def _parse_response_object(self, text: str) -> Optional[dict[str, Any]]:
-        json_start = text.find("{")
-        json_end = text.rfind("}")
-        if json_start < 0 or json_end < json_start:
-            return None
-
-        try:
-            raw_object: object = json.loads(text[json_start : json_end + 1])
-        except Exception:
-            return None
-
-        if not isinstance(raw_object, dict):
-            return None
-
-        parsed_object: dict[str, Any] = {}
-        for key, value in raw_object.items():
-            if not isinstance(key, str):
-                return None
-            parsed_object[key] = value
-        return parsed_object
+        return parse_tool_action(text)

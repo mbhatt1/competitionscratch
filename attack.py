@@ -1,4 +1,7 @@
 # copy into submission.zip
+from collections.abc import Mapping
+from typing import Any, Optional
+
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import (
     AttackAlgorithm as BaselineAttackAlgorithm,
@@ -8,20 +11,9 @@ from aicomp_sdk.attacks.baselines.attacker_goexplore import (
 class AttackAlgorithm(AttackAlgorithmBase):
     """Submission wrapper around the baseline Go-Explore attacker."""
 
-    def __init__(self, config=None):
+    def __init__(self, config: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(config)
         self._baseline = BaselineAttackAlgorithm(config=self.config)
 
     def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
-        findings = self._baseline.run(
-            env,
-            {
-                "time_budget_s": config.time_budget_s,
-                "max_steps": config.max_steps,
-            },
-        )
-        return [
-            AttackCandidate(user_messages=tuple(finding.get("user_messages", [])))
-            for finding in findings
-            if finding.get("user_messages")
-        ]
+        return self._baseline.run(env, config)

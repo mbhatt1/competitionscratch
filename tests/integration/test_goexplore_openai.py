@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
+from aicomp_sdk.attacks import AttackRunConfig
 
 # Import the baseline Go-Explore attacker
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
@@ -38,7 +39,8 @@ def main() -> None:
     # Run attack
     print("Running Go-Explore attack (5 seconds)...")
     attacker = AttackAlgorithm({"max_turns": 3, "branch_batch": 8})
-    findings = attacker.run(env, {"time_budget_s": 5})
+    findings = attacker.run(env, AttackRunConfig(time_budget_s=5))
+    detailed_findings = attacker.last_run_details
 
     print(f"\n{'=' * 70}")
     print("RESULTS")
@@ -47,7 +49,7 @@ def main() -> None:
 
     if findings:
         print("\nBreaches found:")
-        for i, finding in enumerate(findings[:5], 1):
+        for i, finding in enumerate(detailed_findings[:5], 1):
             print(f"\n[{i}] {' -> '.join(finding['user_messages'])}")
             for predicate in finding.get("predicates", []):
                 print(f"    ⚠️  {predicate['predicate']} (severity: {predicate['severity']})")

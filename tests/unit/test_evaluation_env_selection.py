@@ -59,8 +59,7 @@ class _BaselineAttacker:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
-    def run(self, env: AttackEnvProtocol, budget: dict[str, Any]) -> list[dict[str, Any]]:
-        env.interact("read secret")
+    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
         return []
 
 

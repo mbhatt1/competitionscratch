@@ -10,14 +10,21 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from types import ModuleType
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from aicomp_sdk.agents import AgentFactory
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
-from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as BaselineAttacker
+from aicomp_sdk.attacks.baselines.attacker_goexplore import (
+    AttackAlgorithm as BaselineAttacker,
+)
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.env_api import MAX_USER_MESSAGE_CHARS, EnvSelection, parse_env_selection
+from aicomp_sdk.core.env_api import (
+    AttackEnvProtocol,
+    MAX_USER_MESSAGE_CHARS,
+    EnvSelection,
+    parse_env_selection,
+)
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.guardrails.optimal import Guardrail as OptimalGuardrail
 from aicomp_sdk.scoring import score_attack, score_attack_raw
@@ -263,6 +270,32 @@ def _validate_candidate_messages(candidate: AttackCandidate, index: int) -> tupl
     return messages
 
 
+def _replay_candidate_trace(
+    *,
+    candidate: AttackCandidate,
+    index: int,
+    seed: int,
+    fixtures_dir: Path,
+    agent_factory: AgentFactory,
+    guardrail: Any,
+    env_selection: str | EnvSelection,
+    max_tool_hops: int,
+) -> dict[str, Any]:
+    replay_messages = _validate_candidate_messages(candidate, index)
+    replay_env = build_attack_env(
+        seed=seed,
+        fixtures_dir=fixtures_dir,
+        agent_factory=agent_factory,
+        guardrail=guardrail,
+        env_selection=env_selection,
+        max_tool_hops=max_tool_hops,
+    )
+    replay_env.reset()
+    for user_message in replay_messages:
+        replay_env.interact(user_message, max_tool_hops=max_tool_hops)
+    return replay_env.export_trace_dict()
+
+
 def build_attack_env(
     *,
     seed: int,
@@ -272,7 +305,7 @@ def build_attack_env(
     env_selection: str | EnvSelection,
     max_tool_hops: int = AttackRunConfig.max_tool_hops,
     max_episode_messages: int = MAX_REPLAY_MESSAGES_PER_FINDING,
-):
+) -> AttackEnvProtocol:
     """Construct an evaluation environment for the requested env selection."""
     resolved_env_selection = parse_env_selection(env_selection)
     agent = agent_factory()
@@ -291,14 +324,17 @@ def build_attack_env(
             raise RuntimeError(
                 "Environment selection 'gym' requires GymAttackEnv and gymnasium to be available."
             ) from err
-        return GymAttackEnv(
-            seed=seed,
-            fixtures_dir=fixtures_dir,
-            guardrail=guardrail,
-            agent=agent,
-            max_tool_hops=max_tool_hops,
-            max_episode_messages=max_episode_messages,
-            reward_mode="none",
+        return cast(
+            AttackEnvProtocol,
+            GymAttackEnv(
+                seed=seed,
+                fixtures_dir=fixtures_dir,
+                guardrail=guardrail,
+                agent=agent,
+                max_tool_hops=max_tool_hops,
+                max_episode_messages=max_episode_messages,
+                reward_mode="none",
+            ),
         )
     raise ValueError(f"Unsupported env selection: {resolved_env_selection}")
 
@@ -346,13 +382,27 @@ def eval_defense(
     env.reset()
 
     attacker = BaselineAttacker({"max_turns": 4, "branch_batch": 12})
-    raw_findings = attacker.run(env, {"time_budget_s": max(10.0, budget_s * 0.7)})
+    run_config = AttackRunConfig(time_budget_s=max(10.0, budget_s * 0.7))
+    candidates = attacker.run(env, run_config)
 
     breaches = []
-    for finding in raw_findings:
-        trace = finding.get("trace", finding)
-        if not isinstance(trace, dict) or "tool_events" not in trace:
-            continue
+    for idx, candidate in enumerate(candidates[:MAX_REPLAY_FINDINGS]):
+        if not isinstance(candidate, AttackCandidate):
+            raise TypeError(
+                f"Baseline attacker returned unsupported item at index {idx}; "
+                "expected AttackCandidate"
+            )
+
+        trace = _replay_candidate_trace(
+            candidate=candidate,
+            index=idx,
+            seed=attack_seed,
+            fixtures_dir=resolved_fixtures_dir,
+            agent_factory=agent_factory,
+            guardrail=user_guardrail_cls(),
+            env_selection=env_selection,
+            max_tool_hops=run_config.max_tool_hops,
+        )
         predicates = eval_predicates(trace)
         if predicates and _is_breach(trace, predicates):
             breaches.append({"trace": trace, "predicates": predicates})
@@ -419,8 +469,9 @@ def eval_attack(
                 "expected AttackCandidate"
             )
 
-        replay_messages = _validate_candidate_messages(candidate, idx)
-        replay_env = build_attack_env(
+        trace = _replay_candidate_trace(
+            candidate=candidate,
+            index=idx,
             seed=attack_seed,
             fixtures_dir=resolved_fixtures_dir,
             agent_factory=agent_factory,
@@ -428,11 +479,6 @@ def eval_attack(
             env_selection=env_selection,
             max_tool_hops=run_config.max_tool_hops,
         )
-        replay_env.reset()
-        for user_message in replay_messages:
-            replay_env.interact(user_message, max_tool_hops=run_config.max_tool_hops)
-
-        trace = replay_env.export_trace_dict()
         predicates = eval_predicates(trace)
         if not predicates:
             continue

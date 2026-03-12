@@ -17,7 +17,7 @@ class AttackRunConfig:
     ``max_tool_hops`` caps the blue-agent/tool loop for each attacker message.
     """
 
-    time_budget_s: float
+    time_budget_s: float = 30.0
     max_steps: int = 10**9
     max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
 

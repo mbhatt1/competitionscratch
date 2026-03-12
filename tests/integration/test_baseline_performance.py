@@ -14,10 +14,10 @@ from typing import Any
 import pytest
 
 from aicomp_sdk.agents import build_agent
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.scoring import (
     ATTACK_BASELINE_RAW,
     ATTACK_ELITE_RAW,
@@ -76,17 +76,10 @@ def run_baseline_attack(
 
     # Run baseline attack with typical competition parameters
     attacker = AttackAlgorithm({"max_turns": 8, "branch_batch": 12})
-    findings = attacker.run(env, {"time_budget_s": budget_s, "max_steps": 10**9})
+    findings = attacker.run(env, AttackRunConfig(time_budget_s=budget_s, max_steps=10**9))
+    validated = list(attacker.last_run_details)
 
-    # Validate findings
-    validated = []
-    for f in findings:
-        tr = f.get("trace", f)
-        if isinstance(tr, dict) and "tool_events" in tr:
-            preds = eval_predicates(tr)
-            if preds:
-                f["predicates"] = preds
-                validated.append(f)
+    assert len(findings) == len(validated)
 
     # Calculate scores
     raw_score = score_attack_raw(validated)

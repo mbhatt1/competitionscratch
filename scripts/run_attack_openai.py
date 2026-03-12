@@ -342,6 +342,7 @@ def main():
         print("\n✓ Using OpenAI API (gpt-4o-mini)\n")
 
     # Import Go-Explore attack
+    from aicomp_sdk.attacks import AttackRunConfig
     from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
     from aicomp_sdk.core.env import SandboxEnv
 
@@ -358,7 +359,8 @@ def main():
     # Run attack
     print("Running improved Go-Explore with OpenAI agent...\n")
     attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 8})
-    findings = attacker.run(env, {"time_budget_s": 30, "max_steps": 100})
+    findings = attacker.run(env, AttackRunConfig(time_budget_s=30, max_steps=100))
+    detailed_findings = attacker.last_run_details
 
     print(f"\n{'=' * 70}")
     print(f"RESULTS")
@@ -368,7 +370,7 @@ def main():
 
     # Validate findings
     validated = []
-    for i, f in enumerate(findings, 1):
+    for i, f in enumerate(detailed_findings, 1):
         trace = f.get("trace", {})
         predicates = eval_predicates(trace)
 

@@ -13,6 +13,7 @@ from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
 
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
@@ -70,12 +71,13 @@ env = SandboxEnv(
     guardrail=AllowGuardrail(),
 )
 attacker = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings = attacker.run(env, {"time_budget_s": 120})
+findings = attacker.run(env, AttackRunConfig(time_budget_s=120))
+detailed_findings = attacker.last_run_details
 
 secret_chains_success = []
 secret_chains_blocked = []
 
-for f in findings:
+for f in detailed_findings:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 
@@ -125,12 +127,13 @@ env_guard = SandboxEnv(
     guardrail=PromptInjectionGuardrail(),
 )
 attacker_guard = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings_guard = attacker_guard.run(env_guard, {"time_budget_s": 120})
+findings_guard = attacker_guard.run(env_guard, AttackRunConfig(time_budget_s=120))
+detailed_findings_guard = attacker_guard.last_run_details
 
 secret_chains_guard_success = []
 secret_chains_guard_blocked = []
 
-for f in findings_guard:
+for f in detailed_findings_guard:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 
