@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from contextlib import ExitStack, nullcontext
 import json
+from contextlib import ExitStack, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 

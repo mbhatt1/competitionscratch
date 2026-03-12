@@ -182,17 +182,21 @@ class TestReplayHarnessIntegration:
         fixtures_dir.mkdir()
 
         # Create realistic fixtures
-        (fixtures_dir / "web_corpus.json").write_text("""{
+        (fixtures_dir / "web_corpus.json").write_text(
+            """{
             "pages": [
                 {"id": "page1", "title": "Test Page", "content": "Test content"}
             ]
-        }""")
+        }"""
+        )
 
-        (fixtures_dir / "mail_seed.json").write_text("""{
+        (fixtures_dir / "mail_seed.json").write_text(
+            """{
             "inbox": [
                 {"id": "msg1", "from": "test@example.com", "subject": "Test", "body": "Test email"}
             ]
-        }""")
+        }"""
+        )
 
         file_seed = fixtures_dir / "file_seed"
         file_seed.mkdir()

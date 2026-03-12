@@ -10,12 +10,12 @@ from unittest.mock import MagicMock, Mock, call, patch
 import pytest
 
 from aicomp_sdk.agents import GPTOSSAgent, GPTOSSBackend, VulnerableDeterministicAgent
+from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.env_api import (
-    AttackEnvProtocol,
     DEFAULT_MAX_TOOL_HOPS,
     MAX_USER_MESSAGE_CHARS,
+    AttackEnvProtocol,
 )
-from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.trace import ToolEvent, Trace
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -189,6 +189,7 @@ class TestGPTOSSAgent:
         """Create a mock Trace."""
         trace = Mock(spec=Trace)
         trace.user_messages = ["Test message"]
+        trace.tool_events = []
         return trace
 
     def test_agent_generates_tool_call(self, agent, mock_backend, mock_trace):

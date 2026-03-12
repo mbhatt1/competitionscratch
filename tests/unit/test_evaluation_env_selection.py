@@ -6,12 +6,11 @@ from typing import Any
 
 import pytest
 
-from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig, evaluation_core
 from aicomp_sdk.agents import build_agent_factory
-from aicomp_sdk import evaluation_core
 from aicomp_sdk.core.env_api import (
-    AttackEnvProtocol,
     DEFAULT_MAX_TOOL_HOPS,
+    AttackEnvProtocol,
     EnvSelection,
     parse_env_selection,
 )

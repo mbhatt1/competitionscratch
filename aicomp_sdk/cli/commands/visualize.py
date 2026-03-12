@@ -141,9 +141,7 @@ def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None
         elif unique_cells >= 2:
             lines.append("✓ **Good coverage** - found several different vulnerabilities.")
         else:
-            lines.append(
-                "⚠️ **Limited coverage** - consider exploring more diverse attack vectors."
-            )
+            lines.append("⚠️ **Limited coverage** - consider exploring more diverse attack vectors.")
         lines.append("")
     else:
         lines.append(

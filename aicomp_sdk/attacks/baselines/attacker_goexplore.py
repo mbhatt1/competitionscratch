@@ -12,8 +12,8 @@ from aicomp_sdk.attacks.contracts import (
     AttackCandidate,
     AttackRunConfig,
 )
-from aicomp_sdk.core.env_api import AttackEnvProtocol
 from aicomp_sdk.core.cells import cell_signature
+from aicomp_sdk.core.env_api import AttackEnvProtocol
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.utils.timebox import Timebox
 

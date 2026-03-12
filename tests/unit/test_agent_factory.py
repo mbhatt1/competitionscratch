@@ -5,14 +5,16 @@ from typing import Any
 import pytest
 
 from aicomp_sdk.agents import (
-    GPTOSSAgent,
     AgentSelection,
+    GPTOSSAgent,
     VulnerableDeterministicAgent,
     build_agent,
     build_agent_factory,
-    parse_agent_selection,
 )
 from aicomp_sdk.agents import factory as agent_factory
+from aicomp_sdk.agents import (
+    parse_agent_selection,
+)
 
 
 def test_parse_agent_selection_from_string() -> None:

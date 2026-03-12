@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk import evaluation_core
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.core.env_api import MAX_USER_MESSAGE_CHARS
 

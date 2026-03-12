@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import json
+import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 

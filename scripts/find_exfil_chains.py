@@ -8,11 +8,11 @@ import os
 import sys
 from pathlib import Path
 
-from aicomp_sdk.agents import build_agent
 from examples_hooks_submission.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail

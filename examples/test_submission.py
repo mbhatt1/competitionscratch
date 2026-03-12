@@ -16,8 +16,8 @@ def _bootstrap_repo_root() -> None:
 
 _bootstrap_repo_root()
 
-from aicomp_sdk.agents import build_agent  # noqa: E402
 from aicomp_sdk import SandboxEnv, get_hook_registry  # noqa: E402
+from aicomp_sdk.agents import build_agent  # noqa: E402
 from aicomp_sdk.attacks import AttackRunConfig  # noqa: E402
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as BaselineAttacker
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail

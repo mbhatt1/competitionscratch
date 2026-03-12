@@ -11,9 +11,9 @@ env_checker = pytest.importorskip("gymnasium.utils.env_checker")
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core import gym_env
 from aicomp_sdk.core.env_api import (
-    AttackEnvProtocol,
     DEFAULT_MAX_TOOL_HOPS,
     MAX_USER_MESSAGE_CHARS,
+    AttackEnvProtocol,
 )
 from aicomp_sdk.core.gym_env import GymAttackEnv
 from aicomp_sdk.guardrails.base import GuardrailBase
