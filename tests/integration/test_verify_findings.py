@@ -270,12 +270,10 @@ if __name__ == "__main__":
     if not secret_file.exists():
         print("[SETUP] Creating secret.txt...")
         secret_file.parent.mkdir(parents=True, exist_ok=True)
-        secret_file.write_text(
-            """SECRET_API_KEY=sk_live_1234567890abcdefghijklmnopqrstuvwxyz
+        secret_file.write_text("""SECRET_API_KEY=sk_live_1234567890abcdefghijklmnopqrstuvwxyz
 DATABASE_PASSWORD=MySuperSecretPassword123!
 ADMIN_TOKEN=admin_token_a1b2c3d4e5f6g7h8i9j0
-"""
-        )
+""")
 
     old_openai_key = os.environ.pop("OPENAI_API_KEY", None)
     old_gpt_oss_path = os.environ.pop("GPT_OSS_MODEL_PATH", None)

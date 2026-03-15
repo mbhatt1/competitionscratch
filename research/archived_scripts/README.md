@@ -1,45 +1,39 @@
 # Archived Research Scripts
 
-This directory contains older research scripts that predate the current public SDK shape.
+This directory contains research scripts that predate the current public SDK documentation.
 
-They are still archived because they are not part of the supported product surface, but they
-have been updated to run against the current codebase.
+They are kept for reference and occasional reproduction work, but they are not part of the stable public API surface.
 
 ## Current Status
 
-These scripts now target the current SDK using:
+These scripts have been kept compatible with the current repository shape where practical:
 
-- `SandboxEnv` with explicit agent construction
-- the current baseline Go-Explore attacker where applicable
-- current fixture paths via `fixtures/`
+- they construct `SandboxEnv` explicitly
+- they use current fixture locations under `fixtures/`
+- they rely on `archived_imports.py` for repo bootstrapping
 
-The scripts intentionally keep their original Sandbox-based research setup. They do not switch
-to the Gymnasium wrapper by default.
+They intentionally remain Sandbox-based research utilities. They do not attempt to mirror the public Kaggle red-team contract exactly.
 
-## Important Caveats
+## What To Expect
 
-- These are research utilities, not stable public APIs.
-- Most OpenAI-backed scripts require `OPENAI_API_KEY`.
-- `compare_guardrails.py` uses the modern `examples.attacks.attack_working` attack contract and
-  replays returned `AttackCandidate` chains back through `SandboxEnv` to preserve the original
-  comparison semantics.
-- `test_collaborative_multiagent.py` still simulates collaboration. It does not retrofit true
-  shared-archive integration into the baseline attacker.
+- script behavior is less stable than the main package APIs
+- several scripts require `OPENAI_API_KEY`
+- outputs are research artifacts, not canonical benchmark numbers
 
 ## Shared Helper
 
-The archived scripts rely on `archived_imports.py` for:
+[`archived_imports.py`](archived_imports.py) owns the common wiring for:
 
 - repository path setup
 - fixture lookup
-- explicit agent creation
-- current `SandboxEnv` construction
+- environment construction
+- agent construction
 
-If you need to adjust archived script wiring, change that helper first.
+If one archived script breaks because of repo shape changes, check that helper first.
 
-## Script Groups
+## Current Script Groups
 
-Deterministic / local-only:
+Deterministic / local-focused:
 
 - `compare_guardrails.py`
 - `test_seed_sensitivity.py`
@@ -57,18 +51,22 @@ OpenAI-backed:
 
 ## Recommended Usage
 
-Run these from the repository root so their output files land in predictable locations.
-
-Examples:
+Run archived scripts from the repository root:
 
 ```bash
 ./.venv/bin/python research/archived_scripts/compare_guardrails.py
 ./.venv/bin/python research/archived_scripts/test_seed_sensitivity.py
 ```
 
-For the OpenAI-backed scripts:
+OpenAI-backed example:
 
 ```bash
 export OPENAI_API_KEY=...
 ./.venv/bin/python research/archived_scripts/compare_guardrails_openai.py
 ```
+
+If you need supported workflows, prefer the main docs and entrypoints instead:
+
+- `evaluation_redteam.py`
+- `evaluation.py`
+- `aicomp test`

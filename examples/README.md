@@ -1,56 +1,60 @@
 # Examples
 
-This directory contains reference attacks, additional local guardrails, and small test scripts.
+This directory contains runnable attack examples, local-only guardrail examples, and smoke-test scripts.
 
-> Official Kaggle path: submit `attack.py` only. Guardrail examples remain in the repo for local experimentation and research.
+> Official Kaggle path: submit `attack.py` only. Guardrail examples remain for local experimentation and repository workflows.
 
 ## Recommended Starting Points
 
-- [`../docs/KAGGLE_REDTEAM_GUIDE.md`](../docs/KAGGLE_REDTEAM_GUIDE.md)
 - [`../docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md)
+- [`../docs/KAGGLE_REDTEAM_GUIDE.md`](../docs/KAGGLE_REDTEAM_GUIDE.md)
 - [`test_attack_submission.py`](test_attack_submission.py)
 - [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py)
 
 ## Attack Examples
 
-- [`attacks/attack.py`](attacks/attack.py): fuller reference attack
-- [`attacks/attack_simple.py`](attacks/attack_simple.py): simple starting point
-- [`attacks/attack_working.py`](attacks/attack_working.py): working attack patterns
-- [`attacks/attack_goexplore_working.py`](attacks/attack_goexplore_working.py): Go-Explore style example
-- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py): advanced LPCI-flavored example
-- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py): Gym-style message-step example
+- [`attacks/attack.py`](attacks/attack.py) - fuller example attack
+- [`attacks/attack_simple.py`](attacks/attack_simple.py) - experimental hook-based attack
+- [`attacks/attack_working.py`](attacks/attack_working.py) - practical local attack example
+- [`attacks/attack_goexplore_working.py`](attacks/attack_goexplore_working.py) - Go-Explore-style attacker
+- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - LPCI-flavored attack variant
+- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) - Gym-style `env.step(...)` example
 
 ## Guardrail Examples
 
-These are supported local-only examples:
+These are local-only examples:
 
 - [`guardrails/guardrail.py`](guardrails/guardrail.py)
 - [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py)
 - [`guardrails/guardrail_optimal.py`](guardrails/guardrail_optimal.py)
-- [`guardrails/guardrail_taint_tracking.py`](guardrails/guardrail_taint_tracking.py)
-- [`guardrails/guardrail_dataflow.py`](guardrails/guardrail_dataflow.py)
+- [`guardrails/guardrail_pattern.py`](guardrails/guardrail_pattern.py)
+- [`guardrails/guardrail_perfect.py`](guardrails/guardrail_perfect.py)
 - [`guardrails/guardrail_prompt_injection.py`](guardrails/guardrail_prompt_injection.py)
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py)
-- [`guardrails/guardrail_perfect.py`](guardrails/guardrail_perfect.py)
+- [`guardrails/guardrail_taint_tracking.py`](guardrails/guardrail_taint_tracking.py)
 
-## Test Scripts
+## Smoke-Test Scripts
 
-- [`test_attack_submission.py`](test_attack_submission.py): Kaggle-style attack-only smoke test
-- [`test_submission.py`](test_submission.py): zip-based attack+defense smoke test
-- [`QUICK_START.md`](QUICK_START.md): advanced LPCI local attack+defense example flow
+- [`test_attack_submission.py`](test_attack_submission.py) - attack-only smoke test
+- [`test_submission.py`](test_submission.py) - local attack+defense smoke test
+- [`QUICK_START.md`](QUICK_START.md) - quick guide for the experimental example set
 
-## Suggested Workflow
+## Typical Workflows
 
-1. Copy an attack example to `attack.py`
-2. Run the local attack smoke test
-3. Inspect traces and improve prompt/search strategy
-4. Rerun with longer budgets
-5. Submit `attack.py`
-
-Example:
+### Attack-only
 
 ```bash
-cp examples/attacks/attack_simple.py attack.py
+cp examples/attacks/attack_gym_step.py attack.py
 python examples/test_attack_submission.py
 python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+```
+
+### Local dual-track
+
+```bash
+cp examples/attacks/attack_working.py attack.py
+cp examples/guardrails/guardrail_optimal.py guardrail.py
+python examples/test_submission.py
+zip submission.zip attack.py guardrail.py
+python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
 ```

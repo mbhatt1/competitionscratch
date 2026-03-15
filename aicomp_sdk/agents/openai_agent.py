@@ -1,250 +1,501 @@
 """
-OpenAI API agent for testing (not for competition)
+OpenAI Responses API agent.
 """
 
 from __future__ import annotations
 
+import copy
 import json
-import re
-from typing import TYPE_CHECKING, Any, Optional
+import time
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
-from ..core.trace import Trace
-from .tool_call_protocol import (
-    STRUCTURED_OUTPUT_SCHEMA,
-    build_agent_messages,
-    parse_tool_action,
+from aicomp_sdk.agents.debug import (
+    AgentDebugEvent,
+    AgentDebugSink,
+    DebugPhase,
+    serialize_agent_decision,
+    summarize_runtime_history,
 )
+from aicomp_sdk.agents.protocol import AgentProtocol
+from aicomp_sdk.agents.tool_specs import (
+    build_openai_tool_name_maps,
+    to_openai_function_tool,
+)
+from aicomp_sdk.agents.types import (
+    AGENT_STATE_VERSION,
+    AgentDecision,
+    AgentStateSnapshot,
+    AgentStateVersionError,
+    AgentToolSpec,
+    AssistantMessageEvent,
+    FinalResponseDecision,
+    InvalidModelOutputError,
+    ToolCall,
+    ToolCallDecision,
+    ToolRequestEvent,
+    ToolResultEvent,
+    UserMessageEvent,
+)
+from aicomp_sdk.core.runtime_history import RuntimeHistory
 
 if TYPE_CHECKING:
-    from openai.types.responses.response_input_param import ResponseInputItemParam
-
-_VERBOSE_CALL_LIMIT = 5
-_FALLBACK_PAGE_IDS = {
-    "demo": "prompt_injection_demo",
-    "confusion": "tool_confusion",
-    "docs": "docs_api",
-    "api": "docs_api",
-    "blog": "blog_security",
-    "security": "blog_security",
-    "tutorial": "tutorial_shell",
-    "shell": "tutorial_shell",
-    "config": "config_example",
-    "export": "data_export",
-    "howto": "howto",
-    "welcome": "welcome",
-}
-_FALLBACK_MESSAGE_IDS = {
-    "action": "msg2",
-    "msg2": "msg2",
-    "msg3": "msg3",
-    "msg4": "msg4",
-    "msg5": "msg5",
-    "msg6": "msg6",
-    "msg7": "msg7",
-    "maintenance": "msg3",
-    "alert": "msg4",
-    "request": "msg5",
-    "update": "msg6",
-    "data": "msg5",
-}
-_FALLBACK_FILE_PATHS = {
-    "secret": "secret.txt",
-    "config": "config.txt",
-    "install": "install.txt",
-    "package": "package.txt",
-    "backup": "backup.txt",
-    "readme": "readme.txt",
-    "note": "note.txt",
-    "report": "report.txt",
-}
-_DEFAULT_TOOL_ARGS = {
-    "web.search": {"query": "documentation"},
-    "web.open": {"id": "welcome"},
-    "fs.read": {"path": "readme.txt"},
-    "fs.write": {"path": "note.txt", "content": "test"},
-    "fs.delete": {"path": "note.txt"},
-    "shell.run": {"cmd": "echo test"},
-    "email.read": {"id": "msg1"},
-    "email.send": {"to": "test@example.com", "subject": "test", "body": "test"},
-    "http.post": {"url": "https://example.com/api", "data": "test"},
-}
+    from openai.types.responses import (
+        Response,
+        ResponseFunctionToolCall,
+        ResponseOutputItem,
+    )
 
 
-class OpenAIAgent:
-    """Simple agent using OpenAI API for testing"""
+class ResponsesAPIProtocol(Protocol):
+    def create(self, **kwargs: Response) -> Response:
+        """Create a Responses API request."""
 
-    def __init__(self, api_key: str, verbose: bool = False) -> None:
+
+class OpenAIClientProtocol(Protocol):
+    responses: ResponsesAPIProtocol
+
+
+@dataclass(frozen=True)
+class OpenAIResponsesAgentState:
+    next_debug_turn_index: int = 1
+    pending_response_output_items: list[dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.next_debug_turn_index < 1:
+            raise ValueError("next_debug_turn_index must be >= 1")
+        normalized_items: list[dict[str, Any]] = []
+        for index, item in enumerate(self.pending_response_output_items):
+            if not isinstance(item, Mapping):
+                raise ValueError(f"pending_response_output_items[{index}] must be an object")
+            normalized_item = dict(item)
+            if not all(isinstance(key, str) for key in normalized_item):
+                raise ValueError(f"pending_response_output_items[{index}] keys must be strings")
+            normalized_items.append(copy.deepcopy(normalized_item))
+        object.__setattr__(self, "pending_response_output_items", normalized_items)
+
+    def advance(
+        self,
+        decision: AgentDecision,
+        output_items: Sequence[ResponseOutputItem],
+    ) -> OpenAIResponsesAgentState:
+        pending_response_output_items: list[dict[str, Any]] = []
+        if isinstance(decision, ToolCallDecision):
+            pending_response_output_items = [
+                item.model_dump(mode="json", exclude_unset=True) for item in output_items
+            ]
+        return OpenAIResponsesAgentState(
+            next_debug_turn_index=self.next_debug_turn_index + 1,
+            pending_response_output_items=pending_response_output_items,
+        )
+
+    def cleared_pending_response_output_items(self) -> OpenAIResponsesAgentState:
+        if not self.pending_response_output_items:
+            return self
+        return OpenAIResponsesAgentState(
+            next_debug_turn_index=self.next_debug_turn_index,
+        )
+
+    @classmethod
+    def from_snapshot_data(cls, data: object) -> OpenAIResponsesAgentState:
+        if not isinstance(data, Mapping):
+            raise AgentStateVersionError("Invalid agent snapshot data: expected object")
         try:
-            from openai import OpenAI
-        except Exception as err:
-            raise RuntimeError("OpenAI SDK is not available") from err
+            return cls(
+                next_debug_turn_index=cls._require_positive_int(
+                    data,
+                    key="next_debug_turn_index",
+                ),
+                pending_response_output_items=cls._require_pending_output_items(data),
+            )
+        except ValueError as err:
+            raise AgentStateVersionError(f"Invalid agent snapshot state: {err}") from err
 
-        self.client: Any = OpenAI(api_key=api_key)
+    @staticmethod
+    def _require_positive_int(data: Mapping[str, object], *, key: str) -> int:
+        if key not in data:
+            raise ValueError(f"missing {key}")
+        value = data[key]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{key} must be an integer")
+        if value < 1:
+            raise ValueError(f"{key} must be >= 1")
+        return value
+
+    @staticmethod
+    def _require_pending_output_items(
+        data: Mapping[str, object],
+    ) -> list[dict[str, Any]]:
+        if "pending_response_output_items" not in data:
+            raise ValueError("missing pending_response_output_items")
+        raw_value = data["pending_response_output_items"]
+        if not isinstance(raw_value, list):
+            raise ValueError("pending_response_output_items must be a list")
+        normalized_items: list[dict[str, Any]] = []
+        for index, item in enumerate(raw_value):
+            if not isinstance(item, Mapping):
+                raise ValueError(f"pending_response_output_items[{index}] must be an object")
+            normalized_item = dict(item)
+            if not all(isinstance(key, str) for key in normalized_item):
+                raise ValueError(f"pending_response_output_items[{index}] keys must be strings")
+            normalized_items.append(normalized_item)
+        return normalized_items
+
+
+class OpenAIResponsesAgent(AgentProtocol):
+    """OpenAI Responses-backed tool-using agent."""
+
+    def __init__(
+        self,
+        *,
+        client: OpenAIClientProtocol,
+        verbose: bool = False,
+        model: str = "gpt-4o-mini",
+        debug_sink: Optional[AgentDebugSink] = None,
+    ) -> None:
+        self._client = client
         self.verbose = verbose
-        self.call_count = 0
-        self.none_returns = 0
-        self.tool_calls = 0
+        self._model = model
+        self._debug_sink = debug_sink
+        self._state = OpenAIResponsesAgentState()
 
-    def next_tool_call(
-        self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[dict[str, Any]]:
-        """Get next tool call from OpenAI (or return None if unavailable)"""
-        self.call_count += 1
-
-        # Build messages for OpenAI
-        messages: list[ResponseInputItemParam] = build_agent_messages(trace, last_tool_output)
-
+    def next_action(
+        self,
+        *,
+        history: RuntimeHistory,
+        tools: Sequence[AgentToolSpec],
+    ) -> AgentDecision:
+        state = self._effective_state_for_history(history)
+        canonical_to_openai, openai_to_canonical = build_openai_tool_name_maps(tools)
+        provider_payload = self._debug_provider_payload(
+            history,
+            tools,
+            canonical_to_openai,
+            state=state,
+        )
+        request = self._build_request(history, tools, canonical_to_openai, state=state)
+        turn_index = state.next_debug_turn_index
+        self._record_debug_event(
+            phase="request_built",
+            turn_index=turn_index,
+            history=history,
+            request_payload=request,
+            provider_payload=provider_payload,
+        )
+        started_at = time.perf_counter()
+        response: Response = self._client.responses.create(**request)
+        latency_ms = (time.perf_counter() - started_at) * 1000.0
+        response_payload = response.model_dump(mode="json", exclude_unset=True)
+        self._record_debug_event(
+            phase="response_received",
+            turn_index=turn_index,
+            history=history,
+            response_payload=response_payload,
+            latency_ms=latency_ms,
+            provider_payload=provider_payload,
+        )
         try:
-            response = self.client.responses.create(
-                model="gpt-4o-mini",
-                input=messages,
-                temperature=0,
-                max_output_tokens=256,
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "strict": True,
-                        "schema": STRUCTURED_OUTPUT_SCHEMA,
-                    }
-                },
+            self._raise_for_response_error(response)
+            decision = self._parse_response(response, openai_to_canonical)
+        except InvalidModelOutputError as err:
+            self._record_debug_event(
+                phase="parse_error",
+                turn_index=turn_index,
+                history=history,
+                request_payload=request,
+                response_payload=response_payload,
+                error=str(err),
+                latency_ms=latency_ms,
+                provider_payload=provider_payload,
+            )
+            raise
+
+        self._record_debug_event(
+            phase="decision_emitted",
+            turn_index=turn_index,
+            history=history,
+            decision_payload=serialize_agent_decision(decision),
+            latency_ms=latency_ms,
+            provider_payload=provider_payload,
+        )
+        self._state = state.advance(decision, response.output)
+        return decision
+
+    def reset_state(self) -> None:
+        self._state = OpenAIResponsesAgentState()
+
+    def snapshot_state(self) -> AgentStateSnapshot:
+        return {
+            "version": AGENT_STATE_VERSION,
+            "backend": "openai_responses",
+            "data": {
+                "pending_response_output_items": copy.deepcopy(
+                    self._state.pending_response_output_items
+                ),
+                "next_debug_turn_index": self._state.next_debug_turn_index,
+            },
+        }
+
+    def restore_state(self, snapshot: AgentStateSnapshot) -> None:
+        if snapshot["version"] != AGENT_STATE_VERSION:
+            raise AgentStateVersionError(
+                f"Unsupported agent snapshot version: {snapshot['version']}"
+            )
+        if snapshot["backend"] != "openai_responses":
+            raise AgentStateVersionError(
+                f"Unsupported agent snapshot backend: {snapshot['backend']}"
+            )
+        self._state = OpenAIResponsesAgentState.from_snapshot_data(snapshot["data"])
+
+    def _build_request(
+        self,
+        history: RuntimeHistory,
+        tools: Sequence[AgentToolSpec],
+        canonical_to_openai: Mapping[str, str],
+        *,
+        state: OpenAIResponsesAgentState,
+    ) -> dict[str, object]:
+        request = {
+            "model": self._model,
+            "input": self._render_input_items(
+                history,
+                canonical_to_openai,
+                state=state,
+            ),
+            "tools": [
+                to_openai_function_tool(
+                    spec,
+                    name_override=canonical_to_openai.get(spec.name, spec.name),
+                )
+                for spec in tools
+            ],
+            "parallel_tool_calls": False,
+            "temperature": 0,
+        }
+
+        instructions = self._render_instructions(history)
+        if instructions is not None:
+            request["instructions"] = instructions
+
+        return request
+
+    def _raise_for_response_error(self, response: Response) -> None:
+        if response.error is not None:
+            raise InvalidModelOutputError(f"OpenAI response error: {response.error}")
+        if response.incomplete_details is not None:
+            raise InvalidModelOutputError(
+                f"OpenAI response incomplete: {response.incomplete_details}"
             )
 
-            if getattr(response, "error", None) is not None:
-                if self._should_log():
-                    print(f"  Result: API error {response.error}")
-                self.none_returns += 1
-                return None
+    def _render_input_items(
+        self,
+        history: RuntimeHistory,
+        canonical_to_openai: Mapping[str, str],
+        *,
+        state: OpenAIResponsesAgentState,
+    ) -> list[dict[str, Any]]:
+        """
+        Render Responses API input from canonical runtime history.
 
-            if getattr(response, "incomplete_details", None) is not None:
-                if self._should_log():
-                    print(f"  Result: Incomplete response {response.incomplete_details}")
-                self.none_returns += 1
-                return None
+        If the previous OpenAI turn ended in a tool request, and the current history ends
+        with the matching tool request/result suffix, resume that provider-private turn by
+        sending:
+        1. the base history before the trailing roundtrip,
+        2. the stored output items from the prior response,
+        3. the new function_call_output for the trailing tool result.
 
-            text = self._extract_response_text(response)
+        Otherwise, render the full canonical history directly.
+        """
+        split_roundtrip = history.split_trailing_tool_roundtrip()
+        if state.pending_response_output_items and split_roundtrip is not None:
+            base_history, _request_event, result_event = split_roundtrip
+            items = self._render_history_items(base_history, canonical_to_openai)
+            items.extend(copy.deepcopy(state.pending_response_output_items))
+            items.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": result_event.result.call_id,
+                    "output": result_event.result.output_text,
+                }
+            )
+            return items
+        return self._render_history_items(history, canonical_to_openai)
 
-            if self._should_log():
-                print(f"\n[OpenAI Agent] Call #{self.call_count}")
-                print(
-                    f"  User message: {trace.user_messages[-1][:80] if trace.user_messages else 'None'}"
-                )
-                print(f"  Response: {text[:200]}")
-
-            action = parse_tool_action(text)
-            if action is None:
-                if self._should_log():
-                    print("  Result: Invalid structured action (returning None)")
-                self.none_returns += 1
-                return None
-
-            if action["done"]:
-                self.none_returns += 1
-                if self._should_log():
-                    print("  Result: Done (returning None)")
-                return None
-
-            tool = action["tool"]
-            args = action["args"]
-            if not args:
-                args = self._default_args(tool, trace)
-
-            self.tool_calls += 1
-            if self._should_log():
-                print(f"  Tool call: {tool}({args})")
-
-            return {"tool": tool, "args": args, "reason": "openai_model"}
-        except Exception as e:
-            print(f"[OpenAI] Error: {e}")
-            self.none_returns += 1
-            return None
-
-    def _extract_response_text(self, response: Any) -> str:
-        """Extract plain text from a Responses API payload."""
-        text = (getattr(response, "output_text", None) or "").strip()
-        if text:
-            return text
-
-        parts: list[str] = []
-        output_items = getattr(response, "output", None) or []
-        for item in output_items:
-            if getattr(item, "type", None) != "message":
-                continue
-            content_items = getattr(item, "content", None) or []
-            for content in content_items:
-                if getattr(content, "type", None) in ("output_text", "text"):
-                    chunk = getattr(content, "text", None)
-                    if chunk:
-                        parts.append(chunk)
-        return "\n".join(parts).strip()
-
-    def _should_log(self) -> bool:
-        return self.verbose and self.call_count <= _VERBOSE_CALL_LIMIT
-
-    def _fallback_next_call(
-        self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[dict[str, Any]]:
-        """Deterministic fallback"""
-        # Check ACTION directive
-        if last_tool_output:
-            action_re = re.compile(r"^\s*ACTION:\s*(\w+\.\w+)\s*(\{.*\})\s*$", re.MULTILINE)
-            m = action_re.search(last_tool_output)
-            if m:
-                try:
-                    return {
-                        "tool": m.group(1),
-                        "args": json.loads(m.group(2)),
-                        "reason": "action_directive",
+    def _render_history_items(
+        self,
+        history: RuntimeHistory,
+        canonical_to_openai: Mapping[str, str],
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for event in history.events:
+            if isinstance(event, UserMessageEvent):
+                items.append(
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": event.text}],
                     }
-                except Exception:
-                    pass
+                )
+                continue
+            if isinstance(event, AssistantMessageEvent):
+                items.append(
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": event.text}],
+                    }
+                )
+                continue
+            if isinstance(event, ToolRequestEvent):
+                items.append(
+                    {
+                        "type": "function_call",
+                        "call_id": event.call.call_id,
+                        "name": canonical_to_openai.get(
+                            event.call.tool_name,
+                            event.call.tool_name,
+                        ),
+                        "arguments": json.dumps(event.call.arguments, sort_keys=True),
+                    }
+                )
+                continue
+            if isinstance(event, ToolResultEvent):
+                items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": event.result.call_id,
+                        "output": event.result.output_text,
+                    }
+                )
+                continue
+            raise InvalidModelOutputError(f"Unsupported runtime event: {event!r}")
+        return items
 
-        if not trace.user_messages:
+    def _render_instructions(self, history: RuntimeHistory) -> Optional[str]:
+        if not history.instructions:
             return None
+        return "\n\n".join(event.text for event in history.instructions if event.text.strip())
 
-        u = trace.user_messages[-1].lower()
+    def _parse_response(
+        self,
+        response: Response,
+        openai_to_canonical: Mapping[str, str],
+    ) -> AgentDecision:
+        assistant_text_chunks: list[str] = []
+        function_tool_call: Optional[ResponseFunctionToolCall] = None
 
-        # Parse web.open with page ID
-        if "open" in u:
-            page_id = "welcome"  # default
-            for keyword, pid in _FALLBACK_PAGE_IDS.items():
-                if keyword in u:
-                    page_id = pid
-                    break
-            return {"tool": "web.open", "args": {"id": page_id}, "reason": "open"}
+        for output in response.output:
+            if output.type == "function_call":
+                if function_tool_call is not None:
+                    raise InvalidModelOutputError("OpenAI response returned multiple tool calls")
+                function_tool_call = output
+                continue
 
-        # Parse email.read with message ID
-        if "read email" in u or "check email" in u or "email" in u:
-            msg_id = "msg1"  # default
-            for keyword, mid in _FALLBACK_MESSAGE_IDS.items():
-                if keyword in u:
-                    msg_id = mid
-                    break
-            return {"tool": "email.read", "args": {"id": msg_id}, "reason": "email"}
+            if output.type != "message":
+                continue
 
-        # Parse fs.read with file path
-        if "read" in u:
-            file_path = "readme.txt"  # default
-            for keyword, fpath in _FALLBACK_FILE_PATHS.items():
-                if keyword in u:
-                    file_path = fpath
-                    break
-            return {"tool": "fs.read", "args": {"path": file_path}, "reason": "read"}
+            for content in output.content:
+                if content.type != "output_text":
+                    continue
 
-        # File operations
-        if "delete" in u and "secret" in u:
-            return {
-                "tool": "fs.delete",
-                "args": {"path": "secret.txt"},
-                "reason": "delete",
-            }
+                text = content.text
+                if text.strip():
+                    assistant_text_chunks.append(text)
 
-        # Search
-        if "search" in u:
-            query = u.split("search", 1)[-1].strip() or "doc"
-            return {"tool": "web.search", "args": {"query": query}, "reason": "search"}
+        if not assistant_text_chunks and response.output_text.strip():
+            assistant_text_chunks.append(response.output_text.strip())
 
-        return None
+        assistant_text = "\n".join(
+            chunk.strip() for chunk in assistant_text_chunks if chunk.strip()
+        )
 
-    def _default_args(self, tool_name: str, trace: Trace) -> dict[str, Any]:
-        """Provide default args when OpenAI returns empty"""
-        return _DEFAULT_TOOL_ARGS.get(tool_name, {})
+        if function_tool_call is not None:
+            raw_arguments = function_tool_call.arguments
+            raw_tool_name = function_tool_call.name
+            try:
+                arguments = json.loads(raw_arguments)
+            except Exception as err:
+                raise InvalidModelOutputError("Function call arguments are not valid JSON") from err
+
+            if not isinstance(arguments, dict):
+                raise InvalidModelOutputError("Function call arguments must decode to an object")
+
+            return ToolCallDecision(
+                call=ToolCall(
+                    call_id=function_tool_call.call_id,
+                    tool_name=openai_to_canonical.get(raw_tool_name, raw_tool_name),
+                    arguments=arguments,
+                ),
+                assistant_message=assistant_text or None,
+            )
+
+        if assistant_text:
+            return FinalResponseDecision(text=assistant_text)
+
+        raise InvalidModelOutputError(
+            "OpenAI response produced neither assistant text nor tool call"
+        )
+
+    def _debug_provider_payload(
+        self,
+        history: RuntimeHistory,
+        tools: Sequence[AgentToolSpec],
+        canonical_to_openai: Mapping[str, str],
+        *,
+        state: OpenAIResponsesAgentState,
+    ) -> dict[str, Any]:
+        split_roundtrip = history.split_trailing_tool_roundtrip()
+        used_pending_turn_output = bool(
+            state.pending_response_output_items and split_roundtrip is not None
+        )
+        return {
+            "used_pending_turn_output": used_pending_turn_output,
+            "pending_turn_output_item_count": len(state.pending_response_output_items),
+            "tool_names": [tool.name for tool in tools],
+            "registered_tool_names": [
+                canonical_to_openai.get(tool.name, tool.name) for tool in tools
+            ],
+        }
+
+    def _record_debug_event(
+        self,
+        *,
+        phase: DebugPhase,
+        turn_index: int,
+        history: RuntimeHistory,
+        request_payload: Optional[Mapping[str, Any]] = None,
+        response_payload: Optional[Mapping[str, Any]] = None,
+        decision_payload: Optional[Mapping[str, Any]] = None,
+        error: Optional[str] = None,
+        latency_ms: Optional[float] = None,
+        provider_payload: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        if self._debug_sink is None:
+            return
+        self._debug_sink.record(
+            AgentDebugEvent(
+                backend="openai_responses",
+                model=self._model,
+                phase=phase,
+                turn_index=turn_index,
+                history_summary=summarize_runtime_history(history),
+                request_payload=request_payload,
+                response_payload=response_payload,
+                decision_payload=decision_payload,
+                error=error,
+                latency_ms=latency_ms,
+                provider_payload=provider_payload or {},
+            )
+        )
+
+    def _effective_state_for_history(
+        self,
+        history: RuntimeHistory,
+    ) -> OpenAIResponsesAgentState:
+        if (
+            self._state.pending_response_output_items
+            and history.split_trailing_tool_roundtrip() is None
+        ):
+            return self._state.cleared_pending_response_output_items()
+        return self._state

@@ -195,7 +195,8 @@ class Guardrail(GuardrailBase):
         # TODO: Initialize your defense strategy here
         # Examples:
         # - Set up detection hooks
-        # - Load ML models (PromptGuard, etc.)
+        # - Cache heavyweight immutable resources (models, regexes) outside the instance
+        # - Keep per-session mutable state on self
         # - Initialize taint tracking
         # - Configure rule thresholds
     

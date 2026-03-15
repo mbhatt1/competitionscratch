@@ -1,171 +1,110 @@
-"""
-Guardrail using Meta's Llama Prompt-Guard-86M model.
+"""Prompt-Guard-backed example adapted to the current guardrail contract.
 
-This guardrail uses a trained classifier to detect:
-- Prompt injections: out-of-place commands/instructions
-- Jailbreaks: attempts to override system prompts
-
-Model: meta-llama/Prompt-Guard-86M (86M parameters)
-License: Llama 3.1
-
-⚠️ NOTE: This model requires access approval from Meta.
-To use this guardrail:
-1. Visit https://huggingface.co/meta-llama/Prompt-Guard-86M
-2. Request access (usually approved within minutes)
-3. Login with: huggingface-cli login
-4. Run your code - the model will download automatically
-
-Alternative: Use guardrail_prompt_injection.py (no model required)
+The runtime currently passes `last_user`, recent tool/source history, and the
+pending tool call metadata into `decide(...)`. It does not pass raw tool
+outputs directly. This example therefore uses Prompt-Guard to score the latest
+user turn and, for dangerous sink calls, the pending tool arguments.
 """
 
+from __future__ import annotations
+
+import json
+import sys
 from collections.abc import Mapping
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in (current.parent, *current.parents):
+        if (parent / "aicomp_sdk").is_dir():
+            return parent
+    return current.parent
+
+
+_REPO_ROOT = _repo_root()
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
 
+@lru_cache(maxsize=1)
+def _load_promptguard_classifier() -> Any:
+    try:
+        from transformers import pipeline
+
+        print("[PROMPT-GUARD] Loading meta-llama/Prompt-Guard-86M model...")
+        classifier = pipeline(
+            "text-classification",
+            model="meta-llama/Prompt-Guard-86M",
+            device=-1,
+        )
+        print("[PROMPT-GUARD] Model loaded successfully")
+        return classifier
+    except ImportError:
+        print("[PROMPT-GUARD] ERROR: transformers library not installed")
+        print("[PROMPT-GUARD] Install with: pip install transformers torch")
+        raise
+    except Exception as err:
+        print(f"[PROMPT-GUARD] ERROR loading model: {err}")
+        raise
+
+
 class Guardrail(GuardrailBase):
-    """
-    Guardrail using Meta's Prompt-Guard-86M for detecting prompt attacks.
+    """Use Prompt-Guard with a cached classifier and per-instance session state."""
 
-    Blocks both:
-    - INJECTION: Commands embedded in content
-    - JAILBREAK: Attempts to override system behavior
-    """
-
-    def __init__(self):
-        """Initialize the Prompt Guard model."""
+    def __init__(self) -> None:
         super().__init__()
-        self.classifier = None
-        self.recent_tool_outputs = []
-        self.max_history = 5
-        self._load_model()
-
-    def _load_model(self):
-        """Load the Prompt-Guard-86M model lazily."""
-        try:
-            from transformers import pipeline
-
-            print("[PROMPT-GUARD] Loading meta-llama/Prompt-Guard-86M model...")
-            self.classifier = pipeline(
-                "text-classification",
-                model="meta-llama/Prompt-Guard-86M",
-                device=-1,  # Use CPU
-            )
-            print("[PROMPT-GUARD] Model loaded successfully")
-        except ImportError:
-            print("[PROMPT-GUARD] ERROR: transformers library not installed")
-            print("[PROMPT-GUARD] Install with: pip install transformers torch")
-            raise
-        except Exception as e:
-            print(f"[PROMPT-GUARD] ERROR loading model: {e}")
-            raise
+        self.classifier = _load_promptguard_classifier()
+        self.dangerous_tools = {
+            "fs.delete",
+            "fs.write",
+            "shell.run",
+            "http.post",
+            "email.send",
+        }
 
     def _scan_text(self, text: str, threshold: float = 0.5) -> tuple[bool, str, float]:
-        """
-        Scan text for prompt attacks.
-
-        Args:
-            text: Text to scan
-            threshold: Confidence threshold for blocking (default 0.5)
-
-        Returns:
-            (is_malicious, label, score)
-        """
         if not self.classifier:
             return False, "BENIGN", 0.0
 
         try:
-            # Truncate to model's context window (512 tokens)
-            # Approximate: ~4 chars per token, so limit to 2000 chars
             text_to_scan = text[:2000] if len(text) > 2000 else text
-
             result = self.classifier(text_to_scan)
-
-            if isinstance(result, list) and len(result) > 0:
+            if isinstance(result, list) and result:
                 result = result[0]
 
             label = result.get("label", "BENIGN")
             score = result.get("score", 0.0)
-
-            # Block if INJECTION or JAILBREAK with sufficient confidence
-            is_malicious = label in ["INJECTION", "JAILBREAK"] and score >= threshold
-
+            is_malicious = label in {"INJECTION", "JAILBREAK"} and score >= threshold
             return is_malicious, label, score
-
-        except Exception as e:
-            print(f"[PROMPT-GUARD] Error scanning text: {e}")
-            # Fail open: allow the text if scanning fails
+        except Exception as err:
+            print(f"[PROMPT-GUARD] Error scanning text: {err}")
             return False, "ERROR", 0.0
 
     def decide(
         self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
-        """
-        Decide whether to allow, deny, or modify a tool call.
-
-        Uses Prompt-Guard-86M to scan:
-        1. Recent tool outputs for embedded injections
-        2. The user message that triggered this tool call
-
-        Args:
-            tool_name: Name of the tool being called
-            tool_args: Arguments for the tool
-            context: Context including recent messages and outputs
-
-        Returns:
-            Decision to ALLOW or DENY the tool call
-        """
-        # Get user message from context
-        user_message = context.get("user_message", "")
-
-        # Check if user message itself is malicious
-        if user_message:
-            is_malicious, label, score = self._scan_text(user_message, threshold=0.5)
+        last_user = str(context.get("last_user") or "")
+        if last_user:
+            is_malicious, label, score = self._scan_text(last_user, threshold=0.5)
             if is_malicious:
-                print(f"[PROMPT-GUARD] BLOCKED user message: {label} (confidence: {score:.2%})")
-                return Decision.deny(f"User message contains {label.lower()} attempt")
+                print(f"[PROMPT-GUARD] BLOCKED user message: {label} ({score:.2%})")
+                return Decision.deny(f"User message contains a {label.lower()} attempt")
 
-        # Check recent tool outputs for embedded injections
-        recent_outputs = context.get("recent_tool_outputs", [])
-        if recent_outputs:
-            # Scan the most recent outputs
-            for output_text in recent_outputs[-3:]:
-                if isinstance(output_text, dict):
-                    # Extract text from dict
-                    output_text = (
-                        output_text.get("content")
-                        or output_text.get("body")
-                        or output_text.get("text")
-                        or str(output_text)
-                    )
+        recent_sources = context.get("recent_sources", [])
+        tainted = any(src in {"web", "email"} for src in recent_sources)
+        if tainted and tool_name in self.dangerous_tools:
+            args_text = json.dumps(tool_args, sort_keys=True, default=str)
+            is_malicious, label, score = self._scan_text(args_text, threshold=0.6)
+            if is_malicious:
+                print(f"[PROMPT-GUARD] BLOCKED {tool_name} args after {label} detection")
+                print(f"[PROMPT-GUARD] Confidence: {score:.2%}")
+                return Decision.deny(
+                    f"Dangerous action {tool_name} blocked after {label.lower()}-like content"
+                )
 
-                if isinstance(output_text, str) and len(output_text) > 10:
-                    is_malicious, label, score = self._scan_text(output_text, threshold=0.6)
-
-                    if is_malicious:
-                        # Check if this is a dangerous action
-                        dangerous_tools = [
-                            "fs.delete",
-                            "fs.write",
-                            "shell.run",
-                            "http.post",
-                            "email.send",
-                        ]
-
-                        if tool_name in dangerous_tools:
-                            print(f"[PROMPT-GUARD] BLOCKED {tool_name} after {label} detected")
-                            print(f"[PROMPT-GUARD] Confidence: {score:.2%}")
-                            return Decision.deny(
-                                f"Dangerous action {tool_name} blocked after {label.lower()} in content"
-                            )
-
-        # Store this output for next check
-        output = context.get("last_tool_output")
-        if output:
-            self.recent_tool_outputs.append(output)
-            if len(self.recent_tool_outputs) > self.max_history:
-                self.recent_tool_outputs.pop(0)
-
-        # Allow by default
-        return Decision.allow()
+        return Decision.allow("ok")

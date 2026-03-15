@@ -27,6 +27,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
 def test_redteam_evaluator_writes_attack_only_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    pytest.importorskip("gymnasium")
     submission = tmp_path / "attack.py"
     submission.write_text(ATTACK_SOURCE, encoding="utf-8")
     out_path = tmp_path / "scores.txt"
@@ -83,6 +84,7 @@ def test_redteam_evaluator_requires_attack_py_name(
 
 
 def test_redteam_score_matches_eval_attack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("gymnasium")
     submission = tmp_path / "attack.py"
     submission.write_text(ATTACK_SOURCE, encoding="utf-8")
     out_path = tmp_path / "scores.txt"

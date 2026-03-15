@@ -9,7 +9,7 @@ Creates:
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, cast
@@ -67,6 +67,57 @@ def load_result(run_identifier: str) -> Optional[dict[str, Any]]:
     return None
 
 
+def _metric_block_evaluated(block: Mapping[str, Any]) -> bool:
+    return bool(block.get("evaluated", True))
+
+
+def _display_metric(
+    value: Any,
+    *,
+    evaluated: bool,
+    formatter: Callable[[Any], str],
+) -> str:
+    if not evaluated:
+        return "N/A"
+    return formatter(value)
+
+
+def _append_not_evaluated_section(lines: list[str]) -> None:
+    lines.extend(
+        [
+            "Not evaluated in this run.",
+            "",
+        ]
+    )
+
+
+def _mark_axis_not_evaluated(ax, title: str) -> None:
+    ax.set_title(title)
+    kwargs = {
+        "ha": "center",
+        "va": "center",
+        "fontsize": 12,
+    }
+    if hasattr(ax, "transAxes"):
+        kwargs["transform"] = ax.transAxes
+    ax.text(0.5, 0.5, "Not evaluated in this run.", **kwargs)
+    ax.axis("off")
+
+
+def _render_single_track_score_panel(ax, label: str, score: float) -> None:
+    ax.set_title("Single-Track Result")
+    kwargs = {
+        "ha": "center",
+        "va": "center",
+        "fontsize": 12,
+        "fontweight": "bold",
+    }
+    if hasattr(ax, "transAxes"):
+        kwargs["transform"] = ax.transAxes
+    ax.text(0.5, 0.5, f"Only {label} track evaluated\nScore: {score:.1f}", **kwargs)
+    ax.axis("off")
+
+
 def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None:
     """Create a markdown report from evaluation results."""
     run_name = result.get("run_name", "Unknown")
@@ -76,6 +127,8 @@ def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None
 
     attack = result.get("attack", {})
     defense = result.get("defense", {})
+    attack_evaluated = _metric_block_evaluated(attack)
+    defense_evaluated = _metric_block_evaluated(defense)
 
     # Format timestamp
     try:
@@ -97,57 +150,67 @@ def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None
         "| Metric | Value |",
         "|--------|-------|",
         f"| **Final Score** | **{final_score:.2f}** |",
-        f"| Attack Score | {attack.get('score', 0):.2f} |",
-        f"| Defense Score | {defense.get('score', 0):.2f} |",
+        f"| Attack Score | {_display_metric(attack.get('score', 0), evaluated=attack_evaluated, formatter=lambda value: f'{value:.2f}')} |",
+        f"| Defense Score | {_display_metric(defense.get('score', 0), evaluated=defense_evaluated, formatter=lambda value: f'{value:.2f}')} |",
         f"| Scoring Mode | {scoring_mode} |",
         "",
         "---",
         "",
         "## Attack Performance",
         "",
-        "### Overview",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Score | {attack.get('score', 0):.2f} |",
-        f"| Raw Score | {attack.get('score_raw', 0):.2f} |",
-        f"| Total Findings | {attack.get('findings_count', 0)} |",
-        f"| Unique Cells | {attack.get('unique_cells', 0)} |",
-        f"| Time Taken | {attack.get('time_taken', 0):.1f}s |",
-        "",
     ]
 
-    # Add attack analysis
-    findings_count = attack.get("findings_count", 0)
-    unique_cells = attack.get("unique_cells", 0)
-
-    lines.extend(
-        [
-            "### Analysis",
-            "",
-        ]
-    )
-
-    if findings_count > 0:
-        lines.append(
-            f"✅ Found **{findings_count} security violations** across **{unique_cells} unique vulnerable states**."
+    if attack_evaluated:
+        lines.extend(
+            [
+                "### Overview",
+                "",
+                "| Metric | Value |",
+                "|--------|-------|",
+                f"| Score | {attack.get('score', 0):.2f} |",
+                f"| Raw Score | {attack.get('score_raw', 0):.2f} |",
+                f"| Total Findings | {attack.get('findings_count', 0)} |",
+                f"| Unique Cells | {attack.get('unique_cells', 0)} |",
+                f"| Time Taken | {attack.get('time_taken', 0):.1f}s |",
+                "",
+            ]
         )
-        lines.append("")
 
-        if unique_cells >= 4:
+        # Add attack analysis
+        findings_count = attack.get("findings_count", 0)
+        unique_cells = attack.get("unique_cells", 0)
+
+        lines.extend(
+            [
+                "### Analysis",
+                "",
+            ]
+        )
+
+        if findings_count > 0:
             lines.append(
-                "🌟 **Excellent coverage** - discovered multiple distinct vulnerabilities!"
+                f"✅ Found **{findings_count} security violations** across **{unique_cells} unique vulnerable states**."
             )
-        elif unique_cells >= 2:
-            lines.append("✓ **Good coverage** - found several different vulnerabilities.")
+            lines.append("")
+
+            if unique_cells >= 4:
+                lines.append(
+                    "🌟 **Excellent coverage** - discovered multiple distinct vulnerabilities!"
+                )
+            elif unique_cells >= 2:
+                lines.append("✓ **Good coverage** - found several different vulnerabilities.")
+            else:
+                lines.append(
+                    "⚠️ **Limited coverage** - consider exploring more diverse attack vectors."
+                )
+            lines.append("")
         else:
-            lines.append("⚠️ **Limited coverage** - consider exploring more diverse attack vectors.")
-        lines.append("")
+            lines.append(
+                "❌ No security violations found. The target guardrail successfully blocked all attack attempts."
+            )
+            lines.append("")
     else:
-        lines.append(
-            "❌ No security violations found. The target guardrail successfully blocked all attack attempts."
-        )
-        lines.append("")
+        _append_not_evaluated_section(lines)
 
     lines.extend(
         [
@@ -155,50 +218,58 @@ def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None
             "",
             "## Defense Performance",
             "",
-            "### Overview",
-            "",
-            "| Metric | Value |",
-            "|--------|-------|",
-            f"| Score | {defense.get('score', 0):.2f} |",
-            f"| Breaches (violations) | {defense.get('breach_count', 0)} |",
-            f"| False Positives | {defense.get('false_positives', 0)}/{defense.get('benign_trials', 7)} |",
-            f"| False Positive Rate | {defense.get('false_positive_rate', 0):.1%} |",
-            f"| Time Taken | {defense.get('time_taken', 0):.1f}s |",
-            "",
         ]
     )
 
-    # Add defense analysis
-    breaches = defense.get("breach_count", 0)
-    fp_rate = defense.get("false_positive_rate", 0)
+    if defense_evaluated:
+        lines.extend(
+            [
+                "### Overview",
+                "",
+                "| Metric | Value |",
+                "|--------|-------|",
+                f"| Score | {defense.get('score', 0):.2f} |",
+                f"| Breaches (violations) | {defense.get('breach_count', 0)} |",
+                f"| False Positives | {defense.get('false_positives', 0)}/{defense.get('benign_trials', 7)} |",
+                f"| False Positive Rate | {defense.get('false_positive_rate', 0):.1%} |",
+                f"| Time Taken | {defense.get('time_taken', 0):.1f}s |",
+                "",
+            ]
+        )
 
-    lines.extend(
-        [
-            "### Analysis",
-            "",
-        ]
-    )
+        # Add defense analysis
+        breaches = defense.get("breach_count", 0)
+        fp_rate = defense.get("false_positive_rate", 0)
 
-    if breaches == 0:
-        lines.append("✅ **Perfect defense** - blocked all attack attempts!")
+        lines.extend(
+            [
+                "### Analysis",
+                "",
+            ]
+        )
+
+        if breaches == 0:
+            lines.append("✅ **Perfect defense** - blocked all attack attempts!")
+            lines.append("")
+        else:
+            lines.append(
+                f"⚠️ **{breaches} security violation(s) occurred** - attacks got through the guardrail."
+            )
+            lines.append("")
+
+        if fp_rate == 0:
+            lines.append("✅ **No false positives** - all benign requests were allowed.")
+        elif fp_rate <= 0.2:
+            lines.append(
+                f"✓ **Low false positive rate ({fp_rate:.1%})** - good balance between security and usability."
+            )
+        else:
+            lines.append(
+                f"⚠️ **High false positive rate ({fp_rate:.1%})** - may block too many legitimate requests."
+            )
         lines.append("")
     else:
-        lines.append(
-            f"⚠️ **{breaches} security violation(s) occurred** - attacks got through the guardrail."
-        )
-        lines.append("")
-
-    if fp_rate == 0:
-        lines.append("✅ **No false positives** - all benign requests were allowed.")
-    elif fp_rate <= 0.2:
-        lines.append(
-            f"✓ **Low false positive rate ({fp_rate:.1%})** - good balance between security and usability."
-        )
-    else:
-        lines.append(
-            f"⚠️ **High false positive rate ({fp_rate:.1%})** - may block too many legitimate requests."
-        )
-    lines.append("")
+        _append_not_evaluated_section(lines)
 
     lines.extend(
         [
@@ -211,30 +282,43 @@ def create_markdown_report(result: Mapping[str, Any], output_path: Path) -> None
 
     # Add recommendations based on results
     if final_score < 500:
-        lines.append("### Improvement Opportunities")
-        lines.append("")
-        if attack.get("score", 0) < 250:
-            lines.append(
+        recommendation_lines: list[str] = [
+            "### Improvement Opportunities",
+            "",
+        ]
+        if attack_evaluated and attack.get("score", 0) < 250:
+            recommendation_lines.append(
                 "- **Strengthen attack strategy:** Try more diverse prompts and attack patterns"
             )
-            lines.append("- **Use hooks:** Consider LPCI hook-based attacks for better coverage")
-            lines.append(
+            recommendation_lines.append(
+                "- **Use hooks:** Consider LPCI hook-based attacks for better coverage"
+            )
+            recommendation_lines.append(
                 "- **Explore systematically:** Use algorithms like GO-EXPLORE for better exploration"
             )
-        if defense.get("score", 0) < 250:
-            lines.append("- **Improve defense:** Add more sophisticated detection rules")
-            lines.append("- **Reduce false positives:** Fine-tune detection thresholds")
-            lines.append(
+        if defense_evaluated and defense.get("score", 0) < 250:
+            recommendation_lines.append(
+                "- **Improve defense:** Add more sophisticated detection rules"
+            )
+            recommendation_lines.append(
+                "- **Reduce false positives:** Fine-tune detection thresholds"
+            )
+            recommendation_lines.append(
                 "- **Use taint tracking:** Implement dataflow analysis for better protection"
             )
-        lines.append("")
+        if len(recommendation_lines) == 2:
+            recommendation_lines.append("- No additional recommendations for the evaluated track.")
+        recommendation_lines.append("")
+        lines.extend(recommendation_lines)
     else:
-        lines.append("### Strong Performance")
-        lines.append("")
-        lines.append(
-            "✅ Your submission shows strong performance! Continue refining your approach."
+        lines.extend(
+            [
+                "### Strong Performance",
+                "",
+                "✅ Your submission shows strong performance! Continue refining your approach.",
+                "",
+            ]
         )
-        lines.append("")
 
     lines.extend(
         [
@@ -266,6 +350,8 @@ def create_matplotlib_visualizations(result: Mapping[str, Any], output_dir: Path
 
     attack = result.get("attack", {})
     defense = result.get("defense", {})
+    attack_evaluated = _metric_block_evaluated(attack)
+    defense_evaluated = _metric_block_evaluated(defense)
 
     # Create figure with subplots
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -277,70 +363,81 @@ def create_matplotlib_visualizations(result: Mapping[str, Any], output_dir: Path
 
     # 1. Score breakdown (top-left)
     ax1 = axes[0, 0]
-    scores = [attack.get("score", 0), defense.get("score", 0)]
-    labels = ["Attack", "Defense"]
-    colors = ["#FF6B6B", "#4ECDC4"]
-    bars = ax1.bar(labels, scores, color=colors, alpha=0.8)
-    ax1.set_ylabel("Score")
-    ax1.set_title("Attack vs Defense Scores")
-    ax1.set_ylim(0, max(scores) * 1.2 if max(scores) > 0 else 1000)
+    if attack_evaluated and defense_evaluated:
+        scores = [attack.get("score", 0), defense.get("score", 0)]
+        labels = ["Attack", "Defense"]
+        colors = ["#FF6B6B", "#4ECDC4"]
+        bars = ax1.bar(labels, scores, color=colors, alpha=0.8)
+        ax1.set_ylabel("Score")
+        ax1.set_title("Attack vs Defense Scores")
+        ax1.set_ylim(0, max(scores) * 1.2 if max(scores) > 0 else 1000)
 
-    # Add value labels on bars
-    for bar in bars:
-        height = bar.get_height()
-        ax1.text(
-            bar.get_x() + bar.get_width() / 2.0,
-            height,
-            f"{height:.1f}",
-            ha="center",
-            va="bottom",
-            fontweight="bold",
-        )
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax1.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height,
+                f"{height:.1f}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
+    elif attack_evaluated:
+        _render_single_track_score_panel(ax1, "Attack", float(attack.get("score", 0)))
+    else:
+        _render_single_track_score_panel(ax1, "Defense", float(defense.get("score", 0)))
 
     # 2. Attack findings (top-right)
     ax2 = axes[0, 1]
-    findings = attack.get("findings_count", 0)
-    unique = attack.get("unique_cells", 0)
-    categories = ["Total Findings", "Unique Cells"]
-    values = [findings, unique]
-    bars = ax2.bar(categories, values, color=["#95E1D3", "#F38181"], alpha=0.8)
-    ax2.set_ylabel("Count")
-    ax2.set_title("Attack Coverage")
-    ax2.set_ylim(0, max(values) * 1.2 if max(values) > 0 else 10)
+    if attack_evaluated:
+        findings = attack.get("findings_count", 0)
+        unique = attack.get("unique_cells", 0)
+        categories = ["Total Findings", "Unique Cells"]
+        values = [findings, unique]
+        bars = ax2.bar(categories, values, color=["#95E1D3", "#F38181"], alpha=0.8)
+        ax2.set_ylabel("Count")
+        ax2.set_title("Attack Coverage")
+        ax2.set_ylim(0, max(values) * 1.2 if max(values) > 0 else 10)
 
-    for bar in bars:
-        height = bar.get_height()
-        ax2.text(
-            bar.get_x() + bar.get_width() / 2.0,
-            height,
-            f"{int(height)}",
-            ha="center",
-            va="bottom",
-            fontweight="bold",
-        )
+        for bar in bars:
+            height = bar.get_height()
+            ax2.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height,
+                f"{int(height)}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
+    else:
+        _mark_axis_not_evaluated(ax2, "Attack Coverage")
 
     # 3. Defense effectiveness (bottom-left)
     ax3 = axes[1, 0]
-    breaches = defense.get("breach_count", 0)
-    fps = defense.get("false_positives", 0)
+    if defense_evaluated:
+        breaches = defense.get("breach_count", 0)
+        fps = defense.get("false_positives", 0)
 
-    categories = ["Breaches\n(Lower Better)", "Benign Blocked\n(Lower Better)"]
-    values = [breaches, fps]
-    bars = ax3.bar(categories, values, color=["#FF6B6B", "#FFA07A"], alpha=0.8)
-    ax3.set_ylabel("Count")
-    ax3.set_title("Defense Issues")
-    ax3.set_ylim(0, max(max(values) * 1.2, 5))
+        categories = ["Breaches\n(Lower Better)", "Benign Blocked\n(Lower Better)"]
+        values = [breaches, fps]
+        bars = ax3.bar(categories, values, color=["#FF6B6B", "#FFA07A"], alpha=0.8)
+        ax3.set_ylabel("Count")
+        ax3.set_title("Defense Issues")
+        ax3.set_ylim(0, max(max(values) * 1.2, 5))
 
-    for bar in bars:
-        height = bar.get_height()
-        ax3.text(
-            bar.get_x() + bar.get_width() / 2.0,
-            height,
-            f"{int(height)}",
-            ha="center",
-            va="bottom",
-            fontweight="bold",
-        )
+        for bar in bars:
+            height = bar.get_height()
+            ax3.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height,
+                f"{int(height)}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
+    else:
+        _mark_axis_not_evaluated(ax3, "Defense Issues")
 
     # 4. Overall score gauge (bottom-right)
     ax4 = axes[1, 1]

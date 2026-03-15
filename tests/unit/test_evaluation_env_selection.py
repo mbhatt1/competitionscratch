@@ -11,6 +11,7 @@ from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.core.env_api import (
     DEFAULT_MAX_TOOL_HOPS,
     AttackEnvProtocol,
+    EnvInteractionResult,
     EnvSelection,
     parse_env_selection,
 )
@@ -31,9 +32,9 @@ class _FakeEvalEnv:
 
     def interact(
         self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
-    ) -> dict[str, Any]:
+    ) -> EnvInteractionResult:
         self._messages.append(user_message)
-        return {"seed": self.seed, "max_tool_hops": max_tool_hops}
+        return EnvInteractionResult(seed=self.seed, agent_turns=1, total_tool_events=0)
 
     def export_trace_dict(self) -> dict[str, Any]:
         return {
@@ -54,12 +55,27 @@ class _Guardrail:
     pass
 
 
+class _CountingGuardrail:
+    init_calls = 0
+
+    def __init__(self) -> None:
+        type(self).init_calls += 1
+
+
 class _BaselineAttacker:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
     def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
         return []
+
+
+class _SingleCandidateBaselineAttacker:
+    def __init__(self, config: dict[str, Any]) -> None:
+        self.config = config
+
+    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+        return [AttackCandidate.from_messages(["attack prompt"])]
 
 
 class _HopSensitiveAttack(AttackAlgorithmBase):
@@ -120,6 +136,49 @@ def test_build_attack_env_selects_sandbox_without_importing_gym(
     from aicomp_sdk.core.env import SandboxEnv
 
     assert isinstance(env, SandboxEnv)
+
+
+def test_build_attack_env_calls_agent_factory_each_time(tmp_path: Path) -> None:
+    fixtures_dir = _make_fixtures(tmp_path)
+    created_agents: list[object] = []
+
+    class _FakeAgent:
+        def next_action(self, *, history, tools):  # noqa: ANN001
+            return None
+
+        def reset_state(self) -> None:
+            return None
+
+        def snapshot_state(self):  # noqa: ANN201
+            return {"version": 1, "backend": "fake_agent", "data": {}}
+
+        def restore_state(self, snapshot) -> None:  # noqa: ANN001
+            return None
+
+    def agent_factory() -> object:
+        agent = _FakeAgent()
+        created_agents.append(agent)
+        return agent
+
+    env1 = evaluation_core.build_attack_env(
+        seed=123,
+        fixtures_dir=fixtures_dir,
+        agent_factory=agent_factory,
+        guardrail=_Guardrail(),
+        env_selection="sandbox",
+    )
+    env2 = evaluation_core.build_attack_env(
+        seed=123,
+        fixtures_dir=fixtures_dir,
+        agent_factory=agent_factory,
+        guardrail=_Guardrail(),
+        env_selection="sandbox",
+    )
+
+    assert len(created_agents) == 2
+    assert env1.agent is created_agents[0]
+    assert env2.agent is created_agents[1]
+    assert env1.agent is not env2.agent
 
 
 def test_parse_env_selection_from_string() -> None:
@@ -197,7 +256,70 @@ def test_eval_defense_uses_requested_env_selection_for_all_envs(monkeypatch) -> 
     assert selections == ["gym", "gym", "gym"]
 
 
+def test_eval_defense_builds_fresh_env_for_replays_and_benign_trials(monkeypatch) -> None:
+    env_instances: list[_FakeEvalEnv] = []
+
+    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _SingleCandidateBaselineAttacker)
+    monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["safe one", "safe two"])
+    monkeypatch.setattr(
+        evaluation_core,
+        "eval_predicates",
+        lambda trace: (
+            [{"predicate": "EXFILTRATION", "severity": 5}]
+            if trace.get("user_messages") == ["attack prompt"]
+            else []
+        ),
+    )
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
+        env = _FakeEvalEnv(seed=kwargs["seed"])
+        env_instances.append(env)
+        return env
+
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+
+    report = evaluation_core.eval_defense(
+        _Guardrail,
+        30.0,
+        build_agent_factory("deterministic"),
+        env_selection="gym",
+    )
+
+    assert report["breach_count"] == 0
+    assert report["benign_trials"] == 2
+    assert len(env_instances) == 4
+    assert len({id(env) for env in env_instances}) == 4
+
+
+def test_eval_defense_builds_fresh_guardrail_instances(monkeypatch) -> None:
+    env_guardrails: list[object] = []
+    _CountingGuardrail.init_calls = 0
+
+    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _SingleCandidateBaselineAttacker)
+    monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["safe one", "safe two"])
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
+        env_guardrails.append(kwargs["guardrail"])
+        return _FakeEvalEnv(seed=kwargs["seed"])
+
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+
+    report = evaluation_core.eval_defense(
+        _CountingGuardrail,
+        30.0,
+        build_agent_factory("deterministic"),
+        env_selection="gym",
+    )
+
+    assert report["breach_count"] == 0
+    assert report["benign_trials"] == 2
+    assert _CountingGuardrail.init_calls == 4
+    assert len(env_guardrails) == 4
+    assert len({id(guardrail) for guardrail in env_guardrails}) == 4
+
+
 def test_eval_attack_summary_matches_between_sandbox_and_gym() -> None:
+    pytest.importorskip("gymnasium")
     sandbox_summary = _summarize_attack_for_env("sandbox")
     gym_summary = _summarize_attack_for_env("gym")
 

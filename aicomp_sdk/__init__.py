@@ -16,7 +16,14 @@ from .attacks import (
     AttackRunConfig,
 )
 from .core.env import SandboxEnv
-from .core.env_api import AttackEnvProtocol, EnvSelection, parse_env_selection
+from .core.env_api import (
+    AttackEnvProtocol,
+    DiagnosticsEnv,
+    EnvInteractionResult,
+    EnvSelection,
+    RunDiagnostics,
+    parse_env_selection,
+)
 
 try:
     from .core.gym_env import GymAttackEnv as _GymAttackEnv
@@ -58,7 +65,10 @@ __all__ = [
     "SandboxEnv",
     "GymAttackEnv",
     "AttackEnvProtocol",
+    "DiagnosticsEnv",
+    "EnvInteractionResult",
     "EnvSelection",
+    "RunDiagnostics",
     "parse_env_selection",
     "GuardrailBase",
     "Decision",

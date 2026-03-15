@@ -8,7 +8,7 @@ Loads results from .aicomp/history/ and displays:
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Optional, cast
 
@@ -78,6 +78,27 @@ def format_delta(value: float, higher_is_better: bool = True) -> str:
         return f"  ({sign}{value:.2f} {symbol})"
 
 
+def _metric_block_evaluated(block: Mapping[str, Any]) -> bool:
+    return bool(block.get("evaluated", True))
+
+
+def _format_metric_value(
+    value: Any,
+    *,
+    evaluated: bool,
+    formatter: Callable[[Any], str],
+) -> str:
+    if not evaluated:
+        return "N/A"
+    return formatter(value)
+
+
+def _not_run_suffix(evaluated: bool) -> str:
+    if evaluated:
+        return ""
+    return "  (not run)"
+
+
 def compare_metrics(
     run1: Mapping[str, Any], run2: Mapping[str, Any], metric_filter: str = "all"
 ) -> None:
@@ -107,29 +128,70 @@ def compare_metrics(
     if metric_filter in ["all", "attack"]:
         attack1 = run1.get("attack", {})
         attack2 = run2.get("attack", {})
+        attack1_evaluated = _metric_block_evaluated(attack1)
+        attack2_evaluated = _metric_block_evaluated(attack2)
 
         print("Attack Metrics:")
 
         score1 = attack1.get("score", 0)
         score2 = attack2.get("score", 0)
-        delta = score2 - score1
+        score1_display = _format_metric_value(
+            score1,
+            evaluated=attack1_evaluated,
+            formatter=lambda value: f"{value:.2f}",
+        )
+        score2_display = _format_metric_value(
+            score2,
+            evaluated=attack2_evaluated,
+            formatter=lambda value: f"{value:.2f}",
+        )
         print("  Score:")
-        print(f"    {name1:38s} {score1:8.2f}")
-        print(f"    {name2:38s} {score2:8.2f}{format_delta(delta, True)}")
+        print(f"    {name1:38s} {score1_display:>8}{_not_run_suffix(attack1_evaluated)}")
+        if attack1_evaluated and attack2_evaluated:
+            delta = score2 - score1
+            print(f"    {name2:38s} {score2_display:>8}{format_delta(delta, True)}")
+        else:
+            print(f"    {name2:38s} {score2_display:>8}{_not_run_suffix(attack2_evaluated)}")
 
         findings1 = attack1.get("findings_count", 0)
         findings2 = attack2.get("findings_count", 0)
-        delta = findings2 - findings1
+        findings1_display = _format_metric_value(
+            findings1,
+            evaluated=attack1_evaluated,
+            formatter=lambda value: str(value),
+        )
+        findings2_display = _format_metric_value(
+            findings2,
+            evaluated=attack2_evaluated,
+            formatter=lambda value: str(value),
+        )
         print("  Findings:")
-        print(f"    {name1:38s} {findings1:8d}")
-        print(f"    {name2:38s} {findings2:8d}{format_delta(float(delta), True)}")
+        print(f"    {name1:38s} {findings1_display:>8}{_not_run_suffix(attack1_evaluated)}")
+        if attack1_evaluated and attack2_evaluated:
+            delta = findings2 - findings1
+            print(f"    {name2:38s} {findings2_display:>8}{format_delta(float(delta), True)}")
+        else:
+            print(f"    {name2:38s} {findings2_display:>8}{_not_run_suffix(attack2_evaluated)}")
 
         cells1 = attack1.get("unique_cells", 0)
         cells2 = attack2.get("unique_cells", 0)
-        delta = cells2 - cells1
+        cells1_display = _format_metric_value(
+            cells1,
+            evaluated=attack1_evaluated,
+            formatter=lambda value: str(value),
+        )
+        cells2_display = _format_metric_value(
+            cells2,
+            evaluated=attack2_evaluated,
+            formatter=lambda value: str(value),
+        )
         print("  Unique Cells:")
-        print(f"    {name1:38s} {cells1:8d}")
-        print(f"    {name2:38s} {cells2:8d}{format_delta(float(delta), True)}")
+        print(f"    {name1:38s} {cells1_display:>8}{_not_run_suffix(attack1_evaluated)}")
+        if attack1_evaluated and attack2_evaluated:
+            delta = cells2 - cells1
+            print(f"    {name2:38s} {cells2_display:>8}{format_delta(float(delta), True)}")
+        else:
+            print(f"    {name2:38s} {cells2_display:>8}{_not_run_suffix(attack2_evaluated)}")
 
         print()
 
@@ -137,36 +199,90 @@ def compare_metrics(
     if metric_filter in ["all", "defense"]:
         defense1 = run1.get("defense", {})
         defense2 = run2.get("defense", {})
+        defense1_evaluated = _metric_block_evaluated(defense1)
+        defense2_evaluated = _metric_block_evaluated(defense2)
 
         print("Defense Metrics:")
 
         score1 = defense1.get("score", 0)
         score2 = defense2.get("score", 0)
-        delta = score2 - score1
+        score1_display = _format_metric_value(
+            score1,
+            evaluated=defense1_evaluated,
+            formatter=lambda value: f"{value:.2f}",
+        )
+        score2_display = _format_metric_value(
+            score2,
+            evaluated=defense2_evaluated,
+            formatter=lambda value: f"{value:.2f}",
+        )
         print("  Score:")
-        print(f"    {name1:38s} {score1:8.2f}")
-        print(f"    {name2:38s} {score2:8.2f}{format_delta(delta, True)}")
+        print(f"    {name1:38s} {score1_display:>8}{_not_run_suffix(defense1_evaluated)}")
+        if defense1_evaluated and defense2_evaluated:
+            delta = score2 - score1
+            print(f"    {name2:38s} {score2_display:>8}{format_delta(delta, True)}")
+        else:
+            print(f"    {name2:38s} {score2_display:>8}{_not_run_suffix(defense2_evaluated)}")
 
         breaches1 = defense1.get("breach_count", 0)
         breaches2 = defense2.get("breach_count", 0)
-        delta = breaches2 - breaches1
+        breaches1_display = _format_metric_value(
+            breaches1,
+            evaluated=defense1_evaluated,
+            formatter=lambda value: str(value),
+        )
+        breaches2_display = _format_metric_value(
+            breaches2,
+            evaluated=defense2_evaluated,
+            formatter=lambda value: str(value),
+        )
         print("  Breaches:")
-        print(f"    {name1:38s} {breaches1:8d}")
-        print(f"    {name2:38s} {breaches2:8d}{format_delta(float(delta), False)}")
+        print(f"    {name1:38s} {breaches1_display:>8}{_not_run_suffix(defense1_evaluated)}")
+        if defense1_evaluated and defense2_evaluated:
+            delta = breaches2 - breaches1
+            print(f"    {name2:38s} {breaches2_display:>8}{format_delta(float(delta), False)}")
+        else:
+            print(f"    {name2:38s} {breaches2_display:>8}{_not_run_suffix(defense2_evaluated)}")
 
         fp1 = defense1.get("false_positives", 0)
         fp2 = defense2.get("false_positives", 0)
-        delta = fp2 - fp1
+        fp1_display = _format_metric_value(
+            fp1,
+            evaluated=defense1_evaluated,
+            formatter=lambda value: str(value),
+        )
+        fp2_display = _format_metric_value(
+            fp2,
+            evaluated=defense2_evaluated,
+            formatter=lambda value: str(value),
+        )
         print("  False Positives:")
-        print(f"    {name1:38s} {fp1:8d}")
-        print(f"    {name2:38s} {fp2:8d}{format_delta(float(delta), False)}")
+        print(f"    {name1:38s} {fp1_display:>8}{_not_run_suffix(defense1_evaluated)}")
+        if defense1_evaluated and defense2_evaluated:
+            delta = fp2 - fp1
+            print(f"    {name2:38s} {fp2_display:>8}{format_delta(float(delta), False)}")
+        else:
+            print(f"    {name2:38s} {fp2_display:>8}{_not_run_suffix(defense2_evaluated)}")
 
         fpr1 = defense1.get("false_positive_rate", 0)
         fpr2 = defense2.get("false_positive_rate", 0)
-        delta = fpr2 - fpr1
+        fpr1_display = _format_metric_value(
+            fpr1,
+            evaluated=defense1_evaluated,
+            formatter=lambda value: f"{value:.1%}",
+        )
+        fpr2_display = _format_metric_value(
+            fpr2,
+            evaluated=defense2_evaluated,
+            formatter=lambda value: f"{value:.1%}",
+        )
         print("  FP Rate:")
-        print(f"    {name1:38s} {fpr1:7.1%}")
-        print(f"    {name2:38s} {fpr2:7.1%}{format_delta(delta * 100, False)}")
+        print(f"    {name1:38s} {fpr1_display:>8}{_not_run_suffix(defense1_evaluated)}")
+        if defense1_evaluated and defense2_evaluated:
+            delta = fpr2 - fpr1
+            print(f"    {name2:38s} {fpr2_display:>8}{format_delta(delta * 100, False)}")
+        else:
+            print(f"    {name2:38s} {fpr2_display:>8}{_not_run_suffix(defense2_evaluated)}")
 
         print()
 

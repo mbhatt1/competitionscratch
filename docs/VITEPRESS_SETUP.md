@@ -1,184 +1,127 @@
 # VitePress Documentation Setup
 
-This directory contains the VitePress-powered documentation website for the JED Framework.
+This directory contains the VitePress site for the repository docs.
 
-## Setup
+## Current Tooling
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
+- package file: [`package.json`](package.json)
+- site config: [`.vitepress/config.ts`](.vitepress/config.ts)
+- framework: VitePress `^1.0.0`
 
-### Installation
+Current npm scripts:
+
+```bash
+npm run docs:dev
+npm run docs:build
+npm run docs:preview
+```
+
+## Prerequisites
+
+- Node.js `18+` locally
+- npm
+
+CI currently uses Node `20`.
+
+## Install
 
 ```bash
 cd docs
 npm install
 ```
 
-## Development
+## Local Development
 
-### Local Development Server
+Start the dev server:
 
 ```bash
 cd docs
 npm run docs:dev
 ```
 
-This starts a local development server at `http://localhost:5173` with:
-- Hot module replacement (HMR)
-- Live preview of changes
-- Full-text search
+By default, VitePress serves locally on `http://localhost:5173`.
 
-### Build for Production
+## Production Build
 
 ```bash
 cd docs
 npm run docs:build
 ```
 
-Generates static files in `docs/.vitepress/dist/`
+Current build output:
 
-### Preview Production Build
+```text
+docs/.vitepress/dist/
+```
+
+Preview the production build:
 
 ```bash
 cd docs
 npm run docs:preview
 ```
 
-## Project Structure
+## Current Site Configuration
 
-```
-docs/
-├── .vitepress/
-│   ├── config.ts          # VitePress configuration
-│   ├── dist/              # Build output (gitignored)
-│   └── cache/             # Build cache (gitignored)
-├── index.md               # Home page
-├── GETTING_STARTED.md     # Getting started guide
-├── GUARDRAILS_GUIDE.md    # Guardrails guide
-├── ATTACKS_GUIDE.md       # Attacks guide
-├── API_REFERENCE.md       # API reference
-├── SCORING.md             # Scoring system
-├── COMPETITION_RULES.md   # Competition rules
-├── FAQ.md                 # FAQ
-└── ...                    # Other documentation files
-```
+The current config in `.vitepress/config.ts` sets:
 
-## Configuration
+- `base: "/competitionscratch/"`
+- local search
+- a docs sidebar and top navigation
+- GitHub edit links
+- line numbers in Markdown code blocks
+- GitHub Pages-friendly deployment settings
 
-The VitePress configuration is in `docs/.vitepress/config.ts`:
-
-- **Base URL**: `/competitionscratch/` (GitHub Pages)
-- **Theme**: Custom sidebar with organized sections
-- **Features**: Search, edit links, dark mode, line numbers
-- **Navigation**: Top nav + sidebar for easy browsing
+The config also sets `ignoreDeadLinks: true`, so broken local links may not fail the site build even though they are still worth fixing.
 
 ## Deployment
 
-### GitHub Pages (Automatic)
+The current deployment workflow is:
 
-Documentation is automatically deployed to GitHub Pages when changes are pushed to the `master` branch:
+- workflow file: [`../.github/workflows/deploy-docs.yml`](../.github/workflows/deploy-docs.yml)
+- trigger: pushes to `master` that touch `docs/**` or the workflow file
+- build command: `cd docs && npm install && npm run docs:build`
+- publish target: GitHub Pages
 
-1. GitHub Actions workflow (`.github/workflows/deploy-docs.yml`) triggers
-2. VitePress builds the static site
-3. Deploys to `https://mbhatt1.github.io/competitionscratch/`
+## Common Tasks
 
-### Manual Deployment
+### Add a new page
 
-To deploy manually:
+1. create a new `.md` file under `docs/`
+2. add it to `.vitepress/config.ts` if it should appear in nav or sidebar
+3. add links from related pages
 
-```bash
-cd docs
-npm run docs:build
-# Upload docs/.vitepress/dist/ to your hosting provider
-```
+### Update the homepage
 
-## Features
+Edit [`index.md`](index.md), which uses VitePress frontmatter plus Markdown content.
 
-### Search
-Full-text search is enabled using VitePress's built-in local search.
+### Update navigation
 
-### Dark Mode
-Automatic dark mode support with theme toggle.
+Edit:
 
-### Mobile Responsive
-Optimized for mobile devices with responsive sidebar.
+- `themeConfig.nav`
+- `themeConfig.sidebar`
 
-### Edit on GitHub
-Each page has an "Edit on GitHub" link for easy contributions.
-
-### Code Highlighting
-Syntax highlighting for Python, bash, JSON, and more.
-
-## Customization
-
-### Adding New Pages
-
-1. Create a new `.md` file in the `docs/` directory
-2. Add the page to the sidebar in `docs/.vitepress/config.ts`
-3. Link to it from other pages as needed
-
-### Modifying Navigation
-
-Edit `docs/.vitepress/config.ts`:
-
-```typescript
-nav: [
-  { text: 'Home', link: '/' },
-  { text: 'New Page', link: '/NEW_PAGE' }
-]
-```
-
-### Modifying Sidebar
-
-Edit `docs/.vitepress/config.ts`:
-
-```typescript
-sidebar: [
-  {
-    text: 'New Section',
-    items: [
-      { text: 'New Page', link: '/NEW_PAGE' }
-    ]
-  }
-]
-```
+in [`.vitepress/config.ts`](.vitepress/config.ts).
 
 ## Troubleshooting
 
-### Port Already in Use
+### Port in use
 
-If port 5173 is already in use:
+Run VitePress on a different port:
 
 ```bash
 npx vitepress dev --port 5174
 ```
 
-### Build Errors
-
-Clear the cache and rebuild:
+### Clean rebuild
 
 ```bash
-rm -rf docs/.vitepress/cache docs/.vitepress/dist
+rm -rf docs/.vitepress/dist docs/.vitepress/cache
+cd docs
 npm run docs:build
 ```
 
-### TypeScript Errors in config.ts
+### Broken links not caught by VitePress
 
-The TypeScript error is normal in development. VitePress will be installed when you run `npm install`.
-
-## Links
-
-- **VitePress Documentation**: https://vitepress.dev/
-- **GitHub Repository**: https://github.com/mbhatt1/competitionscratch
-- **Live Documentation**: https://mbhatt1.github.io/competitionscratch/
-
-## Contributing
-
-To contribute to the documentation:
-
-1. Edit the relevant `.md` files
-2. Test locally with `npm run docs:dev`
-3. Submit a pull request
-
-All documentation follows Markdown syntax with VitePress extensions.
+The site config currently ignores dead links. Use the repository Markdown link checks or inspect changed pages manually when you edit docs.

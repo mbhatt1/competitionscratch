@@ -13,7 +13,11 @@ from gymnasium import spaces
 from aicomp_sdk.agents.protocol import AgentProtocol
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.env_api import DEFAULT_MAX_TOOL_HOPS, MAX_USER_MESSAGE_CHARS
+from aicomp_sdk.core.env_api import (
+    DEFAULT_MAX_TOOL_HOPS,
+    MAX_USER_MESSAGE_CHARS,
+    EnvInteractionResult,
+)
 from aicomp_sdk.core.predicates import eval_predicates
 
 MAX_TRACE_SUMMARY_JSON_CHARS = 8_192
@@ -80,7 +84,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
             charset=TEXT_CHARSET,
         )
         self.observation_space = self._build_observation_space()
-        self._last_legacy_result = self._empty_legacy_result()
+        self._last_interaction_result = self._empty_interaction_result()
 
     @property
     def seed(self) -> int:
@@ -102,12 +106,8 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
     def guardrail(self):
         return self._sandbox.guardrail
 
-    def _empty_legacy_result(self) -> dict[str, Any]:
-        return {
-            "seed": self.seed,
-            "n_tools": 0,
-            "agent_refused": False,
-        }
+    def _empty_interaction_result(self) -> EnvInteractionResult:
+        return EnvInteractionResult(seed=self.seed)
 
     def _trace_summary(self) -> dict[str, Any]:
         trace = self.export_trace_dict()
@@ -136,7 +136,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
                 for event in tool_events[-LAST_OUTPUT_WINDOW:]
             ],
             "egress_count": len(egress),
-            "agent_refused_last_turn": bool(self._last_legacy_result.get("agent_refused")),
+            "agent_refused_last_turn": self._last_interaction_result.agent_refused,
         }
 
         summary_json = json.dumps(summary, sort_keys=True, separators=(",", ":"))
@@ -175,7 +175,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
         predicates = eval_predicates(trace)
         return {
             "trace": trace,
-            "legacy_result": copy.deepcopy(self._last_legacy_result),
+            "interaction_result": copy.deepcopy(self._last_interaction_result),
             "predicates": predicates,
             "cell_signature": cell_signature(
                 trace.get("tool_events", []),
@@ -234,7 +234,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
                 self.observation_space = self._build_observation_space()
 
         self._sandbox.reset()
-        self._last_legacy_result = self._empty_legacy_result()
+        self._last_interaction_result = self._empty_interaction_result()
         return self._observation(), self._info()
 
     def step(self, action: str) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
@@ -243,13 +243,15 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
         if len(action) > MAX_USER_MESSAGE_CHARS:
             raise ValueError(f"Action exceeds max length ({MAX_USER_MESSAGE_CHARS} characters)")
 
-        self._last_legacy_result = self._sandbox.interact(action, max_tool_hops=self.max_tool_hops)
+        self._last_interaction_result = self._sandbox.interact(
+            action, max_tool_hops=self.max_tool_hops
+        )
         truncated = len(self.trace.user_messages) >= self.max_episode_messages
         observation = self._observation()
         info = self._info()
         return observation, 0.0, False, truncated, info
 
-    def interact(self, user_message: str, max_tool_hops: int | None = None) -> dict[str, Any]:
+    def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
         if max_tool_hops is not None and max_tool_hops != self.max_tool_hops:
             previous = self.max_tool_hops
             self.max_tool_hops = int(max_tool_hops)
@@ -258,8 +260,8 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
             finally:
                 self.max_tool_hops = previous
         else:
-            _, _, _, _, info = self.step(user_message)
-        return copy.deepcopy(info["legacy_result"])
+            self.step(user_message)
+        return copy.deepcopy(self._last_interaction_result)
 
     def export_trace_dict(self) -> dict[str, Any]:
         return self._sandbox.export_trace_dict()
@@ -267,14 +269,14 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
     def snapshot(self) -> dict[str, Any]:
         return {
             "sandbox": self._sandbox.snapshot(),
-            "last_legacy_result": copy.deepcopy(self._last_legacy_result),
+            "last_interaction_result": copy.deepcopy(self._last_interaction_result),
             "max_tool_hops": self.max_tool_hops,
             "max_episode_messages": self.max_episode_messages,
         }
 
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         self._sandbox.restore(snapshot["sandbox"])
-        self._last_legacy_result = copy.deepcopy(snapshot["last_legacy_result"])
+        self._last_interaction_result = copy.deepcopy(snapshot["last_interaction_result"])
         self.max_tool_hops = int(snapshot["max_tool_hops"])
         self.max_episode_messages = int(snapshot["max_episode_messages"])
         self.observation_space = self._build_observation_space()

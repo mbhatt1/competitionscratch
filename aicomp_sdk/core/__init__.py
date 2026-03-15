@@ -4,7 +4,14 @@ from typing import Any
 
 from .cells import *
 from .env import SandboxEnv
-from .env_api import AttackEnvProtocol, EnvSelection, parse_env_selection
+from .env_api import (
+    AttackEnvProtocol,
+    DiagnosticsEnv,
+    EnvInteractionResult,
+    EnvSelection,
+    RunDiagnostics,
+    parse_env_selection,
+)
 
 try:
     from .gym_env import GymAttackEnv as _GymAttackEnv
@@ -20,6 +27,9 @@ __all__ = [
     "SandboxEnv",
     "GymAttackEnv",
     "AttackEnvProtocol",
+    "DiagnosticsEnv",
+    "EnvInteractionResult",
     "EnvSelection",
+    "RunDiagnostics",
     "parse_env_selection",
 ]

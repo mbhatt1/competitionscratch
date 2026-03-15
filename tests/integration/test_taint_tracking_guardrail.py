@@ -117,7 +117,9 @@ def run_taint_tracking_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any]
         print(f"     Final: {defense_score:.2f}")
 
         if fp_penalty > base_score:
-            print(f"     ⚠️  FP penalty exceeds base score by {fp_penalty - base_score:.2f} points!")
+            print(
+                f"     ⚠️  FP penalty exceeds base score by {fp_penalty - base_score:.2f} points!"
+            )
 
     # Show breach examples if any
     if report["breaches"]:

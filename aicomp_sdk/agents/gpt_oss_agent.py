@@ -1,93 +1,235 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
-from ..core.trace import Trace
-from .tool_call_protocol import build_agent_messages, parse_tool_action
+from aicomp_sdk.agents.debug import AgentDebugSink
+from aicomp_sdk.agents.hf_chat_template.hf_agent import (
+    HFChatTemplateAgent,
+    _relabel_hf_chat_template_snapshot,
+    _unwrap_hf_chat_template_snapshot,
+)
+from aicomp_sdk.agents.hf_chat_template.hf_backend import (
+    HFChatTemplateBackend,
+    _build_hf_backend_config,
+)
+from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
+    JsonEnvelopeToolCallParser,
+    TokenizerNativeResponseParser,
+    normalize_parsed_response,
+    normalize_tool_arguments,
+    tokenizer_supports_response_parsing,
+)
+from aicomp_sdk.agents.hf_chat_template.hf_types import (
+    HFBackendConfig,
+    HFGenerationBackendProtocol,
+    HFGenerationResponse,
+    HFModelProfile,
+    HFResponseParser,
+)
+from aicomp_sdk.agents.protocol import AgentProtocol
+from aicomp_sdk.agents.types import (
+    AgentDecision,
+    AgentStateSnapshot,
+    AgentToolSpec,
+    FinalResponseDecision,
+    InvalidModelOutputError,
+)
+from aicomp_sdk.core.runtime_history import RuntimeHistory
+
+DEFAULT_GPT_OSS_MODEL_ID = "openai/gpt-oss-20b"
 
 
-class GPTOSSBackend:
-    def __init__(self, model_path: str) -> None:
-        self.model_path = model_path
-        self._ready = False
-        self._tokenizer = None
-        self._model = None
-        self._load()
+def build_gpt_oss_backend_config(
+    *,
+    model_path: Optional[str] = None,
+    model_id: Optional[str] = None,
+    local_files_only: bool = True,
+    device_map: str = "auto",
+    torch_dtype: str = "auto",
+    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
+    model_kwargs: Optional[Mapping[str, Any]] = None,
+    trust_remote_code: Optional[bool] = None,
+    attn_implementation: Optional[str] = None,
+    max_new_tokens: int = 256,
+    generation_kwargs: Optional[Mapping[str, Any]] = None,
+) -> HFBackendConfig:
+    return _build_hf_backend_config(
+        default_model_id=DEFAULT_GPT_OSS_MODEL_ID,
+        model_id_env_var="GPT_OSS_MODEL_ID",
+        model_path_env_var="GPT_OSS_MODEL_PATH",
+        model_path=model_path,
+        model_id=model_id,
+        local_files_only=local_files_only,
+        device_map=device_map,
+        torch_dtype=torch_dtype,
+        tokenizer_kwargs=tokenizer_kwargs,
+        model_kwargs=model_kwargs,
+        trust_remote_code=trust_remote_code,
+        attn_implementation=attn_implementation,
+        max_new_tokens=max_new_tokens,
+        generation_kwargs=generation_kwargs,
+    )
 
-    def _load(self) -> None:
-        try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-        except Exception:
-            return
-        try:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-            self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_path,
-                torch_dtype="auto",
-                device_map="auto",
-            )
-            self._ready = True
-        except Exception:
-            self._ready = False
 
-    def ready(self) -> bool:
-        return self._ready
+def build_gpt_oss_backend(
+    *,
+    model_path: Optional[str] = None,
+    model_id: Optional[str] = None,
+    local_files_only: bool = True,
+    device_map: str = "auto",
+    torch_dtype: str = "auto",
+    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
+    model_kwargs: Optional[Mapping[str, Any]] = None,
+    trust_remote_code: Optional[bool] = None,
+    attn_implementation: Optional[str] = None,
+    max_new_tokens: int = 256,
+    generation_kwargs: Optional[Mapping[str, Any]] = None,
+) -> HFChatTemplateBackend:
+    return HFChatTemplateBackend.from_pretrained(
+        build_gpt_oss_backend_config(
+            model_path=model_path,
+            model_id=model_id,
+            local_files_only=local_files_only,
+            device_map=device_map,
+            torch_dtype=torch_dtype,
+            tokenizer_kwargs=tokenizer_kwargs,
+            model_kwargs=model_kwargs,
+            trust_remote_code=trust_remote_code,
+            attn_implementation=attn_implementation,
+            max_new_tokens=max_new_tokens,
+            generation_kwargs=generation_kwargs,
+        )
+    )
 
-    def generate(
+
+def build_gpt_oss_parser(tokenizer: Any, *, model_id: str) -> HFResponseParser:
+    if tokenizer_supports_response_parsing(tokenizer):
+        return TokenizerNativeResponseParser(tokenizer)
+
+    normalized_model_id = model_id.lower().replace("_", "-")
+    if "gpt-oss" in normalized_model_id:
+        return GptOssHarmonyResponseParser()
+
+    return JsonEnvelopeToolCallParser()
+
+
+class GptOssHarmonyResponseParser(HFResponseParser):
+    def parse(
         self,
-        messages: Sequence[Mapping[str, str]],
-        max_new_tokens: int = 256,
-    ) -> str:
-        if self._tokenizer is None or self._model is None:
-            raise RuntimeError(
-                "GPTOSSBackend is not initialized. Ensure GPT_OSS_MODEL_PATH points to a "
-                "valid local model and that Transformers/Torch are installed."
+        response: HFGenerationResponse,
+        *,
+        fallback_call_id: str,
+    ) -> AgentDecision:
+        parsed_response = _parse_gpt_oss_harmony_response(response.raw_text)
+        if parsed_response is not None:
+            return normalize_parsed_response(
+                parsed_response,
+                fallback_call_id=fallback_call_id,
             )
 
-        tokenizer = self._tokenizer
-        model = self._model
-
-        chat_messages = [dict(message) for message in messages]
-        inputs = tokenizer.apply_chat_template(
-            chat_messages,
-            add_generation_prompt=True,
-            return_tensors="pt",
-            return_dict=True,
-        ).to(model.device)
-        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
-        text = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True)
-        return text
+        stripped = response.text.strip()
+        if stripped:
+            return FinalResponseDecision(text=stripped)
+        raise InvalidModelOutputError("Model returned empty output")
 
 
-class GPTOSSAgent:
-    """Tool-using agent powered by gpt-oss-20b (optional)."""
+class GPTOSSAgent(AgentProtocol):
+    """GPT-OSS agent implemented via the shared HF chat-template adapter."""
 
-    def __init__(self, backend: GPTOSSBackend) -> None:
-        self.backend = backend
-
-    def next_tool_call(
-        self, trace: Trace, last_tool_output: Optional[str]
-    ) -> Optional[dict[str, Any]]:
-        messages = self._build_messages(trace, last_tool_output)
-
-        text = self.backend.generate(messages, max_new_tokens=256).strip()
-        action = self._parse_response_object(text)
-        if action is None or action["done"]:
-            return None
-
-        return {
-            "tool": action["tool"],
-            "args": action["args"],
-            "reason": "model",
-        }
-
-    def _build_messages(
+    def __init__(
         self,
-        trace: Trace,
-        last_tool_output: Optional[str],
-    ) -> list[dict[str, str]]:
-        return build_agent_messages(trace, last_tool_output)
+        backend: Optional[HFGenerationBackendProtocol] = None,
+        *,
+        profile: Optional[HFModelProfile] = None,
+        parser: Optional[HFResponseParser] = None,
+        debug_sink: Optional[AgentDebugSink] = None,
+    ) -> None:
+        resolved_backend = backend or build_gpt_oss_backend()
+        resolved_profile = profile or HFModelProfile(instruction_role="system")
+        resolved_parser = parser or build_gpt_oss_parser(
+            getattr(resolved_backend, "tokenizer", None),
+            model_id=resolved_backend.config.model_id,
+        )
+        self._delegate = HFChatTemplateAgent(
+            backend=resolved_backend,
+            profile=resolved_profile,
+            parser=resolved_parser,
+            debug_sink=debug_sink,
+            debug_backend_label="gpt_oss",
+        )
 
-    def _parse_response_object(self, text: str) -> Optional[dict[str, Any]]:
-        return parse_tool_action(text)
+    def next_action(
+        self,
+        *,
+        history: RuntimeHistory,
+        tools: Sequence[AgentToolSpec],
+    ) -> AgentDecision:
+        return self._delegate.next_action(history=history, tools=tools)
+
+    def reset_state(self) -> None:
+        self._delegate.reset_state()
+
+    def snapshot_state(self) -> AgentStateSnapshot:
+        return _relabel_hf_chat_template_snapshot(
+            self._delegate.snapshot_state(),
+            backend_label="gpt_oss",
+        )
+
+    def restore_state(self, snapshot: AgentStateSnapshot) -> None:
+        self._delegate.restore_state(
+            _unwrap_hf_chat_template_snapshot(
+                snapshot,
+                backend_label="gpt_oss",
+            )
+        )
+
+
+def _parse_gpt_oss_harmony_response(raw_text: str) -> Optional[dict[str, Any]]:
+    if not raw_text.strip():
+        return None
+
+    tool_calls: list[dict[str, Any]] = []
+    for match in _GPT_OSS_TOOL_CALL_PATTERN.finditer(raw_text):
+        header = match.group("header")
+        tool_match = re.search(r"to=functions\.([A-Za-z0-9_.-]+)", header)
+        if tool_match is None:
+            raise InvalidModelOutputError("GPT-OSS tool call output is missing a function target")
+        arguments = normalize_tool_arguments(match.group("arguments").strip())
+        tool_calls.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_match.group(1),
+                    "arguments": arguments,
+                },
+            }
+        )
+
+    content_chunks = [
+        match.group("content").strip()
+        for match in _GPT_OSS_FINAL_MESSAGE_PATTERN.finditer(raw_text)
+        if match.group("content").strip()
+    ]
+    content = "\n".join(content_chunks)
+
+    if not tool_calls and not content:
+        return None
+
+    return {
+        "role": "assistant",
+        "content": content,
+        "tool_calls": tool_calls,
+    }
+
+
+_GPT_OSS_TOOL_CALL_PATTERN = re.compile(
+    r"<\|channel\|>commentary(?P<header>.*?)<\|message\|>"
+    r"(?P<arguments>.*?)(?:<\|call\|>|<\|end\|>|$)",
+    re.DOTALL,
+)
+_GPT_OSS_FINAL_MESSAGE_PATTERN = re.compile(
+    r"<\|channel\|>final<\|message\|>(?P<content>.*?)(?:<\|end\|>|$)",
+    re.DOTALL,
+)

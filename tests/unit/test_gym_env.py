@@ -14,6 +14,7 @@ from aicomp_sdk.core.env_api import (
     DEFAULT_MAX_TOOL_HOPS,
     MAX_USER_MESSAGE_CHARS,
     AttackEnvProtocol,
+    EnvInteractionResult,
 )
 from aicomp_sdk.core.gym_env import GymAttackEnv
 from aicomp_sdk.guardrails.base import GuardrailBase
@@ -62,7 +63,7 @@ def test_step_returns_valid_gym_tuple(temp_fixtures: Path) -> None:
     assert reward == 0.0
     assert terminated is False
     assert truncated is False
-    assert info["legacy_result"]["seed"] == 42
+    assert info["interaction_result"].seed == 42
     assert info["trace"]["user_messages"] == ["read secret"]
 
 
@@ -84,21 +85,21 @@ def test_gym_env_uses_shared_default_tool_hops(temp_fixtures: Path) -> None:
     assert env.max_tool_hops == DEFAULT_MAX_TOOL_HOPS
 
 
-def test_interact_matches_legacy_shape(temp_fixtures: Path) -> None:
+def test_interact_returns_typed_interaction_result(temp_fixtures: Path) -> None:
     env = make_env(temp_fixtures)
     env.reset()
 
     result = env.interact("read secret")
 
-    assert result["seed"] == 42
-    assert "n_tools" in result
-    assert "agent_refused" in result
+    assert isinstance(result, EnvInteractionResult)
+    assert result.seed == 42
+    assert result.total_tool_events >= 0
 
 
 def test_snapshot_and_restore_preserve_trace(temp_fixtures: Path) -> None:
     env = make_env(temp_fixtures)
     env.reset()
-    env.interact("read secret")
+    interaction_result = env.interact("read secret")
     snapshot = env.snapshot()
     before = env.export_trace_dict()
 
@@ -106,6 +107,7 @@ def test_snapshot_and_restore_preserve_trace(temp_fixtures: Path) -> None:
     env.restore(snapshot)
 
     assert env.export_trace_dict() == before
+    assert env._last_interaction_result == interaction_result
     observation, _, _, _, _ = env.step("read readme")
     assert env.observation_space.contains(observation)
 

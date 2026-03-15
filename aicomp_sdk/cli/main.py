@@ -68,6 +68,8 @@ Examples:
   aicomp init guardrail           # Create guardrail template
   aicomp validate attack.py       # Validate attack submission
   aicomp test attack.py           # Run Kaggle-style red-team evaluation
+  aicomp test attack.py --agent openai --agent-debug-jsonl /tmp/agent.jsonl
+                                 # Run with agent backend debug JSONL logging
   aicomp test submission.zip      # Run legacy local dual-track evaluation
   aicomp test attack.py --env sandbox  # Run attack-only eval on SandboxEnv
   aicomp test --quick attack.py   # Quick red-team smoke test
@@ -141,6 +143,14 @@ For more help on a command: aicomp <command> --help
         choices=[member.value for member in AgentSelection],
         default="auto",
         help="Blue-agent selection policy for evaluation runs (default: auto)",
+    )
+    test_parser.add_argument(
+        "--agent-debug-jsonl",
+        default=None,
+        help=(
+            "Optional local JSONL file for raw agent backend debug events. "
+            "Contains model requests/responses and tool outputs; keep it local."
+        ),
     )
     test_parser.add_argument(
         "--env",

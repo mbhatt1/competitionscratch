@@ -9,13 +9,15 @@ import ast
 import datetime
 import json
 import time
+import zipfile
 from contextlib import ExitStack
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Optional
 
 from aicomp_sdk.agents import (
     AgentFactory,
     AgentSelection,
+    JsonlAgentDebugSink,
     build_agent_factory,
     parse_agent_selection,
 )
@@ -70,12 +72,38 @@ def _detect_python_submission_type(content: str) -> str:
     return "unknown"
 
 
+def _detect_zip_submission_type(submission_path: Path) -> str:
+    try:
+        with zipfile.ZipFile(submission_path, "r") as zf:
+            member_names = set()
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                normalized_path = PurePosixPath(info.filename.replace("\\", "/"))
+                if normalized_path.is_absolute() or ".." in normalized_path.parts:
+                    continue
+                member_names.add(normalized_path.as_posix())
+    except zipfile.BadZipFile:
+        return "unknown"
+
+    has_attack = "attack.py" in member_names
+    has_guardrail = "guardrail.py" in member_names
+
+    if has_attack and has_guardrail:
+        return "dual"
+    if has_attack:
+        return "redteam"
+    if has_guardrail:
+        return "defense"
+    return "unknown"
+
+
 def _resolve_track(submission_path: Path, requested_track: str) -> str:
     if requested_track != "auto":
         return requested_track
 
     if submission_path.suffix == ".zip":
-        return "dual"
+        return _detect_zip_submission_type(submission_path)
     if submission_path.suffix == ".py":
         detected = _detect_python_submission_type(submission_path.read_text(encoding="utf-8"))
         if detected == "attack":
@@ -155,11 +183,15 @@ def _with_status(message: str):
 
 def _resolve_agent_factory(
     agent_selection: AgentSelection,
+    agent_debug_jsonl: Optional[Path] = None,
     agent_factory: Optional[AgentFactory] = None,
 ) -> AgentFactory:
     if agent_factory is not None:
         return agent_factory
-    return build_agent_factory(agent_selection)
+    debug_sink = None
+    if agent_debug_jsonl is not None:
+        debug_sink = JsonlAgentDebugSink(agent_debug_jsonl)
+    return build_agent_factory(agent_selection, debug_sink=debug_sink)
 
 
 def _evaluate_attack_once(
@@ -211,6 +243,7 @@ def _build_attack_summary(
     from aicomp_sdk.evaluation_core import summarize_attack_findings
 
     return {
+        "evaluated": True,
         **summarize_attack_findings(attack_findings),
         "time_taken": elapsed,
     }
@@ -226,12 +259,36 @@ def _build_defense_summary(
     fps = defense_report.get("false_positives", 0)
     benign_trials = defense_report.get("benign_trials", 7)
     return {
+        "evaluated": True,
         "score": score_defense(defense_report),
         "breach_count": breaches,
         "false_positives": fps,
         "benign_trials": benign_trials,
         "false_positive_rate": fps / max(1, benign_trials),
         "time_taken": elapsed,
+    }
+
+
+def _build_not_evaluated_attack_summary() -> dict[str, Any]:
+    return {
+        "evaluated": False,
+        "score": None,
+        "score_raw": None,
+        "findings_count": None,
+        "unique_cells": None,
+        "time_taken": None,
+    }
+
+
+def _build_not_evaluated_defense_summary() -> dict[str, Any]:
+    return {
+        "evaluated": False,
+        "score": None,
+        "breach_count": None,
+        "false_positives": None,
+        "benign_trials": None,
+        "false_positive_rate": None,
+        "time_taken": None,
     }
 
 
@@ -242,12 +299,17 @@ def run_redteam_evaluation_with_progress(
     env_selection: EnvSelection,
     fixtures_dir: Optional[Path] = None,
     *,
+    agent_debug_jsonl: Optional[Path] = None,
     agent_factory: Optional[AgentFactory] = None,
 ) -> dict[str, Any]:
     """Run the attack-only Kaggle-style evaluation."""
     from aicomp_sdk.cli.main import print_info, print_success
 
-    resolved_agent_factory = _resolve_agent_factory(agent_selection, agent_factory)
+    resolved_agent_factory = _resolve_agent_factory(
+        agent_selection,
+        agent_debug_jsonl=agent_debug_jsonl,
+        agent_factory=agent_factory,
+    )
 
     status = _with_status("[bold blue]Running red-team evaluation...")
     if status is None:
@@ -278,6 +340,7 @@ def run_redteam_evaluation_with_progress(
     return {
         "track": "redteam",
         "attack": attack_summary,
+        "defense": _build_not_evaluated_defense_summary(),
         "final_score": attack_summary["score"],
         "submission_type": "attack_only",
         "scoring_mode": "normalized",
@@ -293,12 +356,17 @@ def run_defense_evaluation_with_progress(
     env_selection: EnvSelection,
     fixtures_dir: Optional[Path] = None,
     *,
+    agent_debug_jsonl: Optional[Path] = None,
     agent_factory: Optional[AgentFactory] = None,
 ) -> dict[str, Any]:
     """Run the local-only defense helper track."""
     from aicomp_sdk.cli.main import print_info, print_success
 
-    resolved_agent_factory = _resolve_agent_factory(agent_selection, agent_factory)
+    resolved_agent_factory = _resolve_agent_factory(
+        agent_selection,
+        agent_debug_jsonl=agent_debug_jsonl,
+        agent_factory=agent_factory,
+    )
 
     status = _with_status("[bold blue]Running defense evaluation...")
     if status is None:
@@ -328,6 +396,7 @@ def run_defense_evaluation_with_progress(
 
     return {
         "track": "defense",
+        "attack": _build_not_evaluated_attack_summary(),
         "defense": defense_summary,
         "final_score": defense_summary["score"],
         "submission_type": "guardrail_only",
@@ -345,13 +414,18 @@ def run_dual_evaluation_with_progress(
     env_selection: EnvSelection,
     fixtures_dir: Optional[Path] = None,
     *,
+    agent_debug_jsonl: Optional[Path] = None,
     agent_factory: Optional[AgentFactory] = None,
 ) -> dict[str, Any]:
     """Run the legacy local dual-track evaluation."""
     from aicomp_sdk.cli.main import print_info, print_success
     from aicomp_sdk.scoring import get_score_breakdown
 
-    resolved_agent_factory = _resolve_agent_factory(agent_selection, agent_factory)
+    resolved_agent_factory = _resolve_agent_factory(
+        agent_selection,
+        agent_debug_jsonl=agent_debug_jsonl,
+        agent_factory=agent_factory,
+    )
 
     status = _with_status("[bold blue]Running attack evaluation...")
     if status is None:
@@ -496,6 +570,11 @@ def run_test(args) -> int:
     fixtures_dir = (
         Path(args.fixtures_dir).resolve() if getattr(args, "fixtures_dir", None) else None
     )
+    agent_debug_jsonl = (
+        Path(args.agent_debug_jsonl).expanduser().resolve()
+        if getattr(args, "agent_debug_jsonl", None)
+        else None
+    )
     if track == "unknown":
         print_error("Could not determine submission track")
         print_info("Use --track redteam, --track dual, or --track defense")
@@ -510,6 +589,8 @@ def run_test(args) -> int:
     print_info(f"Env selection: {env_selection}")
     if fixtures_dir is not None:
         print_info(f"Using fixtures override: {fixtures_dir}")
+    if agent_debug_jsonl is not None:
+        print_info(f"Agent debug JSONL: {agent_debug_jsonl}")
     if track == "redteam":
         print_info(f"Time budget: {attack_budget_s:.1f}s attack")
     elif track == "defense":
@@ -532,6 +613,7 @@ def run_test(args) -> int:
                     agent_selection,
                     env_selection,
                     fixtures_dir=fixtures_dir,
+                    agent_debug_jsonl=agent_debug_jsonl,
                 )
             elif track == "defense":
                 if guardrail_cls is None:
@@ -543,6 +625,7 @@ def run_test(args) -> int:
                     agent_selection,
                     env_selection,
                     fixtures_dir=fixtures_dir,
+                    agent_debug_jsonl=agent_debug_jsonl,
                 )
             else:
                 if attack_cls is None or guardrail_cls is None:
@@ -558,6 +641,7 @@ def run_test(args) -> int:
                     agent_selection,
                     env_selection,
                     fixtures_dir=fixtures_dir,
+                    agent_debug_jsonl=agent_debug_jsonl,
                 )
     except Exception as e:
         print_error(f"Evaluation failed: {e}")

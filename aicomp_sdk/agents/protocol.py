@@ -1,14 +1,28 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol
+from collections.abc import Sequence
+from typing import Protocol
 
-from ..core.trace import Trace
+from aicomp_sdk.agents.types import AgentDecision, AgentStateSnapshot, AgentToolSpec
+from aicomp_sdk.core.runtime_history import RuntimeHistory
 
 
 class AgentProtocol(Protocol):
-    def next_tool_call(
+    """Common agent contract for all evaluator backends."""
+
+    def next_action(
         self,
-        trace: Trace,
-        last_tool_output: Optional[str],
-    ) -> Optional[dict[str, Any]]:
-        pass
+        *,
+        history: RuntimeHistory,
+        tools: Sequence[AgentToolSpec],
+    ) -> AgentDecision:
+        """Choose the next action from canonical runtime history."""
+
+    def reset_state(self) -> None:
+        """Clear provider-private runtime state."""
+
+    def snapshot_state(self) -> AgentStateSnapshot:
+        """Return a restorable provider-private snapshot."""
+
+    def restore_state(self, snapshot: AgentStateSnapshot) -> None:
+        """Restore provider-private state from a snapshot."""

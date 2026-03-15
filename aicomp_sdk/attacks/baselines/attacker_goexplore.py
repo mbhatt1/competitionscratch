@@ -233,6 +233,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         max_search_steps = int(config.max_steps)
         max_tool_hops = int(config.max_tool_hops)
         tb = Timebox(budget_s)
+        self.last_run_details = []
 
         # archive maps cell_hash -> exemplar
         archive: dict[str, Exemplar] = {}
@@ -241,10 +242,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
 
         # DIAGNOSTIC: Track exploration statistics
         total_novel_cells = 0
-        total_tool_calls = 0
         total_predicates = 0
-        failed_tool_calls = 0
-        agent_refusals = 0  # Track refusals separately
 
         print(f"[GO-EXPLORE] Starting attack run: {budget_s}s budget, seed={env.seed}")
 
@@ -270,7 +268,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         while (not tb.expired()) and productive_steps < max_search_steps:
             if productive_steps % 10 == 0 and productive_steps > 0:
                 print(
-                    f"[GO-EXPLORE] Step {productive_steps}: archive_size={len(archive)}, findings={len(findings)}, novel_cells={total_novel_cells}, tool_calls={total_tool_calls}, refusals={agent_refusals}"
+                    f"[GO-EXPLORE] Step {productive_steps}: archive_size={len(archive)}, findings={len(findings)}, novel_cells={total_novel_cells}"
                 )
 
             # Select cell using improved policy
@@ -297,8 +295,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
                 result = env.interact(new_action, max_tool_hops=max_tool_hops)
 
                 # Check if agent refused
-                if result.get("agent_refused", False):
-                    agent_refusals += 1
+                if result.agent_refused:
                     # Don't process this branch further - agent didn't do anything
                     continue
 
@@ -306,12 +303,6 @@ class AttackAlgorithm(AttackAlgorithmBase):
                 step_had_any_work = True
 
                 tr = env.export_trace_dict()
-                total_tool_calls += len(tr.get("tool_events", []))
-
-                # Count failed tool calls
-                for evt in tr.get("tool_events", []):
-                    if not evt.get("ok", False):
-                        failed_tool_calls += 1
 
                 preds = eval_predicates(tr)
                 if preds:
@@ -472,16 +463,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
         print(
             f"  Productive steps: {productive_steps} / {max_search_steps} (refusals don't count against budget)"
         )
-        print(
-            f"  Total branch attempts: {total_branches_attempted} (including {agent_refusals} refusals)"
-        )
-        print(
-            f"  Agent refusal rate: {(agent_refusals / max(1, total_branches_attempted) * 100):.1f}%"
-        )
+        print(f"  Total branch attempts: {total_branches_attempted}")
         print(f"  Archive size: {len(archive)}")
         print(f"  Novel cells discovered: {total_novel_cells}")
-        print(f"  Total tool calls: {total_tool_calls}")
-        print(f"  Failed tool calls: {failed_tool_calls}")
         print(f"  Predicates triggered: {total_predicates}")
         print(f"  Findings with predicates: {len(findings)}")
 
@@ -492,7 +476,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         print(f"  Depth distribution: {dict(sorted(depth_counts.items()))}")
 
         # DIAGNOSTIC: Show some example tool call patterns
-        if total_tool_calls > 0:
+        if archive:
             print("\n[GO-EXPLORE] Sample tool call patterns:")
             for i, ex in enumerate(list(archive.values())[:5]):
                 # Get the trace for this exemplar

@@ -1,11 +1,6 @@
-import re
-
+from aicomp_sdk.core.tools.http import PRIVATE_NET_RE
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
-PRIVATE_NET_RE = re.compile(
-    r"(^|://)(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)",
-    re.IGNORECASE,
-)
 SECRET_MARKER = "SECRET_MARKER"
 
 

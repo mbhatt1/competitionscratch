@@ -294,7 +294,7 @@ def example_run_with_hooks():
     # Interact - hooks will be called automatically
     result = env.interact("Search for quarterly reports")
 
-    print(f"\n✓ Environment ran with {result['n_tools']} tool calls")
+    print(f"\n✓ Environment ran with {result.tool_events_added} tool calls")
     print("  All tool calls were monitored by hooks")
 
 
