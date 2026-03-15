@@ -8,18 +8,19 @@ import os
 import sys
 from pathlib import Path
 
-from examples_hooks_submission.guardrail_prompt_injection import (
+repo_root = Path(__file__).resolve().parent.parent
+repo_root_str = str(repo_root)
+if repo_root_str not in sys.path:
+    sys.path.insert(0, repo_root_str)
+
+from examples.guardrails.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
-
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
-
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
 
 
 if not os.environ.get("OPENAI_API_KEY"):

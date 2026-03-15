@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -76,7 +78,14 @@ def run_collaborative_agent(agent_id, config, shared_archive, fixtures, duration
         agent_selection="openai",
     )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config["params"]})
-    findings = atk.run(env, {"time_budget_s": duration_s})
+    candidates = run_archived_attack(atk, env, time_budget_s=duration_s)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
 
     stats = extract_stats(findings)
     print(
@@ -188,7 +197,14 @@ for i, config in enumerate(agent_configs, 1):
         agent_selection="openai",
     )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config["params"]})
-    findings = atk.run(env, {"time_budget_s": 60})
+    candidates = run_archived_attack(atk, env, time_budget_s=60)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_stats(findings)
     all_stats_indep.append({"agent_id": i, "config": config["name"], "stats": stats})
     all_findings_indep.extend(findings)

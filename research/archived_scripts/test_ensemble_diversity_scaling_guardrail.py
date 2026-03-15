@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -95,7 +97,14 @@ def run_simple_agent_sync(seed, time_budget=60):
     }
 
     atk = AttackAlgorithm(config)
-    findings = atk.run(env, {"time_budget_s": time_budget})
+    candidates = run_archived_attack(atk, env, time_budget_s=time_budget)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail_factory=SimpleGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_diversity_stats(findings)
     stats["seed"] = seed
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 import pytest
 from pydantic import BaseModel, ConfigDict
@@ -63,7 +63,7 @@ class _ResponseFunctionToolCall(BaseModel):
 class _ResponseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    output: list[_ResponseOutputMessage | _ResponseFunctionToolCall]
+    output: list[Union[_ResponseOutputMessage, _ResponseFunctionToolCall]]
     output_text: str = ""
     error: Any = None
     incomplete_details: Any = None
@@ -71,7 +71,7 @@ class _ResponseModel(BaseModel):
 
 def _build_agent(
     *responses: object,
-    debug_sink: InMemoryAgentDebugSink | None = None,
+    debug_sink: Optional[InMemoryAgentDebugSink] = None,
 ) -> tuple[OpenAIResponsesAgent, SpyResponsesAPI]:
     responses_api = SpyResponsesAPI(queued_responses=list(responses))
     client = SpyOpenAIClient(responses=responses_api)
@@ -113,7 +113,7 @@ def _tool_call_response(
     arguments: str,
     assistant_text: str = "",
 ) -> _ResponseModel:
-    output: list[_ResponseOutputMessage | _ResponseFunctionToolCall] = []
+    output: list[Union[_ResponseOutputMessage, _ResponseFunctionToolCall]] = []
     if assistant_text:
         output.append(
             _ResponseOutputMessage(

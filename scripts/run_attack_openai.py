@@ -12,16 +12,17 @@ import os
 import sys
 from pathlib import Path
 
+repo_root = Path(__file__).resolve().parent.parent
+repo_root_str = str(repo_root)
+if repo_root_str not in sys.path:
+    sys.path.insert(0, repo_root_str)
+
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
 from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
-
-# Add repository root to path
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
 
 
 def _select_openai_demo_agent() -> str:

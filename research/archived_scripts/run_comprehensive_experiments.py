@@ -16,7 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -66,7 +68,14 @@ env1 = create_archived_sandbox_env(
     agent_selection="openai",
 )
 attacker1 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings1 = attacker1.run(env1, {"time_budget_s": 120})
+candidates1 = run_archived_attack(attacker1, env1, time_budget_s=120)
+findings1 = replay_archived_candidates(
+    candidates=candidates1,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=AllowGuardrail,
+    agent_selection="openai",
+)
 
 # With guardrail
 env2 = create_archived_sandbox_env(
@@ -76,7 +85,14 @@ env2 = create_archived_sandbox_env(
     agent_selection="openai",
 )
 attacker2 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings2 = attacker2.run(env2, {"time_budget_s": 120})
+candidates2 = run_archived_attack(attacker2, env2, time_budget_s=120)
+findings2 = replay_archived_candidates(
+    candidates=candidates2,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=PromptInjectionGuardrail,
+    agent_selection="openai",
+)
 
 results["general"] = {
     "no_guard_findings": len(findings1),

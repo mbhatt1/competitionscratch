@@ -14,7 +14,9 @@ Usage:
 
 import os
 import sys
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 
 def get_repo_root() -> Path:
@@ -83,6 +85,54 @@ def create_archived_sandbox_env(
         agent=build_archived_agent(agent_selection),
         guardrail=guardrail,
     )
+
+
+def run_archived_attack(attacker, env, *, time_budget_s: float):
+    """Run an archived attack via the current ``AttackRunConfig`` contract."""
+    from aicomp_sdk.attacks import AttackRunConfig
+
+    return attacker.run(env, AttackRunConfig(time_budget_s=float(time_budget_s)))
+
+
+def replay_archived_candidates(
+    *,
+    candidates: Sequence[Any],
+    seed: int,
+    fixtures_dir: Path,
+    guardrail_factory: Callable[[], Any],
+    agent_selection: str,
+) -> list[dict[str, Any]]:
+    """Replay archived ``AttackCandidate`` chains into trace-bearing finding records."""
+    from aicomp_sdk.core.predicates import eval_predicates
+
+    replayed_findings: list[dict[str, Any]] = []
+    for index, candidate in enumerate(candidates):
+        if not hasattr(candidate, "user_messages"):
+            raise TypeError(
+                f"Archived candidate at index {index} does not expose user_messages"
+            )
+
+        user_messages = tuple(candidate.user_messages)
+        env = create_archived_sandbox_env(
+            seed=seed,
+            fixtures_dir=fixtures_dir,
+            guardrail=guardrail_factory(),
+            agent_selection=agent_selection,
+        )
+        env.reset()
+        for user_message in user_messages:
+            env.interact(user_message)
+
+        trace = env.export_trace_dict()
+        replayed_findings.append(
+            {
+                "user_messages": list(user_messages),
+                "trace": trace,
+                "predicates": eval_predicates(trace),
+            }
+        )
+
+    return replayed_findings
 
 
 # Convenience re-exports for backward compatibility

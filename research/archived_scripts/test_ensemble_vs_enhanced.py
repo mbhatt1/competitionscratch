@@ -17,7 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -116,7 +118,14 @@ env_enh = create_archived_sandbox_env(
     agent_selection="openai",
 )
 atk_enh = AttackAlgorithm(enhanced_config)
-findings_enh = atk_enh.run(env_enh, {"time_budget_s": 180})
+candidates_enh = run_archived_attack(atk_enh, env_enh, time_budget_s=180)
+findings_enh = replay_archived_candidates(
+    candidates=candidates_enh,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=AllowGuardrail,
+    agent_selection="openai",
+)
 stats_enh = extract_stats(findings_enh)
 results["single_enhanced"] = stats_enh
 print(
@@ -137,7 +146,14 @@ for i, seed in enumerate([42, 123, 456], 1):
         agent_selection="openai",
     )
     atk_simple = AttackAlgorithm(simple_config)
-    findings = atk_simple.run(env_simple, {"time_budget_s": 60})
+    candidates = run_archived_attack(atk_simple, env_simple, time_budget_s=60)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_stats(findings)
     ensemble_all_stats.append(stats)
     ensemble_findings.extend(findings)
@@ -201,7 +217,14 @@ for i, (name, config) in enumerate(strategies, 1):
         agent_selection="openai",
     )
     atk_div = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config})
-    findings = atk_div.run(env_div, {"time_budget_s": 60})
+    candidates = run_archived_attack(atk_div, env_div, time_budget_s=60)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_stats(findings)
     diverse_stats_list.append({"name": name, "stats": stats})
     diverse_findings.extend(findings)
@@ -226,7 +249,14 @@ env_baseline = create_archived_sandbox_env(
     agent_selection="openai",
 )
 atk_baseline = AttackAlgorithm(simple_config)
-findings_baseline = atk_baseline.run(env_baseline, {"time_budget_s": 180})
+candidates_baseline = run_archived_attack(atk_baseline, env_baseline, time_budget_s=180)
+findings_baseline = replay_archived_candidates(
+    candidates=candidates_baseline,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=AllowGuardrail,
+    agent_selection="openai",
+)
 stats_baseline = extract_stats(findings_baseline)
 results["single_simple_180s"] = stats_baseline
 print(

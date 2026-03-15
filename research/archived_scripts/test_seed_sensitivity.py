@@ -7,12 +7,19 @@ Async execution for faster results.
 import asyncio
 import json
 import sys
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from archived_imports import create_archived_sandbox_env, get_fixtures_dir, setup_imports
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    replay_archived_candidates,
+    run_archived_attack,
+    setup_imports,
+)
 
 setup_imports()
 
@@ -54,21 +61,28 @@ def run_single_test(seed, signature_type, guardrail_type, fixtures_path):
         agent_selection="deterministic",
     )
     attacker = AttackAlgorithm(config)
-    findings = attacker.run(env, {"time_budget_s": 90})
+    candidates = run_archived_attack(attacker, env, time_budget_s=90)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures_path,
+        guardrail_factory=AllowGuardrail if guardrail_type == "allow" else RulesGuardrail,
+        agent_selection="deterministic",
+    )
 
     # Count unique attack types
-    attack_types = set()
+    attack_counts: defaultdict[str, int] = defaultdict(int)
     for finding in findings:
         for pred in finding.get("predicates", []):
-            attack_types.add(pred.get("predicate"))
+            attack_counts[pred.get("predicate", "UNKNOWN")] += 1
 
     result = {
         "seed": seed,
         "signature_type": signature_type,
         "guardrail_type": guardrail_type,
         "findings": len(findings),
-        "attack_types": sorted(list(attack_types)),
-        "unique_types": len(attack_types),
+        "attack_types": sorted(attack_counts),
+        "unique_types": len(attack_counts),
     }
 
     print(

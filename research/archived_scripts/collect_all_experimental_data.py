@@ -22,7 +22,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -146,7 +148,14 @@ def run_experiment(name, seed, fixtures, guardrail_cls, attack_config, budget, m
         agent_selection="openai",
     )
     atk = AttackAlgorithm(attack_config)
-    findings = atk.run(env, budget)
+    candidates = run_archived_attack(atk, env, time_budget_s=budget)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail_factory=guardrail_cls,
+        agent_selection="openai",
+    )
     stats = extract_tool_stats(findings)
     print(
         f"[{name}-seed{seed}] Complete: {stats['total_findings']} findings, {stats['real_attacks']} real attacks"
@@ -170,37 +179,37 @@ async def run_all_experiments_async(model, seeds):
             "1_general_150s_noguard",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"time_budget_s": 150},
+            150,
         ),
         (
             "2_general_150s_guard",
             PromptInjectionGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"time_budget_s": 150},
+            150,
         ),
         (
             "3_targeted_120s_noguard",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": True},
-            {"time_budget_s": 120},
+            120,
         ),
         (
             "4_targeted_120s_guard",
             PromptInjectionGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": True},
-            {"time_budget_s": 120},
+            120,
         ),
         (
             "5_baseline_20s",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"time_budget_s": 20},
+            20,
         ),
         (
             "6_intermediate_60s",
             AllowGuardrail,
             {"max_turns": 6, "branch_batch": 12, "target_shell": False},
-            {"time_budget_s": 60},
+            60,
         ),
     ]
 

@@ -13,7 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -52,7 +54,14 @@ env_no_guard = create_archived_sandbox_env(
     agent_selection="openai",
 )
 attacker1 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_no_guard = attacker1.run(env_no_guard, {"time_budget_s": 150})
+candidates_no_guard = run_archived_attack(attacker1, env_no_guard, time_budget_s=150)
+findings_no_guard = replay_archived_candidates(
+    candidates=candidates_no_guard,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=AllowGuardrail,
+    agent_selection="openai",
+)
 
 # Analyze findings with detailed logging
 real_attacks_no_guard = []
@@ -90,7 +99,14 @@ env_with_guard = create_archived_sandbox_env(
     agent_selection="openai",
 )
 attacker2 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_with_guard = attacker2.run(env_with_guard, {"time_budget_s": 150})
+candidates_with_guard = run_archived_attack(attacker2, env_with_guard, time_budget_s=150)
+findings_with_guard = replay_archived_candidates(
+    candidates=candidates_with_guard,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=PromptInjectionGuardrail,
+    agent_selection="openai",
+)
 
 # Analyze findings with detailed logging
 real_attacks_with_guard = []

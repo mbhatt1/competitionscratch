@@ -17,7 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from archived_imports import (
     create_archived_sandbox_env,
     get_fixtures_dir,
+    replay_archived_candidates,
     require_openai_key,
+    run_archived_attack,
     setup_imports,
 )
 
@@ -128,7 +130,14 @@ for i, (name, config) in enumerate(configs, 1):
         agent_selection="openai",
     )
     atk = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, **config})
-    findings = atk.run(env, {"time_budget_s": 120})
+    candidates = run_archived_attack(atk, env, time_budget_s=120)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=42,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_stats(findings)
 
     results[name] = stats
