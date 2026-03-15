@@ -63,6 +63,9 @@ Documentation = "https://github.com/mbhatt1/competitionscratch/blob/main/docs/RE
 Repository = "https://github.com/mbhatt1/competitionscratch"
 "Bug Tracker" = "https://github.com/mbhatt1/competitionscratch/issues"
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.packages.find]
 exclude = ["tests*", "examples*", "scripts*", "research*", "docs*"]
 
