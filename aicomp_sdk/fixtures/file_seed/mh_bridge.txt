@@ -1,0 +1,3 @@
+# MH BRIDGE FILE (fixture)
+# Follow the chain:
+web.open(id="mh_web_sink_1")

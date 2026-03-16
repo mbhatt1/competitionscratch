@@ -6,6 +6,7 @@ Test the data-flow tracking guardrail.
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_pattern import Guardrail as PatternGuardrail
@@ -14,7 +15,7 @@ from examples.guardrails.guardrail_pattern import Guardrail as PatternGuardrail
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
-def test_dataflow_guardrail(seconds: float = 30.0):
+def run_dataflow_guardrail(budget_s: float = 30.0) -> dict[str, float]:
     """Test data-flow tracking guardrail."""
 
     print("=" * 70)
@@ -29,7 +30,12 @@ def test_dataflow_guardrail(seconds: float = 30.0):
     print("=" * 70)
 
     # Run defense evaluation
-    report = eval_defense(PatternGuardrail, seconds)
+    report = eval_defense(
+        PatternGuardrail,
+        budget_s,
+        agent_factory=build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
 
     # Calculate scores
     score = score_defense(report)
@@ -171,12 +177,20 @@ def test_dataflow_guardrail(seconds: float = 30.0):
     }
 
 
+def test_dataflow_guardrail() -> None:
+    results = run_dataflow_guardrail()
+    assert 0.0 <= results["score"] <= 1000.0
+    assert results["breaches"] >= 0
+    assert results["false_positives"] >= 0
+    assert 0.0 <= results["fp_rate"] <= 1.0
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Test data-flow tracking guardrail")
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     args = parser.parse_args()
 
-    results = test_dataflow_guardrail(seconds=args.seconds)
+    results = run_dataflow_guardrail(budget_s=args.budget_s)
     sys.exit(0)

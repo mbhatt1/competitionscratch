@@ -8,6 +8,9 @@ import argparse
 import sys
 from typing import Callable, Optional, TextIO
 
+from aicomp_sdk.agents import AgentSelection
+from aicomp_sdk.core.env_api import EnvSelection
+
 # Try to import rich for beautiful output, fall back to plain output.
 RICH_PRINT: Optional[Callable[[str], None]]
 try:
@@ -64,8 +67,12 @@ Examples:
   aicomp init attack              # Create attack template
   aicomp init guardrail           # Create guardrail template
   aicomp validate attack.py       # Validate attack submission
-  aicomp test submission.zip      # Run full evaluation
-  aicomp test --quick attack.py   # Quick test (subset)
+  aicomp test attack.py           # Run Kaggle-style red-team evaluation
+  aicomp test attack.py --agent openai --agent-debug-jsonl /tmp/agent.jsonl
+                                 # Run with agent backend debug JSONL logging
+  aicomp test submission.zip      # Run legacy local dual-track evaluation
+  aicomp test attack.py --env sandbox  # Run attack-only eval on SandboxEnv
+  aicomp test --quick attack.py   # Quick red-team smoke test
   aicomp history                  # Show past results
   aicomp compare run1 run2        # Compare two runs
   aicomp visualize latest         # Generate charts
@@ -112,10 +119,47 @@ For more help on a command: aicomp <command> --help
     )
     test_parser.add_argument("submission", help="Path to submission file or zip")
     test_parser.add_argument(
-        "--seconds",
+        "--budget-s",
         type=float,
         default=3600.0,
-        help="Total time budget in seconds (default: 3600)",
+        help="Total evaluation budget in seconds (default: 3600)",
+    )
+    test_parser.add_argument(
+        "--track",
+        choices=["auto", "redteam", "dual", "defense"],
+        default="auto",
+        help="Evaluation track (default: auto-detect from submission type)",
+    )
+    test_parser.add_argument(
+        "--fixtures_dir",
+        default=None,
+        help=(
+            "Optional fixtures root override. Defaults to AICOMP_FIXTURES_DIR, then packaged "
+            "fixtures, then legacy repo fixtures."
+        ),
+    )
+    test_parser.add_argument(
+        "--agent",
+        choices=[member.value for member in AgentSelection],
+        default="auto",
+        help="Blue-agent selection policy for evaluation runs (default: auto)",
+    )
+    test_parser.add_argument(
+        "--agent-debug-jsonl",
+        default=None,
+        help=(
+            "Optional local JSONL file for raw agent backend debug events. "
+            "Contains model requests/responses and tool outputs; keep it local."
+        ),
+    )
+    test_parser.add_argument(
+        "--env",
+        choices=[member.value for member in EnvSelection],
+        default=None,
+        help=(
+            "Attack environment selection. Defaults to gym for redteam, sandbox for dual "
+            "and defense."
+        ),
     )
     test_parser.add_argument(
         "--quick", action="store_true", help="Quick test with reduced time budget"

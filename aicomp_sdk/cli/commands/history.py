@@ -43,6 +43,22 @@ def format_timestamp(iso_timestamp: str) -> str:
         return iso_timestamp
 
 
+def _metric_block_evaluated(block: Mapping[str, Any]) -> bool:
+    return bool(block.get("evaluated", True))
+
+
+def _format_float_metric(block: Mapping[str, Any], key: str) -> str:
+    if not _metric_block_evaluated(block):
+        return "N/A"
+    return f"{block.get(key, 0):.2f}"
+
+
+def _format_int_metric(block: Mapping[str, Any], key: str) -> str:
+    if not _metric_block_evaluated(block):
+        return "N/A"
+    return str(block.get(key, 0))
+
+
 def print_results_table(results: Collection[Mapping[str, Any]]) -> None:
     """Print results in a formatted table."""
     if not results:
@@ -54,7 +70,7 @@ def print_results_table(results: Collection[Mapping[str, Any]]) -> None:
         from rich.console import Console
         from rich.table import Table
 
-        console = Console()
+        console = Console(width=120, force_terminal=False, color_system=None)
         table = Table(show_header=True, header_style="bold blue")
 
         table.add_column("Run Name", style="cyan", no_wrap=False)
@@ -70,21 +86,23 @@ def print_results_table(results: Collection[Mapping[str, Any]]) -> None:
             run_name = result.get("run_name", result.get("_filename", "Unknown"))
             timestamp = format_timestamp(result.get("timestamp", "N/A"))
             final_score = result.get("final_score", 0)
-            attack_score = result.get("attack", {}).get("score", 0)
-            defense_score = result.get("defense", {}).get("score", 0)
-            findings = result.get("attack", {}).get("findings_count", 0)
-            breaches = result.get("defense", {}).get("breach_count", 0)
-            fps = result.get("defense", {}).get("false_positives", 0)
+            attack = result.get("attack", {})
+            defense = result.get("defense", {})
+            attack_score = _format_float_metric(attack, "score")
+            defense_score = _format_float_metric(defense, "score")
+            findings = _format_int_metric(attack, "findings_count")
+            breaches = _format_int_metric(defense, "breach_count")
+            fps = _format_int_metric(defense, "false_positives")
 
             table.add_row(
                 run_name,
                 timestamp,
                 f"{final_score:.2f}",
-                f"{attack_score:.2f}",
-                f"{defense_score:.2f}",
-                str(findings),
-                str(breaches),
-                str(fps),
+                attack_score,
+                defense_score,
+                findings,
+                breaches,
+                fps,
             )
 
         console.print(table)
@@ -101,18 +119,20 @@ def print_results_table(results: Collection[Mapping[str, Any]]) -> None:
             run_name = result.get("run_name", result.get("_filename", "Unknown"))
             timestamp = format_timestamp(result.get("timestamp", "N/A"))
             final_score = result.get("final_score", 0)
-            attack_score = result.get("attack", {}).get("score", 0)
-            defense_score = result.get("defense", {}).get("score", 0)
-            findings = result.get("attack", {}).get("findings_count", 0)
-            breaches = result.get("defense", {}).get("breach_count", 0)
-            fps = result.get("defense", {}).get("false_positives", 0)
+            attack = result.get("attack", {})
+            defense = result.get("defense", {})
+            attack_score = _format_float_metric(attack, "score")
+            defense_score = _format_float_metric(defense, "score")
+            findings = _format_int_metric(attack, "findings_count")
+            breaches = _format_int_metric(defense, "breach_count")
+            fps = _format_int_metric(defense, "false_positives")
 
             # Truncate run name if too long
             if len(run_name) > 34:
                 run_name = run_name[:31] + "..."
 
             print(
-                f"{run_name:<35} {timestamp:<20} {final_score:8.2f} {attack_score:8.2f} {defense_score:8.2f} {findings:9d} {breaches:9d} {fps:5d}"
+                f"{run_name:<35} {timestamp:<20} {final_score:8.2f} {attack_score:>8} {defense_score:>8} {findings:>9} {breaches:>9} {fps:>5}"
             )
 
         print()

@@ -8,15 +8,21 @@ normalization constants are appropriate.
 
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
-from aicomp_sdk.agents.openai_agent import OpenAIAgent
+from aicomp_sdk.agents import build_agent
+from aicomp_sdk.agents import factory as agent_factory
+from aicomp_sdk.agents.openai_agent import OpenAIResponsesAgent
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.core.env_api import DiagnosticsEnv, EnvInteractionResult
 from aicomp_sdk.scoring import (
     ATTACK_BASELINE_RAW,
     ATTACK_ELITE_RAW,
@@ -28,7 +34,79 @@ from aicomp_sdk.scoring import (
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "fixtures"
 
 
-def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: bool = True):
+@dataclass
+class _OfflineResponsesAPI:
+    def create(self, **kwargs: Any) -> "_ResponseModel":
+        del kwargs
+        return _final_response("I cannot help with that.")
+
+
+@dataclass
+class _OfflineOpenAIClient:
+    responses: _OfflineResponsesAPI
+
+
+class _ResponseOutputText(BaseModel):
+    type: str
+    text: str
+
+
+class _ResponseOutputMessage(BaseModel):
+    id: str
+    content: list[_ResponseOutputText]
+    role: str
+    status: str
+    type: str
+
+
+class _ResponseModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    output: list[_ResponseOutputMessage]
+    output_text: str = ""
+    error: Any = None
+    incomplete_details: Any = None
+
+
+def _final_response(text: str) -> _ResponseModel:
+    return _ResponseModel(
+        output=[
+            _ResponseOutputMessage(
+                id="msg_offline",
+                content=[_ResponseOutputText(type="output_text", text=text)],
+                role="assistant",
+                status="completed",
+                type="message",
+            )
+        ],
+        output_text=text,
+    )
+
+
+@pytest.fixture
+def offline_openai_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Route the OpenAI agent path to a local fake client for offline tests."""
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-offline-fixture")
+
+    def fake_create_openai_agent(
+        api_key: str,
+        verbose: bool,
+        debug_sink: Any = None,
+    ) -> OpenAIResponsesAgent:
+        del api_key
+        return OpenAIResponsesAgent(
+            client=_OfflineOpenAIClient(responses=_OfflineResponsesAPI()),
+            verbose=verbose,
+            debug_sink=debug_sink,
+        )
+
+    monkeypatch.setattr(agent_factory, "_create_openai_agent", fake_create_openai_agent)
+
+
+def run_baseline_attack(
+    budget_s: float = 30.0, seed: int = 123, use_openai: bool = True
+) -> dict[str, Any]:
     """Test baseline Go-Explore attack against baseline guardrail."""
 
     # Check for OpenAI API key
@@ -46,7 +124,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     print(f"  Agent: {agent_type}")
     print(f"  Attack: Go-Explore baseline (max_turns=8, branch_batch=12)")
     print(f"  Defense: Rule-based baseline guardrail")
-    print(f"  Time Budget: {seconds} seconds")
+    print(f"  Time Budget: {budget_s} seconds")
     print(f"  Seed: {seed}")
     print(f"\nExpected Normalization:")
     print(f"  Baseline Raw Target: {ATTACK_BASELINE_RAW} → ~500 normalized")
@@ -57,36 +135,30 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
 
     # Set up agent
     if use_openai:
-        agent = OpenAIAgent(verbose=False)
+        agent = build_agent("openai")
         print("\n[INFO] Using OpenAI API (gpt-4o-mini)")
         # Set up environment
-        env = SandboxEnv(seed=seed, fixtures_dir=FIXTURES, agent=agent, guardrail=Guardrail())
+        env = DiagnosticsEnv(
+            SandboxEnv(seed=seed, fixtures_dir=FIXTURES, agent=agent, guardrail=Guardrail())
+        )
     else:
-        # Temporarily unset API key to force deterministic agent
-        old_key = os.environ.pop("OPENAI_API_KEY", None)
         print("\n[WARNING] Using deterministic vulnerable agent - scores will be inflated!")
-        try:
-            # Set up environment without agent (will default to deterministic)
-            env = SandboxEnv(seed=seed, fixtures_dir=FIXTURES, agent=None, guardrail=Guardrail())
-        finally:
-            # Restore API key
-            if old_key:
-                os.environ["OPENAI_API_KEY"] = old_key
+        env = DiagnosticsEnv(
+            SandboxEnv(
+                seed=seed,
+                fixtures_dir=FIXTURES,
+                agent=build_agent("deterministic"),
+                guardrail=Guardrail(),
+            )
+        )
     env.reset()
 
     # Run baseline attack with typical competition parameters
     attacker = AttackAlgorithm({"max_turns": 8, "branch_batch": 12})
-    findings = attacker.run(env, {"seconds": seconds, "steps": 10**9})
+    findings = attacker.run(env, AttackRunConfig(time_budget_s=budget_s, max_steps=10**9))
+    validated = list(attacker.last_run_details)
 
-    # Validate findings
-    validated = []
-    for f in findings:
-        tr = f.get("trace", f)
-        if isinstance(tr, dict) and "tool_events" in tr:
-            preds = eval_predicates(tr)
-            if preds:
-                f["predicates"] = preds
-                validated.append(f)
+    assert len(findings) == len(validated)
 
     # Calculate scores
     raw_score = score_attack_raw(validated)
@@ -106,28 +178,26 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
             pred_type = p.get("predicate", "UNKNOWN")
             predicate_counts[pred_type] = predicate_counts.get(pred_type, 0) + 1
 
-    # Print agent statistics if OpenAI agent
-    agent_stats = None
-    if use_openai and hasattr(agent, "call_count"):
-        agent_stats = {
-            "total_calls": agent.call_count,
-            "tool_calls": agent.tool_calls,
-            "refusals": agent.none_returns,
-        }
+    run_diagnostics = env.run_diagnostics
 
     # Print results
     print(f"\n{'=' * 70}")
     print("RESULTS")
     print("=" * 70)
 
-    # Print agent statistics first
-    if agent_stats:
-        print(f"\nOpenAI Agent Statistics:")
-        print(f"  Total API Calls: {agent_stats['total_calls']}")
-        print(f"  Successful Tool Calls: {agent_stats['tool_calls']}")
-        print(f"  Refusals/None Returns: {agent_stats['refusals']}")
-        if agent_stats["total_calls"] > 0:
-            refusal_rate = (agent_stats["refusals"] / agent_stats["total_calls"]) * 100
+    # Print runtime diagnostics first
+    if run_diagnostics.interactions > 0:
+        print(f"\nRuntime Diagnostics:")
+        if use_openai:
+            print(f"  Total API Calls: {run_diagnostics.agent_turns}")
+        else:
+            print(f"  Agent Turns: {run_diagnostics.agent_turns}")
+        print(f"  Tool Calls: {run_diagnostics.tool_calls}")
+        print(f"  Successful Tool Calls: {run_diagnostics.successful_tool_calls}")
+        print(f"  Failed Tool Calls: {run_diagnostics.failed_tool_calls}")
+        print(f"  Agent Refusals: {run_diagnostics.agent_refusals}")
+        if run_diagnostics.agent_turns > 0:
+            refusal_rate = (run_diagnostics.agent_refusals / run_diagnostics.agent_turns) * 100
             print(f"  Refusal Rate: {refusal_rate:.1f}%")
 
     print(f"\nFindings:")
@@ -175,7 +245,7 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
         print(f"     - The time budget is too short")
         print(f"\n  Recommendations:")
         print(f"     1. Use allow-all guardrail: Guardrail() from guardrail_allow.py")
-        print(f"     2. Increase time budget: --seconds 60 or more")
+        print(f"     2. Increase time budget: --budget-s 60 or more")
         print(f"     3. Check agent is actually making tool calls (see tool_calls above)")
     elif raw_score < ATTACK_BASELINE_RAW * 0.001:  # Way too low (< 100 when target is 100k)
         print(
@@ -247,13 +317,89 @@ def test_baseline_attack(seconds: float = 30.0, seed: int = 123, use_openai: boo
     }
 
 
+def test_baseline_attack(offline_openai_agent: None) -> None:
+    results = run_baseline_attack(budget_s=0.1)
+    assert results["findings"] >= 0
+    assert results["unique_cells"] >= 0
+    assert results["raw_score"] >= 0.0
+    assert results["normalized_score"] >= 0.0
+
+
+def test_run_baseline_attack_reports_env_diagnostics_for_openai(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FakeEnv:
+        def __init__(self, **kwargs: Any) -> None:
+            self.kwargs = kwargs
+            self.seed = int(kwargs["seed"])
+            self._messages: list[str] = []
+
+        def reset(self) -> None:
+            self._messages = []
+
+        def interact(self, user_message: str, max_tool_hops: int = 8) -> EnvInteractionResult:
+            del max_tool_hops
+            self._messages.append(user_message)
+            return EnvInteractionResult(
+                seed=self.seed,
+                total_tool_events=len(self._messages),
+                tool_events_added=1,
+                agent_turns=1,
+                successful_tool_calls=1,
+                failed_tool_calls=0,
+                agent_refused=False,
+            )
+
+        def export_trace_dict(self) -> dict[str, Any]:
+            return {
+                "seed": self.seed,
+                "user_messages": list(self._messages),
+                "tool_events": [],
+                "egress": [],
+            }
+
+        def snapshot(self) -> dict[str, Any]:
+            return {"messages": list(self._messages)}
+
+        def restore(self, snapshot: dict[str, Any]) -> None:
+            self._messages = list(snapshot["messages"])
+
+    class _FakeAttackAlgorithm:
+        def __init__(self, config: dict[str, Any]) -> None:
+            self.config = config
+            self.last_run_details: list[dict[str, Any]] = []
+
+        def run(self, env: object, config: AttackRunConfig) -> list[object]:
+            assert isinstance(env, DiagnosticsEnv)
+            assert isinstance(config, AttackRunConfig)
+            env.reset()
+            env.interact("first")
+            env.interact("second")
+            return []
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(sys.modules[__name__], "build_agent", lambda selection: object())
+    monkeypatch.setattr(sys.modules[__name__], "SandboxEnv", _FakeEnv)
+    monkeypatch.setattr(sys.modules[__name__], "AttackAlgorithm", _FakeAttackAlgorithm)
+
+    run_baseline_attack(budget_s=0.1, seed=1, use_openai=True)
+
+    output = capsys.readouterr().out
+    assert "Total API Calls: 2" in output
+    assert "Tool Calls: 2" in output
+    assert "Successful Tool Calls: 2" in output
+    assert "Failed Tool Calls: 0" in output
+    assert "Agent Refusals: 0" in output
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Test baseline Go-Explore performance with OpenAI agent"
     )
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     parser.add_argument("--seed", type=int, default=123, help="Random seed (default: 123)")
     parser.add_argument(
         "--no-openai",
@@ -263,8 +409,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        results = test_baseline_attack(
-            seconds=args.seconds, seed=args.seed, use_openai=not args.no_openai
+        results = run_baseline_attack(
+            budget_s=args.budget_s, seed=args.seed, use_openai=not args.no_openai
         )
         sys.exit(0)
     except Exception as e:

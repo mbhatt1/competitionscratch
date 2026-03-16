@@ -1,0 +1,4 @@
+files:
+- incident_2026_01.log
+- config.json
+- report.txt

@@ -119,6 +119,97 @@ jobs:
       
       - name: Build package
         run: python -m build
+
+      - name: Verify packaged artifacts
+        run: |
+          python - <<'PY'
+          import glob
+          import tarfile
+          import zipfile
+          from pathlib import PurePosixPath
+
+          wheels = sorted(glob.glob("dist/*.whl"))
+          if not wheels:
+              raise SystemExit("No wheel found in dist/")
+          sdists = sorted(glob.glob("dist/*.tar.gz"))
+          if not sdists:
+              raise SystemExit("No source distribution found in dist/")
+
+          required = [
+              "aicomp_sdk/fixtures/web_corpus.json",
+              "aicomp_sdk/fixtures/mail_seed.json",
+              "aicomp_sdk/fixtures/file_seed/secret.txt",
+          ]
+          forbidden = [
+              "fixtures/web_corpus.json",
+              "fixtures/mail_seed.json",
+              "fixtures/file_seed/secret.txt",
+          ]
+          forbidden_sdist_prefixes = [
+              "docs/",
+              "examples/",
+              "research/",
+              "scripts/",
+              "tests/",
+              "fixtures/",
+          ]
+          forbidden_sdist_names = [
+              "competition.yaml",
+          ]
+
+          def normalize_sdist_name(name: str) -> str:
+              parts = PurePosixPath(name).parts
+              if len(parts) <= 1:
+                  return ""
+              return PurePosixPath(*parts[1:]).as_posix()
+
+          def check_artifact(kind: str, path: str, names: set[str]) -> None:
+              missing = [name for name in required if name not in names]
+              if missing:
+                  raise SystemExit(
+                      f"{kind} {path} is missing required fixtures:\n - "
+                      + "\n - ".join(missing)
+                  )
+              leaked = [name for name in forbidden if name in names]
+              if leaked:
+                  raise SystemExit(
+                      f"{kind} {path} contains legacy top-level fixtures:\n - "
+                      + "\n - ".join(leaked)
+                  )
+              if kind == "Source distribution":
+                  unexpected_prefixes = sorted(
+                      name
+                      for name in names
+                      if any(name.startswith(prefix) for prefix in forbidden_sdist_prefixes)
+                  )
+                  unexpected_names = sorted(
+                      name for name in names if name in forbidden_sdist_names
+                  )
+                  unexpected = unexpected_prefixes + unexpected_names
+              else:
+                  unexpected = []
+              if unexpected:
+                  raise SystemExit(
+                      f"{kind} {path} contains unexpected repo-only content:\n - "
+                      + "\n - ".join(unexpected[:20])
+                  )
+
+          wheel_path = wheels[-1]
+          with zipfile.ZipFile(wheel_path) as wheel:
+              check_artifact("Wheel", wheel_path, set(wheel.namelist()))
+
+          sdist_path = sdists[-1]
+          with tarfile.open(sdist_path, "r:gz") as sdist:
+              sdist_names = {
+                  normalized
+                  for normalized in (
+                      normalize_sdist_name(member.name) for member in sdist.getmembers()
+                  )
+                  if normalized
+              }
+          check_artifact("Source distribution", sdist_path, sdist_names)
+          print("Artifact packaging check passed.")
+          PY
       
       - name: Check package metadata
         run: twine check dist/*

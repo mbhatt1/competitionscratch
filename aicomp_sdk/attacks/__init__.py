@@ -1,5 +1,7 @@
 """Attack algorithms for offensive security testing."""
 
+from aicomp_sdk.core.env_api import AttackEnvProtocol
+
 from .contracts import (
     AttackAlgorithmBase,
     AttackCandidate,
@@ -10,4 +12,5 @@ __all__ = [
     "AttackAlgorithmBase",
     "AttackCandidate",
     "AttackRunConfig",
+    "AttackEnvProtocol",
 ]

@@ -8,9 +8,19 @@ import json
 import os
 import sys
 from datetime import datetime
+
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    replay_archived_candidates,
+    require_openai_key,
+    run_archived_attack,
+    setup_imports,
+)
 
 repo_root = setup_imports()
 
@@ -19,6 +29,7 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required for experiments")
     print("Set with: export OPENAI_API_KEY=your_key")
     sys.exit(1)
+require_openai_key()
 
 print("=" * 70)
 print("COMPREHENSIVE EXPERIMENTAL SUITE")
@@ -45,20 +56,43 @@ print("=" * 70)
 print("\nRunning general Go-Explore for 120s...")
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 # No guardrail
-env1 = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env1 = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=AllowGuardrail(),
+    agent_selection="openai",
+)
 attacker1 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings1 = attacker1.run(env1, {"seconds": 120})
+candidates1 = run_archived_attack(attacker1, env1, time_budget_s=120)
+findings1 = replay_archived_candidates(
+    candidates=candidates1,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=AllowGuardrail,
+    agent_selection="openai",
+)
 
 # With guardrail
-env2 = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env2 = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=PromptInjectionGuardrail(),
+    agent_selection="openai",
+)
 attacker2 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings2 = attacker2.run(env2, {"seconds": 120})
+candidates2 = run_archived_attack(attacker2, env2, time_budget_s=120)
+findings2 = replay_archived_candidates(
+    candidates=candidates2,
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail_factory=PromptInjectionGuardrail,
+    agent_selection="openai",
+)
 
 results["general"] = {
     "no_guard_findings": len(findings1),

@@ -10,23 +10,33 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    replay_archived_candidates,
+    require_openai_key,
+    run_archived_attack,
+    setup_imports,
+)
 
 repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from tests.integration.test_verify_findings import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")
     sys.exit(1)
+require_openai_key()
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 
 def extract_diversity_stats(findings):
@@ -66,7 +76,12 @@ async def run_simple_agent_async(seed, time_budget=60, agent_id=""):
 
 def run_simple_agent_sync(seed, time_budget=60):
     """Run a single simple agent with given random seed (sync implementation)"""
-    env = SandboxEnv(seed=seed, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+    env = create_archived_sandbox_env(
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail=AllowGuardrail(),
+        agent_selection="openai",
+    )
 
     config = {
         "max_turns": 6,
@@ -82,7 +97,14 @@ def run_simple_agent_sync(seed, time_budget=60):
     }
 
     atk = AttackAlgorithm(config)
-    findings = atk.run(env, {"seconds": time_budget})
+    candidates = run_archived_attack(atk, env, time_budget_s=time_budget)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures,
+        guardrail_factory=AllowGuardrail,
+        agent_selection="openai",
+    )
     stats = extract_diversity_stats(findings)
     stats["seed"] = seed
 

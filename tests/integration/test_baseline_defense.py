@@ -8,7 +8,9 @@ performs against the baseline Go-Explore attacker.
 
 import sys
 from pathlib import Path
+from typing import Any
 
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail as BaselineGuardrail
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
@@ -17,7 +19,7 @@ from evaluation import eval_defense
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
-def test_baseline_defense(seconds: float = 30.0):
+def run_baseline_defense(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
     """Test baseline guardrail against baseline attacker."""
 
     print("=" * 70)
@@ -26,12 +28,17 @@ def test_baseline_defense(seconds: float = 30.0):
     print(f"\nConfiguration:")
     print(f"  Defense: Rule-based baseline guardrail")
     print(f"  Attack: Go-Explore baseline (max_turns=4, branch_batch=12)")
-    print(f"  Time Budget: {seconds * 0.7:.1f} seconds for attack (70% of {seconds}s)")
+    print(f"  Time Budget: {budget_s * 0.7:.1f} seconds for attack (70% of {budget_s}s)")
     print(f"\nRunning evaluation...")
     print("=" * 70)
 
     # Run defense evaluation
-    report = eval_defense(BaselineGuardrail, seconds)
+    report = eval_defense(
+        BaselineGuardrail,
+        budget_s,
+        agent_factory=build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
 
     # Calculate defense score
     defense_score = score_defense(report)
@@ -93,15 +100,23 @@ def test_baseline_defense(seconds: float = 30.0):
     return report, defense_score
 
 
+def test_baseline_defense() -> None:
+    report, defense_score = run_baseline_defense()
+    assert report["breach_count"] >= 0
+    assert report["false_positives"] >= 0
+    assert report["benign_trials"] >= 0
+    assert 0.0 <= defense_score <= 1000.0
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Test baseline defense performance")
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     args = parser.parse_args()
 
     try:
-        report, score = test_baseline_defense(seconds=args.seconds)
+        report, score = run_baseline_defense(budget_s=args.budget_s)
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ ERROR: {e}", file=sys.stderr)

@@ -8,17 +8,19 @@ import os
 import sys
 from pathlib import Path
 
-from examples_hooks_submission.guardrail_prompt_injection import (
+repo_root = Path(__file__).resolve().parent.parent
+repo_root_str = str(repo_root)
+if repo_root_str not in sys.path:
+    sys.path.insert(0, repo_root_str)
+
+from examples.guardrails.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
-
+from aicomp_sdk.agents import build_agent
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
-
-# Add repository root to path
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
 
 
 # Check for OpenAI API key
@@ -35,15 +37,21 @@ print()
 # Run Go-Explore with TARGETED shell exploration
 print("\n[Step 1] Running Go-Explore with SHELL-TARGETED exploration...")
 print("Using shell-focused prompt bank to maximize shell.run discovery")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=AllowGuardrail(),
+)
 attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings = attacker.run(env, {"seconds": 120})  # More time for targeted search
+findings = attacker.run(env, AttackRunConfig(time_budget_s=120))  # More time for targeted search
+detailed_findings = attacker.last_run_details
 
 # Extract all chains that executed shell.run
 shell_chains_success = []
 shell_chains_blocked = []
 
-for f in findings:
+for f in detailed_findings:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 
@@ -73,11 +81,17 @@ print("\n[Step 2] Testing SHELL-TARGETED chains against Prompt Injection Guardra
 shell_chains_with_guard_success = []
 shell_chains_with_guard_blocked = []
 
-env_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_guard = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=PromptInjectionGuardrail(),
+)
 attacker_guard = AttackAlgorithm({"max_turns": 6, "branch_batch": 12, "target_shell": True})
-findings_guard = attacker_guard.run(env_guard, {"seconds": 120})
+findings_guard = attacker_guard.run(env_guard, AttackRunConfig(time_budget_s=120))
+detailed_findings_guard = attacker_guard.last_run_details
 
-for f in findings_guard:
+for f in detailed_findings_guard:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 

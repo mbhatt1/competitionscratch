@@ -98,6 +98,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.codex-prepush-venv
 env/
 venv/
 ENV/
@@ -137,6 +138,7 @@ research/*.pdf
 research/*.aux
 research/*.out
 research/*.txt
+.aicomp/
 
 # Other
 plans/

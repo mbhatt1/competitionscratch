@@ -1,16 +1,22 @@
-"""
-Data-Flow Tracking Guardrail - Pattern-Based Defense Without Persistent Taint
+"""Pattern-based local guardrail example without persistent session state."""
 
-This guardrail uses pattern-based detection without session-level taint tracking:
-1. Always block ultra-dangerous patterns in arguments
-2. Block dangerous tool + sensitive argument combinations
-3. Allow benign operations without false positives
-
-Strategy: Stateless pattern matching to avoid FP issues with sequential benign tests
-"""
-
+import sys
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in (current.parent, *current.parents):
+        if (parent / "aicomp_sdk").is_dir():
+            return parent
+    return current.parent
+
+
+_REPO_ROOT = _repo_root()
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 

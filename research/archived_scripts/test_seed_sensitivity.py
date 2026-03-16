@@ -7,17 +7,25 @@ Async execution for faster results.
 import asyncio
 import json
 import sys
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from archived_imports import (
+    create_archived_sandbox_env,
+    get_fixtures_dir,
+    replay_archived_candidates,
+    run_archived_attack,
+    setup_imports,
+)
 
 setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail as RulesGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 
 
 def run_single_test(seed, signature_type, guardrail_type, fixtures_path):
@@ -46,23 +54,35 @@ def run_single_test(seed, signature_type, guardrail_type, fixtures_path):
     # Select guardrail
     guardrail = AllowGuardrail() if guardrail_type == "allow" else RulesGuardrail()
 
-    env = SandboxEnv(seed=seed, fixtures_dir=fixtures_path, guardrail=guardrail)
+    env = create_archived_sandbox_env(
+        seed=seed,
+        fixtures_dir=fixtures_path,
+        guardrail=guardrail,
+        agent_selection="deterministic",
+    )
     attacker = AttackAlgorithm(config)
-    findings = attacker.run(env, {"seconds": 90})
+    candidates = run_archived_attack(attacker, env, time_budget_s=90)
+    findings = replay_archived_candidates(
+        candidates=candidates,
+        seed=seed,
+        fixtures_dir=fixtures_path,
+        guardrail_factory=AllowGuardrail if guardrail_type == "allow" else RulesGuardrail,
+        agent_selection="deterministic",
+    )
 
     # Count unique attack types
-    attack_types = set()
+    attack_counts: defaultdict[str, int] = defaultdict(int)
     for finding in findings:
         for pred in finding.get("predicates", []):
-            attack_types.add(pred.get("predicate"))
+            attack_counts[pred.get("predicate", "UNKNOWN")] += 1
 
     result = {
         "seed": seed,
         "signature_type": signature_type,
         "guardrail_type": guardrail_type,
         "findings": len(findings),
-        "attack_types": sorted(list(attack_types)),
-        "unique_types": len(attack_types),
+        "attack_types": sorted(attack_counts),
+        "unique_types": len(attack_counts),
     }
 
     print(
@@ -94,7 +114,7 @@ async def test_signature_across_seeds_async(seeds=[42, 123, 456, 789, 1337], max
         "full_intent_rules": [],
     }
 
-    fixtures = Path(__file__).resolve().parents[1] / "fixtures"
+    fixtures = get_fixtures_dir()
 
     # Create all tasks (4 per seed: 2 signatures × 2 guardrails)
     tasks = []

@@ -5,7 +5,9 @@ Test Taint Tracking Guardrail against baseline attacker.
 
 import sys
 from pathlib import Path
+from typing import Any
 
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_taint_tracking import Guardrail as TaintTrackingGuardrail
@@ -14,7 +16,7 @@ from examples.guardrails.guardrail_taint_tracking import Guardrail as TaintTrack
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
-def test_taint_tracking_guardrail(seconds: float = 30.0):
+def run_taint_tracking_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
     """Test Taint Tracking Guardrail against baseline attacker."""
 
     print("=" * 70)
@@ -24,7 +26,7 @@ def test_taint_tracking_guardrail(seconds: float = 30.0):
     print(f"  Defense: Taint Tracking Guardrail (Persistent Taint)")
     print(f"  Strategy: Once tainted, block ALL dangerous ops until session reset")
     print(f"  Attack: Go-Explore baseline (max_turns=4, branch_batch=12)")
-    print(f"  Time Budget: {seconds * 0.7:.1f} seconds for attack (70% of {seconds}s)")
+    print(f"  Time Budget: {budget_s * 0.7:.1f} seconds for attack (70% of {budget_s}s)")
     print(f"\nGuardrail Features:")
     print(f"  1. Persistent Taint Tracking")
     print(f"     - Taint persists across entire session (no window limit)")
@@ -42,7 +44,12 @@ def test_taint_tracking_guardrail(seconds: float = 30.0):
     print("=" * 70)
 
     # Run defense evaluation
-    report = eval_defense(TaintTrackingGuardrail, seconds)
+    report = eval_defense(
+        TaintTrackingGuardrail,
+        budget_s,
+        agent_factory=build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
 
     # Calculate defense score
     defense_score = score_defense(report)
@@ -167,15 +174,23 @@ def test_taint_tracking_guardrail(seconds: float = 30.0):
     return report, defense_score
 
 
+def test_taint_tracking_guardrail() -> None:
+    report, defense_score = run_taint_tracking_guardrail()
+    assert report["breach_count"] >= 0
+    assert report["false_positives"] >= 0
+    assert report["benign_trials"] >= 0
+    assert 0.0 <= defense_score <= 1000.0
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Test Taint Tracking Guardrail performance")
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     args = parser.parse_args()
 
     try:
-        report, score = test_taint_tracking_guardrail(seconds=args.seconds)
+        report, score = run_taint_tracking_guardrail(budget_s=args.budget_s)
 
         # Print final summary
         print(f"\n{'=' * 70}")

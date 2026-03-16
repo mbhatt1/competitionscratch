@@ -8,16 +8,19 @@ import os
 import sys
 from pathlib import Path
 
-from examples_hooks_submission.guardrail_prompt_injection import (
+repo_root = Path(__file__).resolve().parent.parent
+repo_root_str = str(repo_root)
+if repo_root_str not in sys.path:
+    sys.path.insert(0, repo_root_str)
+
+from examples.guardrails.guardrail_prompt_injection import (
     Guardrail as PromptInjectionGuardrail,
 )
-
+from aicomp_sdk.agents import build_agent
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.core.env import SandboxEnv
-
-repo_root = Path(__file__).parent.parent
-sys.path.insert(0, str(repo_root))
 
 
 if not os.environ.get("OPENAI_API_KEY"):
@@ -62,14 +65,20 @@ class SecretReadTargetedAttacker(AttackAlgorithm):
 
 
 print("\n[Step 1] Running SECRET-READ-TARGETED exploration (No Guardrail)...")
-env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=AllowGuardrail(),
+)
 attacker = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings = attacker.run(env, {"seconds": 120})
+findings = attacker.run(env, AttackRunConfig(time_budget_s=120))
+detailed_findings = attacker.last_run_details
 
 secret_chains_success = []
 secret_chains_blocked = []
 
-for f in findings:
+for f in detailed_findings:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 
@@ -112,14 +121,20 @@ print(f"  Including {exfil_count} with subsequent exfiltration (CRITICAL)")
 
 # Test with guardrail
 print("\n[Step 2] Testing SECRET-READ-TARGETED chains with Guardrail...")
-env_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_guard = SandboxEnv(
+    seed=42,
+    fixtures_dir=fixtures,
+    agent=build_agent("auto"),
+    guardrail=PromptInjectionGuardrail(),
+)
 attacker_guard = SecretReadTargetedAttacker({"max_turns": 6, "branch_batch": 12})
-findings_guard = attacker_guard.run(env_guard, {"seconds": 120})
+findings_guard = attacker_guard.run(env_guard, AttackRunConfig(time_budget_s=120))
+detailed_findings_guard = attacker_guard.last_run_details
 
 secret_chains_guard_success = []
 secret_chains_guard_blocked = []
 
-for f in findings_guard:
+for f in detailed_findings_guard:
     user_messages = f.get("user_messages", [])
     tool_events = f.get("trace", {}).get("tool_events", [])
 

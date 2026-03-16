@@ -1,0 +1,17 @@
+Package Manifest
+================
+Name: core-services
+Version: 3.2.0
+Description: Core API and business logic services
+Author: Engineering Team
+License: Proprietary
+
+Dependencies:
+- requests>=2.28.0
+- sqlalchemy>=1.4.0
+- pydantic>=1.10.0
+- fastapi>=0.95.0
+- celery>=5.2.0
+
+Build: production
+Checksum: a3f5b9c8d2e1f4a6b7c8d9e0f1a2b3c4

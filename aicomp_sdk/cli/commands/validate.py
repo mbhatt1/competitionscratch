@@ -10,7 +10,13 @@ Checks:
 """
 
 import ast
+import importlib
+import importlib.util
 from pathlib import Path
+
+
+def _parse_python_file(filepath: Path) -> ast.AST:
+    return ast.parse(filepath.read_text(encoding="utf-8"))
 
 
 def _class_base_names(node: ast.ClassDef) -> set[str]:
@@ -23,12 +29,35 @@ def _class_base_names(node: ast.ClassDef) -> set[str]:
     return names
 
 
+def _resolve_sdk_imported_name(
+    module_name: str,
+    imported_name: str,
+    module_cache: dict[str, object],
+) -> bool:
+    if imported_name == "*":
+        return True
+
+    module = module_cache.get(module_name)
+    if module is None:
+        try:
+            module = importlib.import_module(module_name)
+        except Exception:
+            return False
+        module_cache[module_name] = module
+
+    if hasattr(module, imported_name):
+        return True
+
+    try:
+        return importlib.util.find_spec(f"{module_name}.{imported_name}") is not None
+    except ModuleNotFoundError:
+        return False
+
+
 def validate_python_syntax(filepath: Path) -> tuple[bool, str]:
     """Check if file has valid Python syntax."""
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            code = f.read()
-        ast.parse(code)
+        _parse_python_file(filepath)
         return True, "Valid Python syntax"
     except SyntaxError as e:
         return False, f"Syntax error at line {e.lineno}: {e.msg}"
@@ -38,74 +67,30 @@ def validate_python_syntax(filepath: Path) -> tuple[bool, str]:
 
 def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
     """Check if imports are valid and can be resolved."""
-    issues = []
+    issues: list[str] = []
+    module_cache: dict[str, object] = {}
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            code = f.read()
+        tree = _parse_python_file(filepath)
 
-        tree = ast.parse(code)
-
-        # Extract all imports
+        # Extract all SDK imports and ensure referenced modules resolve.
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    # Skip relative imports and standard library
-                    if alias.name.startswith("aicomp_sdk"):
-                        # Check if it's a valid aicomp_sdk import
-                        parts = alias.name.split(".")
-                        if len(parts) > 1:
-                            # Check common valid imports
-                            valid_imports = [
-                                "aicomp_sdk.attacks",
-                                "aicomp_sdk.core.env",
-                                "aicomp_sdk.guardrails.hooks",
-                                "aicomp_sdk.guardrails.hooks_simple",
-                                "aicomp_sdk.guardrails.base",
-                                "aicomp_sdk.scoring",
-                                "aicomp_sdk.core.predicates",
-                            ]
-                            if alias.name not in valid_imports and not any(
-                                alias.name.startswith(v) for v in valid_imports
-                            ):
-                                issues.append(
-                                    f"Unusual import: {alias.name} (may not be available)"
-                                )
+                    if not alias.name.startswith("aicomp_sdk"):
+                        continue
+                    if importlib.util.find_spec(alias.name) is None:
+                        issues.append(f"Could not resolve import: {alias.name}")
 
-            elif isinstance(node, ast.ImportFrom):
-                if node.module and node.module.startswith("aicomp_sdk"):
-                    # Validate common imports
-                    valid_from = {
-                        "aicomp_sdk": [
-                            "AttackAlgorithmBase",
-                            "AttackCandidate",
-                            "AttackRunConfig",
-                            "GuardrailBase",
-                            "Decision",
-                        ],
-                        "aicomp_sdk.attacks": [
-                            "AttackAlgorithmBase",
-                            "AttackCandidate",
-                            "AttackRunConfig",
-                        ],
-                        "aicomp_sdk.attacks.contracts": [
-                            "AttackAlgorithmBase",
-                            "AttackCandidate",
-                            "AttackRunConfig",
-                        ],
-                        "aicomp_sdk.core.env": ["SandboxEnv"],
-                        "aicomp_sdk.guardrails.base": ["GuardrailBase", "Decision"],
-                        "aicomp_sdk.guardrails.hooks_simple": [
-                            "attack_hook",
-                            "defense_hook",
-                            "clear_hooks",
-                        ],
-                        "aicomp_sdk.scoring": ["score_attack", "score_defense"],
-                    }
-
-                    if node.module in valid_from:
-                        for alias in node.names:
-                            if alias.name not in valid_from[node.module] and alias.name != "*":
-                                issues.append(f"Unknown import: {alias.name} from {node.module}")
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            if node.module is None or not node.module.startswith("aicomp_sdk"):
+                continue
+            if importlib.util.find_spec(node.module) is None:
+                issues.append(f"Could not resolve import: {node.module}")
+                continue
+            for alias in node.names:
+                if not _resolve_sdk_imported_name(node.module, alias.name, module_cache):
+                    issues.append(f"Could not resolve import: {alias.name} from {node.module}")
 
         return len(issues) == 0, issues
 
@@ -115,43 +100,39 @@ def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
 
 def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
     """Validate attack submission structure."""
-    issues = []
+    issues: list[str] = []
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            code = f.read()
-
-        tree = ast.parse(code)
+        tree = _parse_python_file(filepath)
 
         # Check for AttackAlgorithm class
         has_attack_class = False
         has_run_method = False
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                if node.name == "AttackAlgorithm":
-                    has_attack_class = True
-                    base_names = _class_base_names(node)
-                    if "AttackAlgorithmBase" not in base_names:
-                        issues.append("AttackAlgorithm must inherit from AttackAlgorithmBase")
+            if not isinstance(node, ast.ClassDef) or node.name != "AttackAlgorithm":
+                continue
 
-                    # Check for run method
-                    for item in node.body:
-                        if isinstance(item, ast.FunctionDef) and item.name == "run":
-                            has_run_method = True
+            has_attack_class = True
+            base_names = _class_base_names(node)
+            if "AttackAlgorithmBase" not in base_names:
+                issues.append("AttackAlgorithm must inherit from AttackAlgorithmBase")
 
-                            # Check run method signature
-                            args = item.args
-                            arg_names = [arg.arg for arg in args.args]
+            # Check for run method
+            for item in node.body:
+                if not isinstance(item, ast.FunctionDef) or item.name != "run":
+                    continue
 
-                            if "self" not in arg_names:
-                                issues.append(
-                                    "run() method should be an instance method (missing self)"
-                                )
-                            if "env" not in arg_names:
-                                issues.append("run() method missing required 'env' parameter")
-                            if "config" not in arg_names:
-                                issues.append("run() method missing required 'config' parameter")
+                has_run_method = True
+
+                # Check run method signature
+                arg_names = [arg.arg for arg in item.args.args]
+                if "self" not in arg_names:
+                    issues.append("run() method should be an instance method (missing self)")
+                if "env" not in arg_names:
+                    issues.append("run() method missing required 'env' parameter")
+                if "config" not in arg_names:
+                    issues.append("run() method missing required 'config' parameter")
 
         if not has_attack_class:
             issues.append("Missing 'AttackAlgorithm' class")
@@ -166,48 +147,38 @@ def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
 
 def validate_guardrail_structure(filepath: Path) -> tuple[bool, list[str]]:
     """Validate guardrail submission structure."""
-    issues = []
+    issues: list[str] = []
 
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            code = f.read()
-
-        tree = ast.parse(code)
+        tree = _parse_python_file(filepath)
 
         # Check for Guardrail class
         has_guardrail_class = False
         has_decide_method = False
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                if node.name == "Guardrail":
-                    has_guardrail_class = True
+            if not isinstance(node, ast.ClassDef) or node.name != "Guardrail":
+                continue
 
-                    # Check for decide method
-                    for item in node.body:
-                        if isinstance(item, ast.FunctionDef) and item.name == "decide":
-                            has_decide_method = True
+            has_guardrail_class = True
 
-                            # Check decide method signature
-                            args = item.args
-                            arg_names = [arg.arg for arg in args.args]
+            # Check for decide method
+            for item in node.body:
+                if not isinstance(item, ast.FunctionDef) or item.name != "decide":
+                    continue
 
-                            if "self" not in arg_names:
-                                issues.append(
-                                    "decide() method should be an instance method (missing self)"
-                                )
-                            if "tool_name" not in arg_names:
-                                issues.append(
-                                    "decide() method missing required 'tool_name' parameter"
-                                )
-                            if "tool_args" not in arg_names:
-                                issues.append(
-                                    "decide() method missing required 'tool_args' parameter"
-                                )
-                            if "context" not in arg_names:
-                                issues.append(
-                                    "decide() method missing required 'context' parameter"
-                                )
+                has_decide_method = True
+
+                # Check decide method signature
+                arg_names = [arg.arg for arg in item.args.args]
+                if "self" not in arg_names:
+                    issues.append("decide() method should be an instance method (missing self)")
+                if "tool_name" not in arg_names:
+                    issues.append("decide() method missing required 'tool_name' parameter")
+                if "tool_args" not in arg_names:
+                    issues.append("decide() method missing required 'tool_args' parameter")
+                if "context" not in arg_names:
+                    issues.append("decide() method missing required 'context' parameter")
 
         if not has_guardrail_class:
             issues.append("Missing 'Guardrail' class")
@@ -231,8 +202,7 @@ def auto_detect_type(filepath: Path) -> str:
 
     # Check content
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = filepath.read_text(encoding="utf-8")
 
         if "class AttackAlgorithm" in content:
             return "attack"
@@ -311,6 +281,8 @@ def run_validate(args) -> int:
     print()
     if all_valid:
         print_success(f"✅ Validation passed! {filepath} is ready to test.")
+        if submission_type == "attack":
+            print_info("Attack submissions are Kaggle-compatible when provided as attack.py.")
         return 0
     else:
         print_error("❌ Validation failed. Please fix the issues above.")

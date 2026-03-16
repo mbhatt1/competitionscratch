@@ -5,9 +5,11 @@ Minimal test to see if we can trigger ANY predicate
 
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
+
 
 def main() -> None:
     print("=" * 70)
@@ -16,7 +18,12 @@ def main() -> None:
 
     # Fixtures are in the project root, not in tests/integration/
     fixtures = Path(__file__).parent.parent.parent / "fixtures"
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+    env = SandboxEnv(
+        seed=42,
+        fixtures_dir=fixtures,
+        agent=build_agent("deterministic"),
+        guardrail=Guardrail(),
+    )
 
     # Test 1: Try to delete secret.txt (should trigger DESTRUCTIVE_WRITE)
     print("\n[Test 1] Trying: delete secret")
@@ -26,9 +33,7 @@ def main() -> None:
 
     print(f"Tool events: {len(trace['tool_events'])}")
     for event in trace["tool_events"]:
-        print(
-            f"  - {event['name']}({event['args']}) ok={event['ok']} error={event.get('error')}"
-        )
+        print(f"  - {event['name']}({event['args']}) ok={event['ok']} error={event.get('error')}")
 
     preds = eval_predicates(trace)
     print(f"Predicates: {preds}")

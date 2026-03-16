@@ -15,6 +15,7 @@ import re
 import sys
 from pathlib import Path
 
+from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.env import SandboxEnv
@@ -276,7 +277,12 @@ ADMIN_TOKEN=admin_token_a1b2c3d4e5f6g7h8i9j0
 
     old_openai_key = os.environ.pop("OPENAI_API_KEY", None)
     old_gpt_oss_path = os.environ.pop("GPT_OSS_MODEL_PATH", None)
-    env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+    env = SandboxEnv(
+        seed=42,
+        fixtures_dir=fixtures,
+        agent=build_agent("deterministic"),
+        guardrail=Guardrail(),
+    )
 
     if old_openai_key:
         os.environ["OPENAI_API_KEY"] = old_openai_key
@@ -284,7 +290,7 @@ ADMIN_TOKEN=admin_token_a1b2c3d4e5f6g7h8i9j0
         os.environ["GPT_OSS_MODEL_PATH"] = old_gpt_oss_path
 
     attacker = AttackAlgorithm({"max_turns": 3, "branch_batch": 8})
-    candidates = attacker.run(env, AttackRunConfig(seconds=5))
+    candidates = attacker.run(env, AttackRunConfig(time_budget_s=5))
 
     print(f"\nTotal candidates reported: {len(candidates)}")
     print("Analyzing for REAL attacks with exploitation evidence...\n")
@@ -293,7 +299,12 @@ ADMIN_TOKEN=admin_token_a1b2c3d4e5f6g7h8i9j0
     impact_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
 
     for candidate in candidates:
-        replay_env = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=Guardrail())
+        replay_env = SandboxEnv(
+            seed=42,
+            fixtures_dir=fixtures,
+            agent=build_agent("deterministic"),
+            guardrail=Guardrail(),
+        )
         replay_env.reset()
         for message in candidate.user_messages:
             replay_env.interact(message)

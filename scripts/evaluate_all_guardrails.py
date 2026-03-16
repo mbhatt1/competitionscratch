@@ -22,13 +22,20 @@ import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 # Add repository root to path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
 
-from aicomp_sdk.core.env import AgentMode  # noqa: E402
+from aicomp_sdk.agents import (  # noqa: E402
+    AgentSelection,
+    build_agent_factory,
+    format_agent_selection,
+    parse_agent_selection,
+    require_agent_selection_configuration,
+)
+from aicomp_sdk.core.env_api import EnvSelection, parse_env_selection  # noqa: E402
 from aicomp_sdk.scoring import score_defense  # noqa: E402
 from evaluation import eval_defense  # noqa: E402
 
@@ -61,16 +68,16 @@ def md_print(text: str = "") -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate guardrails (defense-only).")
     parser.add_argument(
-        "--seconds",
+        "--budget-s",
         type=float,
         default=30.0,
         help="Evaluation budget (seconds) for each standard guardrail run (default: 30).",
     )
     parser.add_argument(
-        "--pattern-seconds",
+        "--pattern-budget-s",
         type=float,
         default=None,
-        help="Evaluation budget (seconds) for pattern guardrail. Defaults to --seconds.",
+        help="Evaluation budget (seconds) for pattern guardrail. Defaults to --budget-s.",
     )
     parser.add_argument(
         "--seeds",
@@ -85,11 +92,18 @@ def parse_args() -> argparse.Namespace:
         help=f"Output markdown path (default: {DEFAULT_OUTPUT}).",
     )
     parser.add_argument(
-        "--agent-mode",
+        "--agent",
         type=str,
         default="deterministic",
-        choices=["auto", "deterministic", "openai"],
-        help="Agent mode for evaluation runs (default: deterministic).",
+        choices=[member.value for member in AgentSelection],
+        help="Agent selection for evaluation runs (default: deterministic).",
+    )
+    parser.add_argument(
+        "--env",
+        type=str,
+        default="sandbox",
+        choices=[member.value for member in EnvSelection],
+        help="Evaluation environment selection (default: sandbox).",
     )
     return parser.parse_args()
 
@@ -104,14 +118,6 @@ def parse_seeds(raw: str) -> list[int]:
     if not seeds:
         return list(DEFAULT_SEEDS)
     return seeds
-
-
-def format_agent_mode(agent_mode: AgentMode) -> str:
-    if agent_mode == "deterministic":
-        return "Deterministic vulnerable agent (forced)"
-    if agent_mode == "openai":
-        return "OpenAI API agent (forced)"
-    return "Auto selection (gpt-oss -> OpenAI if key -> deterministic)"
 
 
 def mean_std(values: list[float]) -> tuple[float, float]:
@@ -169,31 +175,34 @@ def merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
         target[key] = target.get(key, 0) + value
 
 
-def effective_attack_budget(eval_seconds: float) -> float:
-    return max(10.0, eval_seconds * 0.7)
+def effective_attack_budget(eval_budget_s: float) -> float:
+    return max(10.0, eval_budget_s * 0.7)
 
 
 def test_guardrail(
     name: str,
     guardrail_path: Path,
-    eval_seconds: float,
+    eval_budget_s: float,
     seeds: list[int],
-    agent_mode: AgentMode,
+    agent_selection: AgentSelection,
+    env_selection: EnvSelection,
 ) -> dict[str, Any]:
     """Test a guardrail against baseline attacker across one or more seeds."""
     md_print(f"\n### Testing: **{name}**")
     md_print()
-    md_print(f"[INFO] Agent mode: {format_agent_mode(agent_mode)}")
+    md_print(f"[INFO] Agent selection: {format_agent_selection(agent_selection)}")
+    md_print(f"[INFO] Env selection: {env_selection.value}")
 
     guardrail_class = load_guardrail_class(guardrail_path)
-    effective_seconds = effective_attack_budget(eval_seconds)
+    effective_budget_s = effective_attack_budget(eval_budget_s)
 
-    md_print(f"- **Evaluation budget per run:** {eval_seconds:.1f}s")
+    md_print(f"- **Evaluation budget per run:** {eval_budget_s:.1f}s")
     md_print(
-        f"- **Effective attacker budget per run:** {effective_seconds:.1f}s "
-        f"(max(10, seconds*0.7))"
+        f"- **Effective attacker budget per run:** {effective_budget_s:.1f}s "
+        f"(max(10, budget_s*0.7))"
     )
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
+    agent_factory = build_agent_factory(agent_selection)
 
     defense_scores: list[float] = []
     breaches_per_run: list[float] = []
@@ -208,10 +217,11 @@ def test_guardrail(
         with contextlib.redirect_stdout(captured_output):
             defense_report = eval_defense(
                 guardrail_class,
-                eval_seconds,
+                eval_budget_s,
+                agent_factory=agent_factory,
+                env_selection=env_selection,
                 attack_seed=seed,
                 benign_seed=seed + BENIGN_SEED_OFFSET,
-                agent_mode=agent_mode,
             )
 
         breaches_found = int(defense_report["breach_count"])
@@ -235,7 +245,9 @@ def test_guardrail(
     fp_rate_mean, fp_rate_std = mean_std(fp_rates_per_run)
     fp_rate_aggregate = false_positives_total / max(1, benign_trials_total)
 
-    md_print(f"- **Breaches:** {fmt_mean_std(breaches_mean, breaches_std, precision=1)} (n={len(seeds)})")
+    md_print(
+        f"- **Breaches:** {fmt_mean_std(breaches_mean, breaches_std, precision=1)} (n={len(seeds)})"
+    )
     md_print(
         "- **False Positives (aggregate):** "
         f"{false_positives_total}/{benign_trials_total} ({fp_rate_aggregate:.1%})"
@@ -244,9 +256,7 @@ def test_guardrail(
         "- **False Positive Rate (per-run):** "
         f"{fmt_mean_std(fp_rate_mean * 100.0, fp_rate_std * 100.0, precision=2)}%"
     )
-    md_print(
-        f"- **Defense Score:** {fmt_mean_std(defense_mean, defense_std, precision=1)}/1000"
-    )
+    md_print(f"- **Defense Score:** {fmt_mean_std(defense_mean, defense_std, precision=1)}/1000")
 
     if predicate_occurrence_counts:
         md_print("- **Attack types that breached:**")
@@ -263,8 +273,8 @@ def test_guardrail(
     return {
         "name": name,
         "runs": len(seeds),
-        "eval_seconds": eval_seconds,
-        "effective_attack_seconds": effective_seconds,
+        "eval_budget_s": eval_budget_s,
+        "effective_attack_budget_s": effective_budget_s,
         "defense_score_mean": defense_mean,
         "defense_score_std": defense_std,
         "breaches_mean": breaches_mean,
@@ -276,6 +286,7 @@ def test_guardrail(
         "fp_rate_aggregate": fp_rate_aggregate,
         "predicate_occurrence_counts": predicate_occurrence_counts,
         "predicate_breach_counts": predicate_breach_counts,
+        "env_selection": env_selection.value,
     }
 
 
@@ -283,11 +294,14 @@ def main() -> None:
     args = parse_args()
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
-    pattern_seconds = args.pattern_seconds if args.pattern_seconds is not None else args.seconds
-    agent_mode = cast(AgentMode, args.agent_mode)
+    pattern_budget_s = args.pattern_budget_s if args.pattern_budget_s is not None else args.budget_s
+    agent_selection = parse_agent_selection(args.agent)
+    env_selection = parse_env_selection(args.env)
 
-    if agent_mode == "openai" and not os.environ.get("OPENAI_API_KEY"):
-        raise SystemExit("OPENAI_API_KEY must be set when --agent-mode openai")
+    try:
+        require_agent_selection_configuration(agent_selection)
+    except RuntimeError as err:
+        raise SystemExit(str(err)) from err
 
     ensure_secret_file()
 
@@ -306,15 +320,16 @@ def main() -> None:
     md_print()
     md_print("- **Evaluation Type:** Defense (baseline attack vs. user guardrails)")
     md_print("- **Attacker:** Go-Explore baseline")
-    md_print(f"- **Agent:** {format_agent_mode(agent_mode)}")
+    md_print(f"- **Agent:** {format_agent_selection(agent_selection)}")
+    md_print(f"- **Env:** {env_selection.value}")
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
     md_print(
-        f"- **Standard guardrail evaluation budget:** {args.seconds:.1f}s "
-        f"(effective attacker: {effective_attack_budget(args.seconds):.1f}s)"
+        f"- **Standard guardrail evaluation budget:** {args.budget_s:.1f}s "
+        f"(effective attacker: {effective_attack_budget(args.budget_s):.1f}s)"
     )
     md_print(
-        f"- **Pattern guardrail evaluation budget:** {pattern_seconds:.1f}s "
-        f"(effective attacker: {effective_attack_budget(pattern_seconds):.1f}s)"
+        f"- **Pattern guardrail evaluation budget:** {pattern_budget_s:.1f}s "
+        f"(effective attacker: {effective_attack_budget(pattern_budget_s):.1f}s)"
     )
     md_print("- **Go-Explore config (from evaluation.py):** max_turns=4, branch_batch=12")
     md_print()
@@ -329,9 +344,10 @@ def main() -> None:
             result = test_guardrail(
                 name,
                 repo_root / rel_path,
-                eval_seconds=args.seconds,
+                eval_budget_s=args.budget_s,
                 seeds=seeds,
-                agent_mode=agent_mode,
+                agent_selection=agent_selection,
+                env_selection=env_selection,
             )
             results.append(result)
         except Exception as err:
@@ -342,7 +358,7 @@ def main() -> None:
     md_print()
     md_print("## Phase 2: Pattern Guardrail")
     md_print()
-    if pattern_seconds != args.seconds:
+    if pattern_budget_s != args.budget_s:
         md_print("Pattern guardrail uses a different budget for targeted stress-testing.")
     else:
         md_print("Pattern guardrail uses the same budget as other guardrails.")
@@ -353,9 +369,10 @@ def main() -> None:
         pattern_result = test_guardrail(
             pattern_name,
             repo_root / pattern_rel_path,
-            eval_seconds=pattern_seconds,
+            eval_budget_s=pattern_budget_s,
             seeds=seeds,
-            agent_mode=agent_mode,
+            agent_selection=agent_selection,
+            env_selection=env_selection,
         )
         results.append(pattern_result)
     except Exception as err:
@@ -366,8 +383,12 @@ def main() -> None:
     md_print()
     md_print("## Summary")
     md_print()
-    md_print("| Guardrail | Defense Score (mean±std) | Breaches (mean±std) | FP Rate (mean±std) | Runs |")
-    md_print("|-----------|---------------------------|----------------------|--------------------|------|")
+    md_print(
+        "| Guardrail | Defense Score (mean±std) | Breaches (mean±std) | FP Rate (mean±std) | Runs |"
+    )
+    md_print(
+        "|-----------|---------------------------|----------------------|--------------------|------|"
+    )
 
     results.sort(key=lambda item: item["defense_score_mean"], reverse=True)
 
@@ -403,8 +424,7 @@ def main() -> None:
         )
         if best["predicate_occurrence_counts"]:
             top_attacks = ", ".join(
-                f"`{name}`"
-                for name in list(best["predicate_occurrence_counts"].keys())[:3]
+                f"`{name}`" for name in list(best["predicate_occurrence_counts"].keys())[:3]
             )
             md_print(f"- **Most common breach types:** {top_attacks}")
         md_print()
@@ -424,8 +444,7 @@ def main() -> None:
         )
         if worst["predicate_occurrence_counts"]:
             top_attacks = ", ".join(
-                f"`{name}`"
-                for name in list(worst["predicate_occurrence_counts"].keys())[:3]
+                f"`{name}`" for name in list(worst["predicate_occurrence_counts"].keys())[:3]
             )
             md_print(f"- **Most common breach types:** {top_attacks}")
         md_print()

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_promptguard import Guardrail as PromptGuardGuardrail
@@ -35,7 +36,7 @@ def _should_skip_promptguard_error(err: BaseException) -> bool:
     return any(token in message for token in _SKIPPABLE_PROMPTGUARD_ERRORS)
 
 
-def test_promptguard_guardrail(seconds: float = 30.0):
+def test_promptguard_guardrail(budget_s: float = 30.0):
     """Test Prompt-Guard-86M guardrail against baseline attacker.
 
     Skips if model is not accessible (gated repo).
@@ -49,7 +50,7 @@ def test_promptguard_guardrail(seconds: float = 30.0):
     print(f"  Model: 86M parameter mDeBERTa-v3 classifier")
     print(f"  Detection: Prompt injections + Jailbreaks")
     print(f"  Attack: Go-Explore baseline (max_turns=4, branch_batch=12)")
-    print(f"  Time Budget: {seconds * 0.7:.1f} seconds for attack (70% of {seconds}s)")
+    print(f"  Time Budget: {budget_s * 0.7:.1f} seconds for attack (70% of {budget_s}s)")
     print(f"\nModel Capabilities:")
     print(f"  - Detects 'out of place' commands in content (INJECTION)")
     print(f"  - Detects system prompt override attempts (JAILBREAK)")
@@ -60,7 +61,12 @@ def test_promptguard_guardrail(seconds: float = 30.0):
 
     # Skip in environments without Prompt-Guard model access or network.
     try:
-        report = eval_defense(PromptGuardGuardrail, seconds)
+        report = eval_defense(
+            PromptGuardGuardrail,
+            budget_s,
+            agent_factory=build_agent_factory("deterministic"),
+            env_selection="sandbox",
+        )
     except Exception as e:
         if _should_skip_promptguard_error(e):
             pytest.skip(
@@ -167,11 +173,11 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Test Prompt-Guard-86M guardrail performance")
-    parser.add_argument("--seconds", type=float, default=30.0, help="Time budget (default: 30)")
+    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
     args = parser.parse_args()
 
     try:
-        report, score = test_promptguard_guardrail(seconds=args.seconds)
+        report, score = test_promptguard_guardrail(budget_s=args.budget_s)
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ ERROR: {e}", file=sys.stderr)

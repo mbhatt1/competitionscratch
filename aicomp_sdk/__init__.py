@@ -7,7 +7,7 @@ This package provides a comprehensive framework for:
 - Running security competitions
 """
 
-__version__ = "1.0.1"
+from typing import Any
 
 # Core SDK
 from .attacks import (
@@ -16,6 +16,22 @@ from .attacks import (
     AttackRunConfig,
 )
 from .core.env import SandboxEnv
+from .core.env_api import (
+    AttackEnvProtocol,
+    DiagnosticsEnv,
+    EnvInteractionResult,
+    EnvSelection,
+    RunDiagnostics,
+    parse_env_selection,
+)
+
+try:
+    from .core.gym_env import GymAttackEnv as _GymAttackEnv
+except ImportError:
+    GymAttackEnv: Any = None
+else:
+    GymAttackEnv = _GymAttackEnv
+
 from .guardrails.base import Decision, GuardrailBase
 
 # Advanced hooks API (for power users)
@@ -47,6 +63,13 @@ from .guardrails.hooks_simple import (
 __all__ = [
     # Core SDK
     "SandboxEnv",
+    "GymAttackEnv",
+    "AttackEnvProtocol",
+    "DiagnosticsEnv",
+    "EnvInteractionResult",
+    "EnvSelection",
+    "RunDiagnostics",
+    "parse_env_selection",
     "GuardrailBase",
     "Decision",
     "AttackAlgorithmBase",

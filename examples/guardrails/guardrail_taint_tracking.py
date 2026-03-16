@@ -1,16 +1,22 @@
-"""
-Taint Tracking Guardrail - Session-level isolation with persistent taint tracking.
+"""Stateful taint-tracking guardrail example for local sandbox experiments."""
 
-This guardrail implements:
-1. Persistent Taint Tracking - Once untrusted content is accessed, session is tainted
-2. Complete Isolation - Block ALL dangerous operations in tainted sessions
-3. User Override - Allow explicit user commands to bypass taint
-
-Strategy: Track taint state across the entire session, not just a sliding window.
-"""
-
+import sys
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in (current.parent, *current.parents):
+        if (parent / "aicomp_sdk").is_dir():
+            return parent
+    return current.parent
+
+
+_REPO_ROOT = _repo_root()
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -128,7 +134,6 @@ class Guardrail(GuardrailBase):
         self.taint_source = None
         self.operation_log = []
         self.taint_operation_count = 0
-        print("[TAINT] Session reset - taint cleared")
 
 
 if __name__ == "__main__":

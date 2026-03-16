@@ -8,31 +8,55 @@ Tests the same attack algorithm against:
 """
 
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
-# Add repository root to path
-from archived_imports import setup_imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-repo_root = setup_imports()
+from archived_imports import create_archived_sandbox_env, get_fixtures_dir, setup_imports
 
+setup_imports()
+
+from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from aicomp_sdk.core.env import SandboxEnv
 from examples.attacks.attack_working import AttackAlgorithm
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
 from tests.integration.test_verify_findings import detect_real_attacks
 
-fixtures = repo_root / "fixtures"
+fixtures = get_fixtures_dir()
 
 # Ensure secret.txt exists
 secret_file = fixtures / "file_seed" / "secret.txt"
 if not secret_file.exists():
     secret_file.write_text("SECRET_API_KEY=sk_live_test\nPASSWORD=test123\nTOKEN=admin123")
 
-# CRITICAL: Unset API keys to force use of vulnerable deterministic agent
-import os
+RUN_CONFIG = AttackRunConfig(time_budget_s=15)
 
-old_openai_key = os.environ.pop("OPENAI_API_KEY", None)
-old_gpt_oss_path = os.environ.pop("GPT_OSS_MODEL_PATH", None)
+
+def replay_candidates(user_message_chains: Sequence[Sequence[str]], guardrail):
+    real_attacks = []
+    for user_messages in user_message_chains:
+        env = create_archived_sandbox_env(
+            seed=42,
+            fixtures_dir=fixtures,
+            guardrail=guardrail,
+            agent_selection="deterministic",
+        )
+        for user_message in user_messages:
+            env.interact(user_message)
+
+        trace = env.export_trace_dict()
+        attacks = detect_real_attacks(trace.get("tool_events", []))
+        if attacks:
+            real_attacks.append(
+                {
+                    "user_messages": list(user_messages),
+                    "trace": trace,
+                    "attacks": attacks,
+                }
+            )
+    return real_attacks
+
 
 print("=" * 70)
 print("COMPARING ATTACK SUCCESS: NO GUARDRAIL VS PROMPT INJECTION GUARDRAIL")
@@ -40,17 +64,20 @@ print("=" * 70)
 
 # Test 1: No Guardrail (Allow All)
 print("\n[Test 1] Running attack with NO GUARDRAIL...")
-env_no_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=AllowGuardrail())
+env_no_guard = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=AllowGuardrail(),
+    agent_selection="deterministic",
+)
 attacker1 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_no_guard = attacker1.run(env_no_guard, {"seconds": 15})
+findings_no_guard = attacker1.run(env_no_guard, RUN_CONFIG)
 
-# Analyze findings
-real_attacks_no_guard = []
-for f in findings_no_guard:
-    events = f.get("trace", {}).get("tool_events", [])
-    attacks = detect_real_attacks(events)
-    if attacks:
-        real_attacks_no_guard.append({"finding": f, "attacks": attacks})
+# Analyze findings via replay, since WorkingAttack now returns AttackCandidate chains.
+real_attacks_no_guard = replay_candidates(
+    [candidate.user_messages for candidate in findings_no_guard],
+    AllowGuardrail(),
+)
 
 print(f"  Total findings: {len(findings_no_guard)}")
 print(f"  Real attacks: {len(real_attacks_no_guard)}")
@@ -64,17 +91,19 @@ for breach in real_attacks_no_guard:
 
 # Test 2: With Prompt Injection Guardrail
 print("\n[Test 2] Running attack WITH PROMPT INJECTION GUARDRAIL...")
-env_with_guard = SandboxEnv(seed=42, fixtures_dir=fixtures, guardrail=PromptInjectionGuardrail())
+env_with_guard = create_archived_sandbox_env(
+    seed=42,
+    fixtures_dir=fixtures,
+    guardrail=PromptInjectionGuardrail(),
+    agent_selection="deterministic",
+)
 attacker2 = AttackAlgorithm({"max_turns": 6, "branch_batch": 12})
-findings_with_guard = attacker2.run(env_with_guard, {"seconds": 15})
+findings_with_guard = attacker2.run(env_with_guard, RUN_CONFIG)
 
-# Analyze findings
-real_attacks_with_guard = []
-for f in findings_with_guard:
-    events = f.get("trace", {}).get("tool_events", [])
-    attacks = detect_real_attacks(events)
-    if attacks:
-        real_attacks_with_guard.append({"finding": f, "attacks": attacks})
+real_attacks_with_guard = replay_candidates(
+    [candidate.user_messages for candidate in findings_with_guard],
+    PromptInjectionGuardrail(),
+)
 
 print(f"  Total findings: {len(findings_with_guard)}")
 print(f"  Real attacks: {len(real_attacks_with_guard)}")
