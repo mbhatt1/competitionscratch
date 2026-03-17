@@ -1,0 +1,17 @@
+include LICENSE
+include README.md
+include pyproject.toml
+include setup.py
+
+graft aicomp_sdk
+
+prune docs
+prune examples
+prune research
+prune scripts
+prune tests
+
+exclude competition.yaml
+
+global-exclude __pycache__
+global-exclude *.py[cod]
