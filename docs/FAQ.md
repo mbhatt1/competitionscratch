@@ -1,24 +1,57 @@
 # FAQ
 
-## What do I submit on Kaggle?
+This FAQ covers both the public Kaggle attack-only path and the broader package workflows.
+
+Use [`GETTING_STARTED.md`](GETTING_STARTED.md) and [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md) for the public submission flow. Use [`README.md`](README.md) when you need to choose between package attack-only, guardrail-only, and dual-track evaluation.
+
+## Workflows
+
+### What workflows does the package support?
+
+The package supports three workflows:
+
+- package attack-only evaluation with `attack.py`
+- package guardrail-only evaluation with `guardrail.py`
+- package dual-track evaluation with `submission.zip`
+
+Examples:
+
+```bash
+aicomp test attack.py --track redteam --quick
+aicomp test guardrail.py --track defense --quick
+aicomp test submission.zip --track dual --quick
+```
+
+The public Kaggle competition uses the attack-only path.
+
+### What do I submit on Kaggle?
 
 Submit `attack.py` only.
 
-## Does the file have to be named `attack.py`?
+### Where should I start?
 
-For the official standalone scorer, yes. `evaluation_redteam.py` rejects other filenames.
+- Public Kaggle path: [`GETTING_STARTED.md`](GETTING_STARTED.md), [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md), and later the official Kaggle rules page
+- Package attack-only: [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md), [`API_REFERENCE.md`](API_REFERENCE.md)
+- Package guardrail-only: [`GUARDRAILS_GUIDE.md`](GUARDRAILS_GUIDE.md), [`TESTING_GUIDE.md`](TESTING_GUIDE.md)
+- Package dual-track: [`COMPETITION_DESIGN.md`](COMPETITION_DESIGN.md), [`../examples/README.md`](../examples/README.md)
 
-For local CLI testing, no. `aicomp test` can evaluate any `.py` file that defines `AttackAlgorithm`.
+## Submission Contract
 
-## What class name is required?
+### Does the file have to be named `attack.py`?
+
+For the public Kaggle path, yes. `evaluation_redteam.py` rejects other filenames.
+
+For package attack-only testing, no. `aicomp test --track redteam` can evaluate any `.py` file that defines `AttackAlgorithm`.
+
+### What class name is required?
 
 `AttackAlgorithm`
 
-## What should `AttackAlgorithm` inherit from?
+### What should `AttackAlgorithm` inherit from?
 
 `aicomp_sdk.AttackAlgorithmBase`
 
-## What should `run(...)` return?
+### What should `run(...)` return?
 
 `list[AttackCandidate]`
 
@@ -28,29 +61,25 @@ Example:
 AttackCandidate(user_messages=("message 1", "message 2"))
 ```
 
-## Can I still use `env.interact(...)` in Kaggle-style evaluation?
+### What file size limits apply?
 
-Yes. The red-team scorer defaults to `GymAttackEnv`, but that environment still exposes:
+The current evaluator enforces a `5 MB` maximum on each submitted Python file.
 
-- `interact(...)`
-- `export_trace_dict()`
-- `snapshot()`
-- `restore(...)`
+### Are there limits on returned findings?
 
-## Does `env.step(...)` reward affect the leaderboard?
+Yes. Current replay validation limits include:
 
-No. Current `GymAttackEnv.step(...)` returns `0.0`, but leaderboard scoring is evaluator-owned and replay-based.
+- at most `2000` replayed findings
+- at most `32` user messages per finding
+- at most `2000` characters per user message
 
-## What budget should I use locally?
+## Scoring and Replay
 
-If you want to mirror the official Kaggle default, use `1800` seconds.
+### Why does the evaluator replay my candidates?
 
-Important distinction:
+Because traces, predicates, and novelty are not trusted if they come from the attacker. The evaluator recomputes them on replay.
 
-- `evaluation_redteam.py` defaults to `1800`
-- `aicomp test` defaults to `3600` because it also supports dual-track evaluation
-
-## How is attack score computed?
+### How is attack score computed?
 
 Current raw score:
 
@@ -64,23 +93,33 @@ Current normalized score:
 min(1000.0, (raw_score / 200000.0) * 1000.0)
 ```
 
-## Why does the evaluator replay my candidates?
+For the current severity weights and defense scoring details, see [`SCORING.md`](SCORING.md).
 
-Because traces, predicates, and novelty are not trusted if they come from the attacker. The evaluator recomputes them on replay.
+### Does `env.step(...)` reward affect the leaderboard?
 
-## What file size limits apply?
+No. Current `GymAttackEnv.step(...)` returns `0.0`, but leaderboard scoring is evaluator-owned and replay-based.
 
-The current scorer enforces a `5 MB` maximum on each submitted Python file.
+## Local Testing
 
-## Are there limits on returned findings?
+### Can I still use `env.interact(...)` in Kaggle-style evaluation?
 
-Yes. Current replay validation limits include:
+Yes. The red-team scorer defaults to `GymAttackEnv`, but that environment still exposes:
 
-- at most `2000` replayed findings
-- at most `32` user messages per finding
-- at most `2000` characters per user message
+- `interact(...)`
+- `export_trace_dict()`
+- `snapshot()`
+- `restore(...)`
 
-## How do I test locally without an API key?
+### What budget should I use locally?
+
+If you want to mirror the official Kaggle default, use `1800` seconds.
+
+Important distinction:
+
+- `evaluation_redteam.py` defaults to `1800`
+- `aicomp test` defaults to `3600` because it supports package attack-only, guardrail-only, and dual-track evaluation
+
+### How do I test locally without an API key?
 
 Use the deterministic agent:
 
@@ -94,17 +133,7 @@ Or:
 python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
-## Can I still run local defense experiments?
-
-Yes. Those workflows are supported in the repository:
-
-```bash
-aicomp test guardrail.py --track defense --quick
-aicomp test submission.zip --track dual --quick
-python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
-```
-
-## Which agent backends exist today?
+### Which agent backends exist today?
 
 Current selections are:
 
@@ -113,9 +142,3 @@ Current selections are:
 - `openai`
 - `gpt_oss`
 - `gemma`
-
-## Where should I start?
-
-- [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md)
-- [`GETTING_STARTED.md`](GETTING_STARTED.md)
-- [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md)

@@ -1,38 +1,46 @@
 # Competition Design
 
-> Repository design note: this page explains why the repository contains both an official red-team scorer and a broader local dual-track workflow.
+Use this page when you want to understand why the repository has both the public Kaggle path and broader package workflows.
 
-## Current Design Split
+This is a repository design note, not a usage guide. For hands-on workflow instructions, use [`GETTING_STARTED.md`](GETTING_STARTED.md), [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md), [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md), or [`GUARDRAILS_GUIDE.md`](GUARDRAILS_GUIDE.md).
 
-The repository intentionally supports two layers of use:
+## Workflow Surfaces
 
-### 1. Public Kaggle red-team workflow
+The repository intentionally exposes two layers of use.
 
-- submission: `attack.py`
-- entrypoint: [`../evaluation_redteam.py`](../evaluation_redteam.py)
+### Public Kaggle path
+
+- submission shape: `attack.py`
+- primary entrypoint: [`../evaluation_redteam.py`](../evaluation_redteam.py)
 - default budget: `1800` seconds
 - default environment: `gym`
 - public score: normalized attack score only
 
-### 2. Local SDK workflow
+### Package workflows
 
-- submission: `guardrail.py` or `submission.zip`
-- entrypoints: [`../evaluation.py`](../evaluation.py) and `aicomp test`
-- default environment: `sandbox` for defense and dual-track flows
-- local scores: defense score or attack + defense
+- submission shapes: `attack.py`, `guardrail.py`, or `submission.zip`
+- primary entrypoints: `aicomp test` for attack-only, guardrail-only, and dual-track evaluation; [`../evaluation.py`](../evaluation.py) for standalone package dual-track evaluation
+- default environment: `gym` for package attack-only evaluation, `sandbox` for package guardrail-only and package dual-track evaluation
+- package scores: normalized attack score, defense score, or combined attack + defense
 
 ## Why Both Exist
 
-The red-team-only workflow is the public contract. The broader local workflow is still valuable because it lets you:
+The public Kaggle path stays intentionally narrow:
 
-- prototype guardrails
-- test attacks and defenses together
-- compare agent backends locally
-- inspect richer traces and local outputs before packaging a public submission
+- one submission shape
+- one scoring surface
+- one public leaderboard number
 
-## Offense and Defense Evaluation
+The package workflows exist because the repository also needs to support local experimentation that the public competition does not expose directly:
 
-Current local dual-track evaluation still does two separate measurements:
+- package attack-only iteration
+- package guardrail-only development
+- package dual-track attack+defense evaluation
+- backend comparison and richer local inspection
+
+## Why Dual-Track Evaluation Is Separate
+
+Package dual-track evaluation measures two different things:
 
 ### Offense
 
@@ -42,28 +50,32 @@ Current local dual-track evaluation still does two separate measurements:
 
 ### Defense
 
-- baseline Go-Explore attacker
+- baseline attacker
 - your guardrail
 - defense scoring based on breaches and false positives
 
+This split lets the package evaluate both sides of the system without changing the public Kaggle path.
+
 ## Budget Semantics
 
-Current evaluator behavior:
+Current evaluator behavior follows the workflow surface:
 
-- red-team-only: full budget goes to attack
-- defense-only: full budget goes to defense
-- dual-track: budget is split evenly between offense and defense
+- public Kaggle path: full budget goes to attack
+- package guardrail-only: full budget goes to defense
+- package dual-track: total budget is split evenly between offense and defense
 
-That split is why `evaluation.py --budget-s 3600` yields `1800` seconds for attack and `1800` seconds for defense.
+That is why `evaluation.py --budget-s 3600` yields `1800` seconds for attack and `1800` seconds for defense.
+
+The same split is reflected in `aicomp test --track dual`.
 
 ## Environment Choices
 
-Current defaults are deliberate:
+The current defaults are deliberate:
 
-- `gym` for red-team scoring because it matches the Kaggle-style surface
-- `sandbox` for defense and dual-track flows because direct SDK guardrail work usually wants the underlying environment
+- `gym` for the public Kaggle path and package attack-only evaluation because it matches the Kaggle-style surface
+- `sandbox` for package guardrail-only and package dual-track evaluation because direct SDK guardrail work usually wants the underlying environment
 
-Both surfaces preserve the common attack helpers:
+Both surfaces preserve the same common attack helpers:
 
 - `reset()`
 - `interact(...)`
@@ -71,29 +83,24 @@ Both surfaces preserve the common attack helpers:
 - `snapshot()`
 - `restore(...)`
 
-## Scoring Philosophy
+## Scoring Design
 
-The current repository design keeps:
+The repository keeps the scoring surfaces separate on purpose:
 
 - replay-based attack scoring so attacker metadata is not trusted
-- normalized attack scores for public red-team comparison
-- explicit defense scoring for local guardrail iteration
+- normalized attack scoring for the public Kaggle path
+- explicit defense scoring for package guardrail iteration
+- combined attack + defense scoring only for package dual-track evaluation
 
-The design goal is to keep the public competition simple while preserving a richer local research surface.
+For the exact scoring formulas and current constants, use [`SCORING.md`](SCORING.md).
 
-## Recommended Usage
+## How To Use This Design Note
 
-Use the public path when you are working on a Kaggle submission:
+Use this page to understand the reasoning behind the workflow split.
 
-```bash
-aicomp test attack.py --track redteam --budget-s 1800 --agent deterministic
-python evaluation_redteam.py --submission attack.py --budget-s 1800 --agent deterministic --env gym
-```
+Use these pages when you need to do actual work:
 
-Use the local path when you are iterating on guardrails or dual-track packages:
-
-```bash
-aicomp test guardrail.py --track defense --quick
-aicomp test submission.zip --track dual --quick
-python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
-```
+- public Kaggle path: [`GETTING_STARTED.md`](GETTING_STARTED.md), [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md)
+- package attack-only: [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md), [`API_REFERENCE.md`](API_REFERENCE.md)
+- package guardrail-only: [`GUARDRAILS_GUIDE.md`](GUARDRAILS_GUIDE.md), [`TESTING_GUIDE.md`](TESTING_GUIDE.md)
+- package dual-track: [`examples/README.md`](../examples/README.md), [`API_REFERENCE.md`](API_REFERENCE.md)

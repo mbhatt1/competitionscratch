@@ -1,14 +1,32 @@
 # API Reference
 
-This reference covers the current public SDK surface and the CLI entrypoints most relevant to users of the repository.
+Use this page when you need exact SDK contracts, evaluator defaults, or CLI syntax.
 
-> Official Kaggle path: `attack.py` only. Guardrail and dual-track APIs remain available for local experimentation.
+This reference documents the current public package surface for `aicomp-sdk`. For workflow selection and tutorials, start with [`README.md`](README.md), [`GETTING_STARTED.md`](GETTING_STARTED.md), [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md), or [`GUARDRAILS_GUIDE.md`](GUARDRAILS_GUIDE.md).
 
-## Attack Types
+## Common Imports
+
+Most users start from the top-level package:
+
+```python
+from aicomp_sdk import (
+    AttackAlgorithmBase,
+    AttackCandidate,
+    AttackRunConfig,
+    Decision,
+    GuardrailBase,
+    GymAttackEnv,
+    SandboxEnv,
+)
+```
+
+The package also exports hook helpers for power users, but the stable submission contracts are still `AttackAlgorithm.run(...)` and `Guardrail.decide(...)`.
+
+## Attack Contract
 
 ### `AttackAlgorithmBase`
 
-Location: `aicomp_sdk.attacks.contracts`
+Stable contract:
 
 ```python
 class AttackAlgorithmBase(ABC):
@@ -24,6 +42,8 @@ Requirements:
 
 ### `AttackRunConfig`
 
+Stable contract:
+
 ```python
 @dataclass(frozen=True)
 class AttackRunConfig:
@@ -32,7 +52,15 @@ class AttackRunConfig:
     max_tool_hops: int = 8
 ```
 
+Current behavior:
+
+- `time_budget_s` is the wall-clock budget for the run
+- `max_steps` is an outer-loop search cap
+- `max_tool_hops` is the per-message blue-agent/tool limit used during interaction and replay
+
 ### `AttackCandidate`
+
+Stable contract:
 
 ```python
 @dataclass(frozen=True)
@@ -43,7 +71,7 @@ class AttackCandidate:
     def from_messages(cls, user_messages: Sequence[str]) -> "AttackCandidate": ...
 ```
 
-Replay validation currently enforces:
+Current replay validation limits:
 
 - at least one message
 - non-empty strings only
@@ -51,11 +79,68 @@ Replay validation currently enforces:
 - at most `2000` characters per message
 - at most `2000` replayed findings per run
 
-## Environment Types
+## Guardrail Contract
+
+### `GuardrailBase`
+
+Stable contract:
+
+```python
+class GuardrailBase:
+    def decide(
+        self,
+        tool_name: str,
+        tool_args: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> Decision: ...
+```
+
+Current behavior:
+
+- guardrail evaluation constructs fresh guardrail instances for replays and benign trials
+- cache heavyweight immutable resources outside the instance when possible
+- keep per-session mutable state on the instance itself
+
+Current context keys passed by `SandboxEnv`:
+
+- `seed`
+- `recent_sources`
+- `recent_tools`
+- `last_user`
+- `side_effect`
+- `scope`
+
+### `Decision`
+
+Stable contract:
+
+```python
+Decision.allow(reason: str = "")
+Decision.deny(reason: str = "")
+Decision.confirm(reason: str = "")
+Decision.sanitize(sanitized_args: Mapping[str, Any], reason: str = "")
+```
+
+Current semantics:
+
+- `DENY` records a failed tool attempt and stops the current interaction
+- `CONFIRM` is treated as a blocked tool call in evaluator flows
+- `SANITIZE` replaces tool arguments before execution
+
+### Hook Helpers for Power Users
+
+Top-level package exports currently include:
+
+- simple hook helpers: `attack_hook`, `defense_hook`, `clear_hooks`, `store_payload`, `poison_tool`
+- advanced hook types and factories: `HookRegistry`, `HookStage`, `HookContext`, `HookResult`, `get_hook_registry`, and the `create_*` helpers
+
+Use these only when the basic `Guardrail.decide(...)` contract is not enough for your workflow.
+
+## Environments
 
 ### `SandboxEnv`
 
-Location: `aicomp_sdk.core.env`
+Stable constructor:
 
 ```python
 SandboxEnv(
@@ -67,8 +152,6 @@ SandboxEnv(
 )
 ```
 
-Since `2.0.0`, direct `SandboxEnv(...)` construction requires an explicit `agent=` instance. There is no implicit agent fallback or `agent_mode` argument.
-
 Current methods:
 
 - `reset() -> None`
@@ -77,9 +160,15 @@ Current methods:
 - `snapshot()`
 - `restore(snapshot)`
 
+Current behavior:
+
+- direct `SandboxEnv(...)` construction requires an explicit `agent=` instance as of `2.0.0`
+- `fixtures_dir` must point at a valid fixtures root
+- package evaluators can resolve packaged fixtures automatically
+
 ### `GymAttackEnv`
 
-Location: `aicomp_sdk.core.gym_env`
+Stable constructor:
 
 ```python
 GymAttackEnv(
@@ -100,7 +189,7 @@ Gym methods:
 - `render()`
 - `close()`
 
-Current `step(...)` semantics:
+Current `step(...)` behavior:
 
 - reward is always `0.0`
 - `terminated` is always `False`
@@ -121,49 +210,17 @@ Info keys:
 - `max_tool_hops`
 - `max_episode_messages`
 
-## Guardrails
+## Agents and Tool Surface
 
-### `GuardrailBase`
+Current agent selections:
 
-Location: `aicomp_sdk.guardrails.base`
-
-```python
-class GuardrailBase:
-    def decide(
-        self,
-        tool_name: str,
-        tool_args: Mapping[str, Any],
-        context: Mapping[str, Any],
-    ) -> Decision: ...
-```
-
-Local defense evaluation constructs fresh guardrail instances for replays and benign trials. Cache heavyweight immutable resources outside the instance and keep per-session mutable state on the instance itself.
-
-Current context keys passed by `SandboxEnv`:
-
-- `seed`
-- `recent_sources`
-- `recent_tools`
-- `last_user`
-- `side_effect`
-- `scope`
-
-### `Decision`
-
-```python
-Decision.allow(reason: str = "")
-Decision.deny(reason: str = "")
-Decision.confirm(reason: str = "")
-Decision.sanitize(sanitized_args: Mapping[str, Any], reason: str = "")
-```
-
-Current semantics:
-
-- `DENY` records a failed tool attempt and stops the current interaction
-- `CONFIRM` is treated as a blocked tool call in evaluator flows
-- `SANITIZE` replaces tool arguments before execution
-
-## Tool Surface
+| Value | Meaning |
+| --- | --- |
+| `auto` | prefer `gpt_oss`, then `openai` if `OPENAI_API_KEY` is set, else `deterministic` |
+| `deterministic` | local vulnerable baseline agent |
+| `openai` | OpenAI Responses-backed agent |
+| `gpt_oss` | local GPT-OSS backend |
+| `gemma` | local Gemma backend |
 
 Current canonical tools:
 
@@ -178,40 +235,31 @@ Current canonical tools:
 - `email.send`
 - `http.post`
 
-Canonical runtime metadata lives in `aicomp_sdk.core.tools.RuntimeToolSpec`.
-
-## Agents
-
-Current agent selections:
-
-| Value | Meaning |
-| --- | --- |
-| `auto` | prefer `gpt_oss`, then `openai` if `OPENAI_API_KEY` is set, else `deterministic` |
-| `deterministic` | local vulnerable baseline agent |
-| `openai` | OpenAI Responses-backed agent |
-| `gpt_oss` | local GPT-OSS backend |
-| `gemma` | local Gemma backend |
-
 ## Evaluators
 
 ### `evaluation_redteam.py`
 
 Current purpose:
 
-- official Kaggle-style standalone scorer
+- public Kaggle-style standalone scorer
 - expects `attack.py`
 - defaults to `--budget-s 1800`
 - defaults to `--env gym`
+- reports normalized attack score only
+
+Implementation note: this entrypoint lives at [`../evaluation_redteam.py`](../evaluation_redteam.py).
 
 ### `evaluation.py`
 
 Current purpose:
 
-- local dual-track evaluator
+- package dual-track evaluator
 - expects `--submission_zip submission.zip`
 - defaults to `--budget-s 3600`
 - splits budget evenly between attack and defense
 - defaults to `--env sandbox`
+
+Implementation note: this entrypoint lives at [`../evaluation.py`](../evaluation.py).
 
 ## CLI
 
@@ -230,11 +278,29 @@ Current subcommands:
 - `history`
 - `visualize`
 
+### `aicomp test`
+
+Most important current options:
+
+- `--track {auto, redteam, dual, defense}`
+- `--budget-s` with default `3600`
+- `--agent`
+- `--env`
+- `--quick`
+- `--fixtures_dir`
+
+Current env defaults:
+
+- `redteam` defaults to `gym`
+- `defense` and `dual` default to `sandbox`
+
 ### Common CLI Examples
 
 ```bash
 aicomp init attack
+aicomp init guardrail
 aicomp validate attack.py
+aicomp validate guardrail.py --type guardrail
 aicomp test attack.py --track redteam --quick
 aicomp test attack.py --track redteam --budget-s 1800 --env gym
 aicomp test guardrail.py --track defense --quick
@@ -243,13 +309,22 @@ aicomp test submission.zip --track dual --quick
 
 ## Scoring Helpers
 
-Location: `aicomp_sdk.scoring`
-
-Useful functions:
+Module-level utilities in `aicomp_sdk.scoring`:
 
 ```python
-score_attack(findings)
-score_attack_raw(findings)
-score_defense(report)
-get_score_breakdown(findings, report)
+from aicomp_sdk.scoring import (
+    get_score_breakdown,
+    score_attack,
+    score_attack_raw,
+    score_defense,
+)
 ```
+
+Use these when you need programmatic scoring helpers outside the main evaluator entrypoints.
+
+## References
+
+- [`SCORING.md`](SCORING.md)
+- [`GETTING_STARTED.md`](GETTING_STARTED.md)
+- [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md)
+- [`GUARDRAILS_GUIDE.md`](GUARDRAILS_GUIDE.md)

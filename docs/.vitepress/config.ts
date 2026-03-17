@@ -7,8 +7,6 @@ export default defineConfig({
   ignoreDeadLinks: true,
   
   themeConfig: {
-    logo: '/logo.svg',
-    
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Getting Started', link: '/GETTING_STARTED' },
