@@ -82,6 +82,15 @@ def test_script_openai_demo_env_never_uses_auto(
     assert selections == ["deterministic"]
 
 
+def test_root_main_fails_fast_when_attack_simple_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delitem(sys.modules, "attack_simple", raising=False)
+
+    with pytest.raises(ModuleNotFoundError, match="attack_simple"):
+        run_attack_openai.main()
+
+
 def test_root_main_runs_through_shared_sandbox_env(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
