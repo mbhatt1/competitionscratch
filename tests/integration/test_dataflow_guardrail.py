@@ -6,7 +6,8 @@ Test the data-flow tracking guardrail.
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
-from examples.guardrails.guardrail_pattern import Guardrail as PatternGuardrail
+
+from tests.integration.guardrail_fixtures import PatternGuardrail
 
 
 def run_dataflow_guardrail(budget_s: float = 30.0) -> dict[str, float]:

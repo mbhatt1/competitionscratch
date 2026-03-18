@@ -7,7 +7,8 @@ from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core.env import SandboxEnv
-from examples.guardrails.guardrail_pattern import Guardrail
+
+from tests.integration.guardrail_fixtures import PatternGuardrail, TaintTrackingGuardrail
 
 
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "fixtures"
@@ -77,9 +78,7 @@ def run_comprehensive_benign() -> dict[str, float]:
 
     # Test with persistent taint guardrail (for comparison)
     print("\n[1] Testing with PERSISTENT TAINT (baseline)...")
-    from examples.guardrails.guardrail_taint_tracking import Guardrail as PersistentGuardrail
-
-    guard1 = PersistentGuardrail()
+    guard1 = TaintTrackingGuardrail()
     env1 = SandboxEnv(
         seed=999,
         fixtures_dir=FIXTURES,
@@ -103,7 +102,7 @@ def run_comprehensive_benign() -> dict[str, float]:
 
     # Test with data-flow guardrail
     print("\n[2] Testing with DATA-FLOW TRACKING...")
-    guard2 = Guardrail()
+    guard2 = PatternGuardrail()
     env2 = SandboxEnv(
         seed=999,
         fixtures_dir=FIXTURES,

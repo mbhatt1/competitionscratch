@@ -8,6 +8,8 @@ This quickstart focuses on three jobs:
 - package guardrail-only testing
 - package dual-track attack+guardrail testing
 
+The example files themselves are submission examples. When you want to execute them from the repo, use the smoke wrappers on this page or the package CLI and evaluator commands.
+
 ## 1. Public-Path Attack Example
 
 Run the canonical attack example smoke test:
@@ -68,6 +70,7 @@ Use these only after the canonical paths are working:
 - [`guardrails/guardrail_prompt_injection.py`](guardrails/guardrail_prompt_injection.py) - smaller persistent-taint guardrail
 - [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - experimental hook-based guardrail
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py) - Prompt-Guard-backed example with heavier model-loading costs
+- [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py) - repo-local demo wrapper for the experimental LPCI attack example
 
 ## Recommended Order
 

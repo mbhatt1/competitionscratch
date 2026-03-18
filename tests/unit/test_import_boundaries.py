@@ -9,6 +9,11 @@ from typing import Final
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT: Final[Path] = REPO_ROOT / "aicomp_sdk"
+INTEGRATION_TEST_ROOT: Final[Path] = REPO_ROOT / "tests" / "integration"
+EXAMPLE_SUBMISSION_ROOTS: Final[tuple[Path, ...]] = (
+    REPO_ROOT / "examples" / "attacks",
+    REPO_ROOT / "examples" / "guardrails",
+)
 
 # This is an executable audit for the import-boundary hardening initiative.
 # The map is intentionally explicit so new repo-bootstrap sites or embedded
@@ -21,24 +26,11 @@ PATH_BOOTSTRAP_CLASSIFICATIONS: Final[dict[str, str]] = {
     "scripts/find_exfil_chains.py": "repo_script_boundary",
     "scripts/find_secret_read_chains.py": "repo_script_boundary",
     "scripts/find_shell_chains.py": "repo_script_boundary",
+    "scripts/goexplore_lpci_demo.py": "repo_script_boundary",
     "scripts/hooks_vs_baseline_comparison.py": "repo_script_boundary",
     "scripts/run_attack_openai.py": "repo_script_boundary",
     "scripts/smoke_check_local.py": "repo_script_boundary",
     "scripts/verify_findings_replay.py": "repo_script_boundary",
-    "examples/attacks/attack.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_goexplore_lpci.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_goexplore_working.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_gym_step.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_simple.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_working.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_optimal.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_pattern.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_perfect.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_prompt_injection.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_promptguard.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_simple.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_taint_tracking.py": "example_submission_cleanup_target",
     "examples/test_attack_submission.py": "example_smoke_wrapper",
     "examples/test_submission.py": "example_smoke_wrapper",
 }
@@ -58,6 +50,7 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "scripts/evaluate_all_sample_attacks.py": "repo_script_boundary",
     "scripts/generate_enhanced_fixtures.py": "repo_script_boundary",
     "scripts/generate_scale_fixtures_20k.py": "repo_script_boundary",
+    "scripts/goexplore_lpci_demo.py": "repo_script_boundary",
     "scripts/goexplore_openai_demo.py": "repo_script_boundary",
     "scripts/hooks_vs_baseline_comparison.py": "repo_script_boundary",
     "scripts/minimal_breach_probe.py": "repo_script_boundary",
@@ -65,16 +58,6 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "scripts/scoring_balance_report.py": "repo_script_boundary",
     "scripts/smoke_check_local.py": "repo_script_boundary",
     "scripts/verify_findings_replay.py": "repo_script_boundary",
-    "examples/attacks/attack.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_goexplore_lpci.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_goexplore_working.py": "example_submission_cleanup_target",
-    "examples/attacks/attack_working.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_optimal.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_pattern.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_perfect.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_prompt_injection.py": "example_submission_cleanup_target",
-    "examples/guardrails/guardrail_taint_tracking.py": "example_submission_cleanup_target",
     "examples/test_attack_submission.py": "example_smoke_wrapper",
     "examples/test_submission.py": "example_smoke_wrapper",
 }
@@ -110,17 +93,19 @@ def _find_text_matches(*markers: str) -> set[str]:
     return matches
 
 
-def _package_import_violations() -> list[tuple[str, str, int]]:
+def _import_violations(
+    root: Path, *, forbidden_roots: set[str]
+) -> list[tuple[str, str, int]]:
     violations: list[tuple[str, str, int]] = []
-    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+    for path in sorted(root.rglob("*.py")):
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name.split(".", 1)[0] in {"tests", "examples"}:
+                    if alias.name.split(".", 1)[0] in forbidden_roots:
                         violations.append((_relative_path(path), alias.name, node.lineno))
             if isinstance(node, ast.ImportFrom) and node.module is not None:
-                if node.module.split(".", 1)[0] in {"tests", "examples"}:
+                if node.module.split(".", 1)[0] in forbidden_roots:
                     violations.append((_relative_path(path), node.module, node.lineno))
     return violations
 
@@ -129,6 +114,13 @@ def _subprocess_env() -> dict[str, str]:
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     return env
+
+
+def _example_submission_files() -> list[Path]:
+    files: list[Path] = []
+    for root in EXAMPLE_SUBMISSION_ROOTS:
+        files.extend(sorted(root.glob("*.py")))
+    return files
 
 
 def test_sys_path_bootstrap_inventory_is_complete() -> None:
@@ -150,7 +142,30 @@ def test_package_code_contains_no_repo_bootstrap() -> None:
 
 
 def test_package_code_never_imports_tests_or_examples() -> None:
-    assert _package_import_violations() == []
+    assert _import_violations(PACKAGE_ROOT, forbidden_roots={"tests", "examples"}) == []
+
+
+def test_integration_tests_never_import_examples() -> None:
+    assert _import_violations(INTEGRATION_TEST_ROOT, forbidden_roots={"examples"}) == []
+
+
+def test_example_submission_files_contain_no_repo_bootstrap() -> None:
+    bootstrapped = [
+        _relative_path(path)
+        for path in _example_submission_files()
+        if "sys.path.insert" in path.read_text() or "sys.path.append" in path.read_text()
+    ]
+    assert bootstrapped == []
+
+
+def test_example_submission_files_have_no_inline_demo_runners() -> None:
+    runners = [
+        _relative_path(path)
+        for path in _example_submission_files()
+        if 'if __name__ == "__main__":' in path.read_text()
+        or "if __name__ == '__main__':" in path.read_text()
+    ]
+    assert runners == []
 
 
 def test_attacker_goexplore_imports_without_repo_root(tmp_path: Path) -> None:

@@ -8,7 +8,8 @@ from typing import Any
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
-from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
+
+from tests.integration.guardrail_fixtures import PromptInjectionGuardrail
 
 
 def run_prompt_injection_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
@@ -18,7 +19,7 @@ def run_prompt_injection_guardrail(budget_s: float = 30.0) -> tuple[dict[str, An
     print("PROMPT INJECTION GUARDRAIL TEST")
     print("=" * 70)
     print("\nConfiguration:")
-    print("  Defense: Prompt Injection Guardrail (from examples_hooks_submission)")
+    print("  Defense: Prompt Injection Guardrail (persistent taint)")
     print("  Attack: Go-Explore baseline (max_turns=4, branch_batch=12)")
     print(f"  Time Budget: {budget_s * 0.7:.1f} seconds for attack (70% of {budget_s}s)")
     print("\nRunning evaluation...")

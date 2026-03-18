@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 
 import run_attack_openai
+import scripts.goexplore_lpci_demo as goexplore_lpci_demo
 import scripts.run_attack_openai as scripts_run_attack_openai
-from examples.attacks import attack_goexplore_lpci
 
 
 def test_root_openai_demo_selection_prefers_openai_when_key_present(
@@ -162,7 +162,7 @@ def test_script_main_runs_through_shared_sandbox_env(
     assert "Validated breaches: 1/1" in output
 
 
-def test_example_openai_branch_uses_shared_sandbox_env(
+def test_goexplore_lpci_demo_openai_branch_uses_shared_sandbox_env(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     captured: dict[str, Any] = {}
@@ -182,18 +182,18 @@ def test_example_openai_branch_uses_shared_sandbox_env(
 
     monkeypatch.delenv("GPT_OSS_MODEL_PATH", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(attack_goexplore_lpci, "build_agent", fake_build_agent)
-    monkeypatch.setattr(attack_goexplore_lpci, "Guardrail", lambda: "guardrail")
-    monkeypatch.setattr(attack_goexplore_lpci, "SandboxEnv", _FakeEnv)
+    monkeypatch.setattr(goexplore_lpci_demo, "build_agent", fake_build_agent)
+    monkeypatch.setattr(goexplore_lpci_demo, "Guardrail", lambda: "guardrail")
+    monkeypatch.setattr(goexplore_lpci_demo, "SandboxEnv", _FakeEnv)
 
-    attack_goexplore_lpci._build_demo_env(seed=123, fixtures_dir=tmp_path)
+    goexplore_lpci_demo._build_demo_env(seed=123, fixtures_dir=tmp_path)
 
     assert build_agent_calls == ["openai"]
     assert captured["fixtures_dir"] == tmp_path
     assert captured["seed"] == 123
 
 
-def test_example_local_model_branch_still_uses_auto(
+def test_goexplore_lpci_demo_local_model_branch_still_uses_auto(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     captured: dict[str, Any] = {}
@@ -209,11 +209,11 @@ def test_example_local_model_branch_still_uses_auto(
         return selection
 
     monkeypatch.setenv("GPT_OSS_MODEL_PATH", "/models/gpt-oss")
-    monkeypatch.setattr(attack_goexplore_lpci, "build_agent", fake_build_agent)
-    monkeypatch.setattr(attack_goexplore_lpci, "Guardrail", lambda: "guardrail")
-    monkeypatch.setattr(attack_goexplore_lpci, "SandboxEnv", _FakeEnv)
+    monkeypatch.setattr(goexplore_lpci_demo, "build_agent", fake_build_agent)
+    monkeypatch.setattr(goexplore_lpci_demo, "Guardrail", lambda: "guardrail")
+    monkeypatch.setattr(goexplore_lpci_demo, "SandboxEnv", _FakeEnv)
 
-    attack_goexplore_lpci._build_demo_env(seed=123, fixtures_dir=tmp_path)
+    goexplore_lpci_demo._build_demo_env(seed=123, fixtures_dir=tmp_path)
 
     assert build_agent_calls == ["auto"]
     assert captured["agent"] == "auto"

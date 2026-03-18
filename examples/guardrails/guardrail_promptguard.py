@@ -12,38 +12,11 @@ via `transformers`, so it starts much more slowly than the rule-based examples.
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Mapping
 from functools import lru_cache
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import Any, Protocol, cast
 
-if TYPE_CHECKING:
-    from aicomp_sdk.guardrails.base import Decision, GuardrailBase
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-
-
-def _load_sdk_types():
-    if str(_REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(_REPO_ROOT))
-
-    from aicomp_sdk.guardrails.base import Decision, GuardrailBase
-
-    return Decision, GuardrailBase
-
-
-if not TYPE_CHECKING:
-    Decision, GuardrailBase = _load_sdk_types()
+from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
 
 class _TextClassifier(Protocol):

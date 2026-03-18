@@ -8,7 +8,8 @@ from typing import Any
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
-from examples.guardrails.guardrail_perfect import Guardrail as PerfectGuardrail
+
+from tests.integration.guardrail_fixtures import PerfectGuardrail
 
 
 def run_perfect_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:

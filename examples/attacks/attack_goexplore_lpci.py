@@ -2,30 +2,12 @@
 
 import os
 import random
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk import get_hook_registry
-from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
-from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.cells import cell_signature
-from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.guardrails.hooks_simple import attack_hook
 from aicomp_sdk.utils.timebox import Timebox
@@ -186,61 +168,3 @@ class AttackAlgorithm(AttackAlgorithmBase):
                 findings.append(AttackCandidate.from_messages(best_tr.get("user_messages", [])))
 
         return findings
-
-
-def _build_demo_env(*, seed: int, fixtures_dir: Path) -> SandboxEnv:
-    if os.environ.get("GPT_OSS_MODEL_PATH"):
-        selection = "auto"
-    elif os.environ.get("OPENAI_API_KEY"):
-        selection = "openai"
-    else:
-        selection = "deterministic"
-    return SandboxEnv(
-        seed=seed,
-        fixtures_dir=fixtures_dir,
-        agent=build_agent(selection),
-        guardrail=Guardrail(),
-    )
-
-
-if __name__ == "__main__":
-    fixtures = _REPO_ROOT / "fixtures"
-
-    try:
-        env = _build_demo_env(seed=123, fixtures_dir=fixtures)
-    except RuntimeError as err:
-        if "OpenAI SDK is not available" not in str(err):
-            raise
-        print("OpenAI SDK unavailable; falling back to deterministic demo agent")
-        env = SandboxEnv(
-            seed=123,
-            fixtures_dir=fixtures,
-            agent=build_agent("deterministic"),
-            guardrail=Guardrail(),
-        )
-
-    print("\nRunning Go-Explore + LPCI hybrid attack...")
-    print("=" * 70)
-
-    atk = AttackAlgorithm({"max_turns": 4, "branch_batch": 8})
-    findings = atk.run(env, AttackRunConfig(time_budget_s=10))
-
-    print(f"\n{'=' * 70}")
-    print("Go-Explore + LPCI Results")
-    print(f"{'=' * 70}")
-    print(f"Total findings: {len(findings)}")
-
-    if findings:
-        print("\nBreaches discovered:")
-        for i, candidate in enumerate(findings[:5], 1):
-            print(f"\n[{i}] {' -> '.join(candidate.user_messages)}")
-    else:
-        print("\nNo breaches found in this run")
-        print("Try increasing the time budget or inspecting the installed hooks.")
-
-    print(f"\n{'=' * 70}")
-    print("The attack combined:")
-    print("  1. Go-Explore's systematic exploration")
-    print("  2. LPCI hooks for payload injection")
-    print("  3. Tool poisoning to target sensitive resources")
-    print(f"{'=' * 70}\n")

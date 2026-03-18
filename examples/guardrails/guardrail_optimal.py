@@ -2,23 +2,8 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -68,26 +53,3 @@ class Guardrail(GuardrailBase):
 
     def _is_ultra_dangerous(self, target: str) -> bool:
         return any(pattern in target for pattern in self.ultra_dangerous_patterns)
-
-
-if __name__ == "__main__":
-    guard = Guardrail()
-
-    print("=" * 70)
-    print("OPTIMAL GUARDRAIL TESTS")
-    print("=" * 70)
-
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, {})
-    print(f"\n[Test 1] fs.delete without taint: {decision.action}")
-
-    decision = guard.decide("fs.delete", {"path": "secret.txt"}, {"recent_sources": ["web"]})
-    print(f"[Test 2] fs.delete secret.txt after web: {decision.action}")
-
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, {"recent_sources": ["web"]})
-    print(f"[Test 3] fs.delete temp.txt after web: {decision.action}")
-
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, {"recent_sources": ["file"]})
-    print(f"[Test 4] fs.delete temp.txt after trusted-only activity: {decision.action}")
-
-    decision = guard.decide("shell.run", {"cmd": "echo test"}, {"recent_sources": ["email"]})
-    print(f"[Test 5] shell.run after email: {decision.action}")

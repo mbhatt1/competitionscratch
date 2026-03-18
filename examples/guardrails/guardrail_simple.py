@@ -2,23 +2,8 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk import Decision, GuardrailBase, get_hook_registry
 from aicomp_sdk.guardrails.hooks_simple import defense_hook

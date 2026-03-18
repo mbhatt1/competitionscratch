@@ -1,25 +1,8 @@
 """Local Go-Explore-style attack example for the current SDK contract."""
 
 import random
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
-from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.predicates import eval_predicates
@@ -130,23 +113,3 @@ class AttackAlgorithm(AttackAlgorithmBase):
                 findings.append(AttackCandidate.from_messages(best_tr.get("user_messages", [])))
 
         return findings
-
-
-if __name__ == "__main__":
-    from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-    from aicomp_sdk.core.env import SandboxEnv
-
-    fixtures = _REPO_ROOT / "fixtures"
-    env = SandboxEnv(
-        seed=123,
-        fixtures_dir=fixtures,
-        agent=build_agent("deterministic"),
-        guardrail=Guardrail(),
-    )
-
-    atk = AttackAlgorithm({"max_turns": 3, "branch_batch": 10})
-    findings = atk.run(env, AttackRunConfig(time_budget_s=10))
-
-    print(f"\nResults: {len(findings)} findings")
-    for i, candidate in enumerate(findings[:5], 1):
-        print(f"\n[{i}] {' -> '.join(candidate.user_messages)}")

@@ -11,7 +11,8 @@ import pytest
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
-from examples.guardrails.guardrail_promptguard import Guardrail as PromptGuardGuardrail
+
+from tests.integration.guardrail_fixtures import PromptGuardGuardrail
 
 _SKIPPABLE_PROMPTGUARD_ERRORS = (
     "gated repo",

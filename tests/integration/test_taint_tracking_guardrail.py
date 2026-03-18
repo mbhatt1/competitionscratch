@@ -8,7 +8,8 @@ from typing import Any
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
-from examples.guardrails.guardrail_taint_tracking import Guardrail as TaintTrackingGuardrail
+
+from tests.integration.guardrail_fixtures import TaintTrackingGuardrail
 
 
 def run_taint_tracking_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:

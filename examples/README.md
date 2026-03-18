@@ -4,6 +4,8 @@ Use this directory when you want runnable examples for the current package surfa
 
 The package supports attack-only, guardrail-only, and dual-track workflows. The public Kaggle path still requires `attack.py` as the submission filename, so attack examples become public-path compatible when you copy or rename them to `attack.py`.
 
+The files under `attacks/` and `guardrails/` are clean submission examples, not standalone CLI programs. Use the smoke wrappers in this directory, `aicomp validate`, `aicomp test`, or the evaluator scripts when you want to run them locally.
+
 ## Choose a Starting Point
 
 ### I want the cleanest public-path attack example
@@ -91,6 +93,7 @@ Use this path if:
 - [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - Go-Explore plus LPCI-style hook experiment
 - [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - hook-based guardrail experiment
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py) - transformer-backed Prompt-Guard example with heavier runtime costs
+- [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py) - repo-local demo wrapper for the experimental LPCI attack example
 
 ## Smoke Tests
 
