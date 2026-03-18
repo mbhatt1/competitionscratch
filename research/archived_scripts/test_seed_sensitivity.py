@@ -125,7 +125,7 @@ async def test_signature_across_seeds_async(seeds=[42, 123, 456, 789, 1337], max
 
     print(f"\n🚀 Starting {len(tasks)} tests concurrently (max {max_workers} workers)...")
     print(f"   Seeds: {seeds}")
-    print(f"   Configurations: 2 signatures × 2 guardrails")
+print("   Configurations: 2 signatures × 2 guardrails")
     print(f"   Estimated time: ~{len(tasks) * 90 / max_workers / 60:.1f} minutes\n")
 
     # Run tests concurrently using asyncio + ThreadPoolExecutor

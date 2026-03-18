@@ -247,11 +247,11 @@ async def main():
 
         if n100_types > n1_types:
             improvement = ((n100_types - n1_types) / max(n1_types, 1)) * 100
-            print(f"\n✓ Diversity improves with ensemble size:")
+        print("\n✓ Diversity improves with ensemble size:")
             print(f"  N=1: {n1_types} types → N={all_results[-1]['n_agents']}: {n100_types} types")
             print(f"  Improvement: +{improvement:.0f}%")
         else:
-            print(f"\n✗ No diversity improvement observed")
+        print("\n✗ No diversity improvement observed")
             print(f"  N=1: {n1_types} types, N={all_results[-1]['n_agents']}: {n100_types} types")
 
     print(f"\n💾 Detailed results saved to: {output_path}")

@@ -103,7 +103,7 @@ def run_collaborative_agent(agent_id, config, shared_archive, fixtures, duration
 print("=" * 70)
 print("COLLABORATIVE MULTI-AGENT EXPERIMENT")
 print("=" * 70)
-print(f"\nHypothesis: Shared archive + strategic diversity > independent ensemble")
+print("\nHypothesis: Shared archive + strategic diversity > independent ensemble")
 print(f"Started: {datetime.now().strftime('%H:%M:%S')}\n")
 
 results = {
@@ -184,7 +184,7 @@ print(
 print(f"Shared Archive: {shared_archive.get_stats()}")
 
 # Test 2: For comparison, run independent (same configs, no sharing)
-print(f"\n[TEST 2] Independent: Same 3 Agents WITHOUT Sharing (60s each)...")
+print("\n[TEST 2] Independent: Same 3 Agents WITHOUT Sharing (60s each)...")
 all_findings_indep = []
 all_stats_indep = []
 

@@ -82,7 +82,7 @@ def run_scenario(name: str, attack_findings, defense_report):
     breakdown = get_score_breakdown(attack_findings, defense_report)
 
     # Print attack details
-    print(f"\nATTACK:")
+    print("\nATTACK:")
     print(f"  Findings: {len(attack_findings)}")
     print(
         f"  Unique Cells: {len(set(f.get('cell_signature', {}).get('hash') for f in attack_findings))}"
@@ -92,7 +92,7 @@ def run_scenario(name: str, attack_findings, defense_report):
     print(f"  Normalization: {attack_raw:.1f} raw → {attack_normalized:.1f} normalized")
 
     # Print defense details
-    print(f"\nDEFENSE:")
+    print("\nDEFENSE:")
     print(f"  Breaches: {defense_report['breach_count']}")
     print(
         f"  False Positives: {defense_report['false_positives']}/{defense_report['benign_trials']}"
@@ -101,7 +101,7 @@ def run_scenario(name: str, attack_findings, defense_report):
     print(f"  Score: {defense_score:.2f} / 1000")
 
     # Print totals
-    print(f"\nTOTAL SCORE:")
+    print("\nTOTAL SCORE:")
     print(
         f"  Attack + Defense = {attack_normalized:.2f} + {defense_score:.2f} = {breakdown['total_normalized']:.2f}"
     )
@@ -114,11 +114,11 @@ def main() -> None:
     print("=" * 70)
     print("SCORING SYSTEM BALANCE TEST")
     print("=" * 70)
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Baseline Attack Raw: {ATTACK_BASELINE_RAW} (→ ~500 normalized)")
     print(f"  Elite Attack Raw: {ATTACK_ELITE_RAW} (→ 1000 normalized)")
-    print(f"  Defense Range: 0-1000")
-    print(f"  Total Range: 0-2000 (normalized)")
+    print("  Defense Range: 0-1000")
+    print("  Total Range: 0-2000 (normalized)")
 
     # Test 1: Red Team Specialist (Strong Attack, Weak Defense)
     run_scenario(

@@ -90,7 +90,7 @@ class Guardrail(GuardrailBase):
         if context.get("user_confirmed_safe", False) or context.get("user_authorized", False):
             # User explicitly authorized this operation
             if self.tainted:
-                print(f"[TAINT] User authorized operation - clearing taint")
+                print("[TAINT] User authorized operation - clearing taint")
                 self.tainted = False
                 self.taint_source = None
             return Decision.allow("User explicitly authorized this operation")
@@ -207,8 +207,8 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("TESTS COMPLETE")
     print("=" * 70)
-    print(f"\nKey Features Demonstrated:")
-    print(f"  ✓ Persistent taint tracking across entire session")
-    print(f"  ✓ Complete isolation (block dangerous ops when tainted)")
-    print(f"  ✓ User override to clear taint")
-    print(f"  ✓ Taint survives 100+ operations (no window limit)")
+    print("\nKey Features Demonstrated:")
+    print("  ✓ Persistent taint tracking across entire session")
+    print("  ✓ Complete isolation (block dangerous ops when tainted)")
+    print("  ✓ User override to clear taint")
+    print("  ✓ Taint survives 100+ operations (no window limit)")

@@ -59,7 +59,7 @@ def analyze_fixtures():
     print(f"Pages with injection triggers: {len(injection_pages)}")
     print(f"Percentage: {len(injection_pages) / total_pages * 100:.1f}%")
 
-    print(f"\nInjection pages:")
+print("\nInjection pages:")
     for i, page in enumerate(injection_pages, 1):
         print(f"\n{i}. {page['id']}: {page['title']}")
         print(f"   Preview: {page['content_preview']}")
@@ -94,7 +94,7 @@ def analyze_fixtures():
     print(f"Emails with injection triggers: {len(injection_emails)}")
     print(f"Percentage: {len(injection_emails) / total_emails * 100:.1f}%")
 
-    print(f"\nInjection emails:")
+print("\nInjection emails:")
     for i, email in enumerate(injection_emails, 1):
         print(f"\n{i}. {email['id']}: {email['subject']}")
         print(f"   From: {email['from']}")

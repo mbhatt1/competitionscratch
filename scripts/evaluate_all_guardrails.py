@@ -199,7 +199,7 @@ def test_guardrail(
     md_print(f"- **Evaluation budget per run:** {eval_budget_s:.1f}s")
     md_print(
         f"- **Effective attacker budget per run:** {effective_budget_s:.1f}s "
-        f"(max(10, budget_s*0.7))"
+        "(max(10, budget_s*0.7))"
     )
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
     agent_factory = build_agent_factory(agent_selection)

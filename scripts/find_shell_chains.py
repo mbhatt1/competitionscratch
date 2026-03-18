@@ -163,11 +163,11 @@ if shell_chains_with_guard_blocked:
 print(f"\n{'=' * 70}")
 print("SUMMARY")
 print(f"{'=' * 70}")
-print(f"No Guardrail:")
+print("No Guardrail:")
 print(f"  Successful shell.run: {len(shell_chains_success)}")
 print(f"  Blocked shell.run: {len(shell_chains_blocked)}")
 
-print(f"\nWith Guardrail:")
+print("\nWith Guardrail:")
 print(f"  Successful shell.run: {len(shell_chains_with_guard_success)}")
 print(f"  Blocked shell.run: {len(shell_chains_with_guard_blocked)}")
 

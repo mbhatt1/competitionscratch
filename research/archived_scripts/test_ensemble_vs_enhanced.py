@@ -72,7 +72,7 @@ def extract_stats(findings):
 print("=" * 70)
 print("ENSEMBLE vs ENHANCED EXPERIMENT")
 print("=" * 70)
-print(f"\nHypothesis: Multiple simple agents with different seeds > Single enhanced agent")
+print("\nHypothesis: Multiple simple agents with different seeds > Single enhanced agent")
 print(f"Started: {datetime.now().strftime('%H:%M:%S')}\n")
 
 results = {
