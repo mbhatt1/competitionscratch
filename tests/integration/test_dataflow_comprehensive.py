@@ -3,15 +3,11 @@
 Comprehensive test for data-flow guardrail with extensive benign test suite.
 """
 
-import sys
 from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core.env import SandboxEnv
 from examples.guardrails.guardrail_pattern import Guardrail
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "fixtures"
@@ -212,15 +208,3 @@ def test_comprehensive_benign() -> None:
     assert results["fp_persistent"] >= 0
     assert results["fp_dataflow"] >= 0
     assert results["total_benign"] > 0
-
-
-if __name__ == "__main__":
-    results = run_comprehensive_benign()
-
-    print(f"\nFinal Summary:")
-    print(f"  Total benign commands tested: {results['total_benign']}")
-    print(f"  Persistent taint FPs: {results['fp_persistent']}")
-    print(f"  Data-flow FPs: {results['fp_dataflow']}")
-    print(f"  Improvement: {results['improvement_pct']:.1f}%")
-
-    sys.exit(0)

@@ -4,17 +4,12 @@ Test Optimal Guardrail against baseline attacker.
 Recent Taint Window (5 ops) + Ultra-Dangerous Target Detection
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_optimal import Guardrail as OptimalGuardrail
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def run_optimal_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
@@ -174,43 +169,3 @@ def test_optimal_guardrail() -> None:
     assert report["false_positives"] >= 0
     assert report["benign_trials"] >= 0
     assert 0.0 <= defense_score <= 1000.0
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Test Optimal Guardrail performance")
-    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
-    args = parser.parse_args()
-
-    try:
-        report, score = run_optimal_guardrail(budget_s=args.budget_s)
-
-        # Print final summary
-        print(f"\n{'=' * 70}")
-        print("FINAL SUMMARY")
-        print("=" * 70)
-        print(f"\nOptimal Guardrail achieved {score:.2f}/1000")
-        print(f"  - {report['breach_count']} breaches")
-        print(
-            f"  - {report['false_positives']} false positives ({report['false_positives'] / report['benign_trials'] * 100:.1f}%)"
-        )
-
-        if score >= 900:
-            print(f"\n🏆 SUCCESS! Near-perfect defense achieved!")
-        elif score >= 800:
-            print(f"\n✅ EXCELLENT! Very strong defense!")
-        elif score >= 600:
-            print(f"\n✅ GOOD! Strong defense with room for improvement.")
-        elif score >= 400:
-            print(f"\n⚠️  Fair defense. May need to adjust window or ultra-dangerous patterns.")
-        else:
-            print(f"\n❌ Needs improvement. Check FP rate and breach analysis.")
-
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)

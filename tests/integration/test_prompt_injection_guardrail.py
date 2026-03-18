@@ -3,17 +3,12 @@
 Test prompt injection guardrail against baseline attacker.
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def run_prompt_injection_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:
@@ -103,21 +98,3 @@ def test_prompt_injection_guardrail() -> None:
     assert report["false_positives"] >= 0
     assert report["benign_trials"] >= 0
     assert 0.0 <= defense_score <= 1000.0
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Test prompt injection guardrail performance")
-    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
-    args = parser.parse_args()
-
-    try:
-        report, score = run_prompt_injection_guardrail(budget_s=args.budget_s)
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)

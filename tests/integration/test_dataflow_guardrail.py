@@ -3,16 +3,10 @@
 Test the data-flow tracking guardrail.
 """
 
-import sys
-from pathlib import Path
-
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.scoring import score_defense
 from evaluation import eval_defense
 from examples.guardrails.guardrail_pattern import Guardrail as PatternGuardrail
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def run_dataflow_guardrail(budget_s: float = 30.0) -> dict[str, float]:
@@ -183,14 +177,3 @@ def test_dataflow_guardrail() -> None:
     assert results["breaches"] >= 0
     assert results["false_positives"] >= 0
     assert 0.0 <= results["fp_rate"] <= 1.0
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Test data-flow tracking guardrail")
-    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
-    args = parser.parse_args()
-
-    results = run_dataflow_guardrail(budget_s=args.budget_s)
-    sys.exit(0)

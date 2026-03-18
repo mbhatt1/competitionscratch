@@ -41,14 +41,6 @@ PATH_BOOTSTRAP_CLASSIFICATIONS: Final[dict[str, str]] = {
     "examples/guardrails/guardrail_taint_tracking.py": "example_submission_cleanup_target",
     "examples/test_attack_submission.py": "example_smoke_wrapper",
     "examples/test_submission.py": "example_smoke_wrapper",
-    "tests/integration/test_baseline_defense.py": "integration_cleanup_target",
-    "tests/integration/test_dataflow_comprehensive.py": "integration_cleanup_target",
-    "tests/integration/test_dataflow_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_optimal_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_perfect_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_prompt_injection_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_promptguard_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_taint_tracking_guardrail.py": "integration_cleanup_target",
 }
 
 MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
@@ -85,15 +77,6 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "examples/guardrails/guardrail_taint_tracking.py": "example_submission_cleanup_target",
     "examples/test_attack_submission.py": "example_smoke_wrapper",
     "examples/test_submission.py": "example_smoke_wrapper",
-    "tests/integration/test_baseline_defense.py": "integration_cleanup_target",
-    "tests/integration/test_baseline_performance.py": "integration_cleanup_target",
-    "tests/integration/test_dataflow_comprehensive.py": "integration_cleanup_target",
-    "tests/integration/test_dataflow_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_optimal_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_perfect_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_prompt_injection_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_promptguard_guardrail.py": "integration_cleanup_target",
-    "tests/integration/test_taint_tracking_guardrail.py": "integration_cleanup_target",
 }
 
 

@@ -391,31 +391,3 @@ def test_run_baseline_attack_reports_env_diagnostics_for_openai(
     assert "Successful Tool Calls: 2" in output
     assert "Failed Tool Calls: 0" in output
     assert "Agent Refusals: 0" in output
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Test baseline Go-Explore performance with OpenAI agent"
-    )
-    parser.add_argument("--budget-s", type=float, default=30.0, help="Time budget (default: 30)")
-    parser.add_argument("--seed", type=int, default=123, help="Random seed (default: 123)")
-    parser.add_argument(
-        "--no-openai",
-        action="store_true",
-        help="Use deterministic agent (not recommended)",
-    )
-    args = parser.parse_args()
-
-    try:
-        results = run_baseline_attack(
-            budget_s=args.budget_s, seed=args.seed, use_openai=not args.no_openai
-        )
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
