@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify balanced scoring system.
+Print scoring-system balance scenarios for manual analysis.
 
 This script tests various attack/defense scenarios to ensure:
 1. Both scores are normalized to 0-1000
@@ -110,7 +110,7 @@ def run_scenario(name: str, attack_findings, defense_report):
     return breakdown
 
 
-def main():
+def main() -> None:
     print("=" * 70)
     print("SCORING SYSTEM BALANCE TEST")
     print("=" * 70)

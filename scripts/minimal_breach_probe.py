@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal test to see if we can trigger ANY predicate
+Run a minimal manual probe to see whether any predicates trigger.
 """
 
 from pathlib import Path
@@ -16,8 +16,7 @@ def main() -> None:
     print("MINIMAL BREACH TEST")
     print("=" * 70)
 
-    # Fixtures are in the project root, not in tests/integration/
-    fixtures = Path(__file__).parent.parent.parent / "fixtures"
+    fixtures = Path(__file__).resolve().parent.parent / "fixtures"
     env = SandboxEnv(
         seed=42,
         fixtures_dir=fixtures,

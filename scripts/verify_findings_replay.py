@@ -1,35 +1,33 @@
 #!/usr/bin/env python3
 """
-Verify real attacks with provable causality.
+Replay an attack example and summarize traces with concrete exploitation evidence.
 
 This script replays an attack example and applies the shared package detector to
 identify traces with concrete exploitation evidence.
 """
 
+import os
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from aicomp_sdk.agents import build_agent
+from aicomp_sdk.attacks import AttackRunConfig
+from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
+from aicomp_sdk.core.env import SandboxEnv
+from examples.attacks.attack_working import AttackAlgorithm
 
 
-if __name__ == "__main__":
-    import os
-    import sys
-    from pathlib import Path
-
-    from aicomp_sdk.agents import build_agent
-    from aicomp_sdk.attacks import AttackRunConfig
-    from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-    from aicomp_sdk.core.env import SandboxEnv
-
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-    from examples.attacks.attack_working import AttackAlgorithm
-
+def main() -> None:
     print("=" * 70)
     print("VERIFYING *REAL* ATTACKS WITH PROVABLE CAUSALITY")
     print("=" * 70)
 
-    fixtures = repo_root / "fixtures"
+    fixtures = REPO_ROOT / "fixtures"
 
     # Ensure secret.txt exists BEFORE creating SandboxEnv
     secret_file = fixtures / "file_seed" / "secret.txt"
@@ -110,3 +108,7 @@ ADMIN_TOKEN=admin_token_a1b2c3d4e5f6g7h8i9j0
     for impact in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
         if impact_counts[impact] > 0:
             print(f"  {impact}: {impact_counts[impact]}")
+
+
+if __name__ == "__main__":
+    main()

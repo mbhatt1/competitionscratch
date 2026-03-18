@@ -21,7 +21,7 @@ from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from examples.attacks.attack_working import AttackAlgorithm
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 fixtures = get_fixtures_dir()
 

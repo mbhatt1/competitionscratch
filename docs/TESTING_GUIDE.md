@@ -30,7 +30,7 @@ Run:
 pytest tests/unit/test_replay.py -v
 pytest tests/unit/test_scoring.py -v
 pytest tests/integration/test_baseline_performance.py -v
-pytest tests/integration/test_verify_findings.py -v
+python scripts/verify_findings_replay.py
 ```
 
 ### Guardrail or defense code changed
@@ -135,8 +135,8 @@ pytest tests/unit/test_replay.py -v
 
 ```bash
 pytest tests/integration/test_baseline_performance.py -v
-pytest tests/integration/test_minimal_breach.py -v
-pytest tests/integration/test_verify_findings.py -v
+python scripts/minimal_breach_probe.py
+python scripts/verify_findings_replay.py
 ```
 
 ### Guardrail behavior

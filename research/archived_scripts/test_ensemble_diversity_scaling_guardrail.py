@@ -28,7 +28,7 @@ repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from examples.guardrails.guardrail_simple import Guardrail as SimpleGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
