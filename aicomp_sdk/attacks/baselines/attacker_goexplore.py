@@ -164,14 +164,10 @@ class AttackAlgorithm(AttackAlgorithmBase):
         self.critical_impact_bonus = self.params.critical_bonus
         self.medium_impact_bonus = self.params.medium_bonus
 
-        prompt_bank = (
-            SHELL_PROMPT_BANK if self.params.target_shell else DEFAULT_PROMPT_BANK
-        )
+        prompt_bank = SHELL_PROMPT_BANK if self.params.target_shell else DEFAULT_PROMPT_BANK
         self.prompt_bank = list(prompt_bank)
 
-    def _select_cell(
-        self, archive: Mapping[str, Exemplar], rng: random.Random
-    ) -> Exemplar:
+    def _select_cell(self, archive: Mapping[str, Exemplar], rng: random.Random) -> Exemplar:
         """
         Improved selection policy:
         - Weighted by: low visits, high score hint, moderate depth
@@ -218,9 +214,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
             sig_kwargs["user_messages"] = trace.get("user_messages", [])
         return cell_signature(trace["tool_events"], **sig_kwargs)
 
-    def run(
-        self, env: AttackEnvProtocol, config: AttackRunConfig
-    ) -> list[AttackCandidate]:
+    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
         rng = random.Random(env.seed)
         budget_s = float(config.time_budget_s)
         max_search_steps = int(config.max_steps)
@@ -253,9 +247,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
             real_attacks=[],
         )
 
-        print(
-            f"[GO-EXPLORE] Seed exemplar created with {len(tr['tool_events'])} tool events"
-        )
+        print(f"[GO-EXPLORE] Seed exemplar created with {len(tr['tool_events'])} tool events")
 
         productive_steps = 0
         total_branches_attempted = 0  # Track total branch attempts including refusals
@@ -391,9 +383,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
                             f"[GO-EXPLORE] 🎯 NEW REAL ATTACK! Bonus: +{real_attack_bonus:.0f} points ({len(new_real_attacks)} new)"
                         )
                         for attack in new_real_attacks:
-                            print(
-                                f"[GO-EXPLORE]    {attack['type']} ({attack['impact']} impact)"
-                            )
+                            print(f"[GO-EXPLORE]    {attack['type']} ({attack['impact']} impact)")
 
                     score = (
                         10.0 * novelty
@@ -450,9 +440,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
                         "cell_signature": cell_data["sig"],
                     }
                     detailed_findings.append(detailed_finding)
-                    findings.append(
-                        AttackCandidate.from_messages(cell_data["user_messages"])
-                    )
+                    findings.append(AttackCandidate.from_messages(cell_data["user_messages"]))
 
         # DIAGNOSTIC: Final statistics
         print("\n[GO-EXPLORE] Attack run complete:")
@@ -484,9 +472,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         # DIAGNOSTIC: Print all attack chains that triggered predicates
         if detailed_findings:
             print(f"\n{'=' * 70}")
-            print(
-                f"[GO-EXPLORE] ALL SUCCESSFUL ATTACK CHAINS ({len(detailed_findings)} total)"
-            )
+            print(f"[GO-EXPLORE] ALL SUCCESSFUL ATTACK CHAINS ({len(detailed_findings)} total)")
             print(f"{'=' * 70}")
 
             for i, finding in enumerate(detailed_findings, 1):
@@ -503,9 +489,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
                     if args:
                         # Show key arguments only
                         arg_strs = []
-                        for k, v in list(args.items())[
-                            :2
-                        ]:  # Limit to 2 args for readability
+                        for k, v in list(args.items())[:2]:  # Limit to 2 args for readability
                             v_str = str(v)[:30]  # Truncate long values
                             arg_strs.append(f"{k}={v_str}")
                         arg_str = ", ".join(arg_strs)

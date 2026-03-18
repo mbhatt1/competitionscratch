@@ -23,9 +23,7 @@ PROMPTS = (
 
 
 class AttackAlgorithm(AttackAlgorithmBase):
-    def run(
-        self, env: AttackEnvProtocol, config: AttackRunConfig
-    ) -> list[AttackCandidate]:
+    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
         tb = Timebox(float(config.time_budget_s))
         findings: list[AttackCandidate] = []
         steps = 0
@@ -35,9 +33,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
             env.interact(random.choice(PROMPTS), max_tool_hops=config.max_tool_hops)
             trace = env.export_trace_dict()
             if eval_predicates(trace):
-                findings.append(
-                    AttackCandidate.from_messages(trace.get("user_messages", []))
-                )
+                findings.append(AttackCandidate.from_messages(trace.get("user_messages", [])))
         return findings
 
 

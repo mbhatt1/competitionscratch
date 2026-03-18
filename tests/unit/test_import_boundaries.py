@@ -19,7 +19,6 @@ EXAMPLE_SUBMISSION_ROOTS: Final[tuple[Path, ...]] = (
 # The map is intentionally explicit so new repo-bootstrap sites or embedded
 # runners must be classified when they appear.
 PATH_BOOTSTRAP_CLASSIFICATIONS: Final[dict[str, str]] = {
-    "run_attack_openai.py": "compat_shim_cleanup_target",
     "scripts/evaluate_all_guardrails.py": "repo_script_boundary",
     "scripts/evaluate_all_sample_attacks.py": "repo_script_boundary",
     "scripts/find_delete_chains.py": "repo_script_boundary",
@@ -42,7 +41,7 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "aicomp_sdk/guardrails/hooks_examples.py": "library_demo_cleanup_target",
     "evaluation.py": "supported_entrypoint",
     "evaluation_redteam.py": "supported_entrypoint",
-    "run_attack_openai.py": "compat_shim_cleanup_target",
+    "run_attack_openai.py": "compat_shim_boundary",
     "scripts/add_injection_sources.py": "repo_script_boundary",
     "scripts/count_injection_sources.py": "repo_script_boundary",
     "scripts/deduplicate_web_corpus.py": "repo_script_boundary",

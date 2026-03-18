@@ -56,6 +56,22 @@ pytest tests/unit/test_evaluation_legacy.py -v
 pytest tests/unit/test_evaluation_env_selection.py -v
 ```
 
+### Import-boundary or entrypoint code changed
+
+Run:
+
+```bash
+pytest tests/unit/test_import_boundaries.py -v
+pytest tests/unit/test_run_attack_openai_scripts.py -v
+```
+
+These tests lock the repository's boundary rules:
+
+- package code under `aicomp_sdk/` must not import from `tests/` or `examples/`
+- pytest integration tests must not depend on checkout-local `examples/` imports
+- example submission files under `examples/attacks/` and `examples/guardrails/` must stay free of repo-root `sys.path` bootstrapping and inline demo runners
+- repo-local bootstrap behavior belongs in explicit wrappers under `scripts/` or in the example smoke wrappers
+
 ## Fast General Commands
 
 Run all tests:

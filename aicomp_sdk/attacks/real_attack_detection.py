@@ -226,8 +226,7 @@ def detect_real_attacks(events: Sequence[dict[str, Any]]) -> list[dict[str, Any]
         event.get("source") in ["web", "email"] and event.get("ok") for event in events
     )
     has_exfil = any(
-        event.get("name") in ["http.post", "email.send"] and event.get("ok")
-        for event in events
+        event.get("name") in ["http.post", "email.send"] and event.get("ok") for event in events
     )
 
     if has_read_secret and has_untrusted_source and has_exfil:

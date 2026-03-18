@@ -139,6 +139,7 @@ research/*.aux
 research/*.out
 research/*.txt
 .aicomp/
+.codex/
 
 # Other
 plans/
