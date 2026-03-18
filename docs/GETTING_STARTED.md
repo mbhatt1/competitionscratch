@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide gets you from install to a working Kaggle-style `attack.py`.
+Use this page if you want to go from install to a first working public Kaggle-style `attack.py`.
 
-> Official Kaggle contract: submit `attack.py` only. Guardrail and zip-based workflows remain supported locally, but they are not part of the public Kaggle submission format.
+The package also supports package guardrail-only and package dual-track workflows, but this page focuses on the public Kaggle path and the shortest route to a successful local run.
 
 ## 1. Install
 
@@ -25,15 +25,17 @@ cd competitionscratch
 pip install -e .
 ```
 
-## 2. Create a Starter Attack
+## 2. Create `attack.py`
 
-Generate a template:
+Generate a starter file:
 
 ```bash
 aicomp init attack
 ```
 
-Validate it:
+This creates an `attack.py` template with the required `AttackAlgorithm` class.
+
+## 3. Validate the File
 
 ```bash
 aicomp validate attack.py
@@ -46,9 +48,9 @@ aicomp validate attack.py
 - presence of `AttackAlgorithm`
 - presence of `run(self, env, config)`
 
-## 3. Understand the Minimum Contract
+## 4. Use the Minimum Working Contract
 
-Your file must define `AttackAlgorithm` and return replayable `AttackCandidate` values.
+Your file must define `AttackAlgorithm` and return replayable `AttackCandidate` values:
 
 ```python
 from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
@@ -59,14 +61,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
         return []
 ```
 
-Important details:
+## 5. Make It Return One Real Candidate
 
-- `config.time_budget_s` is the evaluator budget
-- `env` supports `reset()`, `interact(...)`, `export_trace_dict()`, `snapshot()`, and `restore(...)`
-- Kaggle-style evaluation defaults to `GymAttackEnv`
-- As of `2.0.0`, direct `SandboxEnv(...)` construction requires an explicit `agent=` instance
-
-## 4. Build a First Working Attack
+This minimal version is enough to produce a replayable result:
 
 ```python
 from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
@@ -93,17 +90,19 @@ class AttackAlgorithm(AttackAlgorithmBase):
         return findings
 ```
 
-This works because scoring is replay-based: only the `user_messages` chain is trusted as attack output.
+This works because scoring is replay-based: the evaluator trusts replayed `user_messages`, not attacker-supplied traces or metadata.
 
-## 5. Run a Local Smoke Test
+## 6. Run a Smoke Test
 
-Fast CLI path:
+Fast local package path:
 
 ```bash
 aicomp test attack.py --track redteam --quick --agent deterministic
 ```
 
-Standalone scorer path:
+Use `deterministic` when you want an offline smoke test without API keys.
+
+## 7. Run the Public-Contract Scorer Locally
 
 ```bash
 python evaluation_redteam.py \
@@ -113,57 +112,30 @@ python evaluation_redteam.py \
   --env gym
 ```
 
-Use `deterministic` when you want an offline smoke test without API keys.
-
-## 6. Match the Official Kaggle Defaults
-
-`evaluation_redteam.py` already defaults to the official attack budget of `1800` seconds.
-
-If you prefer the CLI, pass the budget explicitly:
+If you want local CLI behavior that matches the public Kaggle default more closely:
 
 ```bash
-aicomp test attack.py --track redteam --budget-s 1800 --agent deterministic
+aicomp test attack.py --track redteam --budget-s 1800 --agent deterministic --env gym
 ```
 
-This matters because `aicomp test` uses a broader default budget of `3600` seconds total to support local dual-track evaluation.
+This matters because `aicomp test` defaults to a broader `3600` second budget to support the package workflows as well.
 
-## 7. Inspect the Environment Directly
+## 8. What to Read Next
 
-If you want to work with the SDK directly, resolve fixtures and construct the environment yourself:
+After you get one successful run:
 
-```python
-from aicomp_sdk import GymAttackEnv
-from aicomp_sdk.agents import build_agent
-from aicomp_sdk.evaluation_core import resolve_fixtures_dir
-from aicomp_sdk.guardrails.optimal import Guardrail
+- read [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md) for the exact public contract
+- read [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md) for attack iteration strategy
+- read [`SCORING.md`](SCORING.md) for the full scoring model
+- read [`API_REFERENCE.md`](API_REFERENCE.md) for exact SDK and CLI details
 
-env = GymAttackEnv(
-    seed=123,
-    fixtures_dir=resolve_fixtures_dir(),
-    guardrail=Guardrail(),
-    agent=build_agent("deterministic"),
-)
+## Not Covered Here
 
-obs, info = env.reset()
-print(obs["turn_index"])
-print(info["max_tool_hops"])
-```
+This page does not try to cover:
 
-## 8. Know What the Evaluator Rechecks
+- attack strategy beyond the first working example
+- full public Kaggle contract detail
+- package guardrail-only evaluation
+- package dual-track evaluation
 
-For each returned `AttackCandidate`, the evaluator:
-
-1. replays the message chain in a fresh environment
-2. recomputes the trace
-3. recomputes predicates
-4. recomputes the cell signature
-5. scores only the replayed behavior
-
-That means stale traces, fabricated predicates, or attacker-supplied novelty metadata do not help.
-
-## Next Reads
-
-- [`KAGGLE_REDTEAM_GUIDE.md`](KAGGLE_REDTEAM_GUIDE.md)
-- [`SCORING.md`](SCORING.md)
-- [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md)
-- [`API_REFERENCE.md`](API_REFERENCE.md)
+Use [`README.md`](README.md) to route into those workflows.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test Go-Explore attack with OpenAI API
+Run the Go-Explore attack demo with an OpenAI-backed or deterministic agent.
 """
 
 import os
@@ -26,8 +26,7 @@ def main() -> None:
     else:
         print("\n✓ OPENAI_API_KEY found\n")
 
-    # Setup - fixtures are in the project root
-    fixtures = Path(__file__).parent.parent.parent / "fixtures"
+    fixtures = Path(__file__).resolve().parent.parent / "fixtures"
     selection = "openai" if os.environ.get("OPENAI_API_KEY") else "deterministic"
     env = SandboxEnv(
         seed=42,

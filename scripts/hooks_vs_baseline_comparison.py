@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PROOF: LPCI Hooks Enhance Go-Explore
+Compare baseline Go-Explore against a hook-enhanced variant.
 
 This script runs two attacks back-to-back:
 1. Baseline Go-Explore (NO hooks)
@@ -12,6 +12,10 @@ Shows that hooks amplify attack effectiveness!
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
@@ -19,10 +23,7 @@ from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
 
-# First, import baseline attack
 from examples.attacks.attack_working import AttackAlgorithm
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def _count_predicates(candidates, fixtures: Path) -> tuple[int, dict[str, int]]:
@@ -55,7 +56,7 @@ def main() -> None:
     print("=" * 70)
 
     # Fixtures are in the project root, not in tests/integration/
-    fixtures = Path(__file__).parent.parent.parent / "fixtures"
+    fixtures = REPO_ROOT / "fixtures"
 
     # ===== TEST 1: BASELINE (NO HOOKS) =====
     print("\n[TEST 1] Running Go-Explore WITHOUT hooks...")

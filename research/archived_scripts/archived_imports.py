@@ -162,7 +162,7 @@ def import_attacks():
 
 def import_test_utils():
     """Import and return test utilities."""
-    from tests.integration.test_verify_findings import detect_real_attacks
+    from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
     return {
         "detect_real_attacks": detect_real_attacks,

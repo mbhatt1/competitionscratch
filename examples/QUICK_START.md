@@ -1,75 +1,86 @@
 # Examples Quick Start
 
-This guide is for the current example files under `examples/`.
+Use this page when you want the shortest path through the curated example set.
 
-It focuses on two use cases:
+This quickstart focuses on three jobs:
 
-- attack-only Kaggle-style iteration
-- local experimental attack+guardrail iteration
+- public-path attack iteration
+- package guardrail-only testing
+- package dual-track attack+guardrail testing
 
-## 1. Attack-Only Example
+The example files themselves are submission examples. When you want to execute them from the repo, use the smoke wrappers on this page or the package CLI and evaluator commands.
 
-Copy a simple example to the repository root:
+## 1. Public-Path Attack Example
 
-```bash
-cp examples/attacks/attack_gym_step.py attack.py
-```
-
-Run the example smoke test:
+Run the canonical attack example smoke test:
 
 ```bash
 python examples/test_attack_submission.py
 ```
 
-Run the standalone scorer:
+At the default short budget, this is a compatibility smoke test. It may legitimately report `0` findings.
+
+When you want to run the public contract directly, copy the example into the required filename:
 
 ```bash
+cp examples/attacks/attack_gym_step.py attack.py
 python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
-## 2. Local Attack+Guardrail Example
+Why the copy step matters: the public Kaggle evaluator requires the submission file to be named `attack.py`.
 
-Copy an attack and guardrail pair:
+## 2. Package Guardrail-Only Example
+
+Use the canonical guardrail example directly:
 
 ```bash
-cp examples/attacks/attack_working.py attack.py
-cp examples/guardrails/guardrail_optimal.py guardrail.py
+aicomp validate examples/guardrails/guardrail.py --type guardrail
+aicomp test examples/guardrails/guardrail.py --track defense --quick --agent deterministic
 ```
 
-Run the local smoke test:
+Switch to [`guardrails/guardrail_optimal.py`](guardrails/guardrail_optimal.py) when you want a more aggressive blocking policy, or [`guardrails/guardrail_taint_tracking.py`](guardrails/guardrail_taint_tracking.py) when you want a stateful session-taint design.
+
+## 3. Package Dual-Track Example
+
+Run the canonical package-local pair smoke test:
 
 ```bash
 python examples/test_submission.py
 ```
 
-Package them for the local dual-track evaluator:
+When you want to package the pair for the standalone dual-track evaluator:
 
 ```bash
+cp examples/attacks/attack.py attack.py
+cp examples/guardrails/guardrail.py guardrail.py
 zip submission.zip attack.py guardrail.py
 python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
 ```
 
-## Experimental Hook-Based Examples
+## Advanced and Experimental Examples
 
-The repository also includes experimental LPCI / hook-based examples:
+Use these only after the canonical paths are working:
 
-- [`attacks/attack_simple.py`](attacks/attack_simple.py)
-- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py)
-- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py)
-
-Those are useful for local experimentation, but the stable public contract is still:
-
-- `AttackAlgorithm.run(...) -> list[AttackCandidate]`
-- `Guardrail.decide(...) -> Decision`
+- [`attacks/attack.py`](attacks/attack.py) - canonical package-local Go-Explore attack
+- [`attacks/attack_working.py`](attacks/attack_working.py) - broader deterministic attack variant
+- [`attacks/attack_goexplore_working.py`](attacks/attack_goexplore_working.py) - Go-Explore variant with a broader demo runner
+- [`attacks/attack_simple.py`](attacks/attack_simple.py) - experimental hook-based attack
+- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - experimental Go-Explore plus hook attack
+- [`guardrails/guardrail_pattern.py`](guardrails/guardrail_pattern.py) - stateless pattern-based guardrail
+- [`guardrails/guardrail_prompt_injection.py`](guardrails/guardrail_prompt_injection.py) - smaller persistent-taint guardrail
+- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - experimental hook-based guardrail
+- [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py) - Prompt-Guard-backed example with heavier model-loading costs
+- [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py) - repo-local demo wrapper for the experimental LPCI attack example
 
 ## Recommended Order
 
-1. start with `attack_gym_step.py` if you want the cleanest red-team example
-2. switch to `attack_working.py` or `attack_goexplore_working.py` if you want a stronger local baseline
-3. add `guardrail_optimal.py` or another guardrail example only if you are using the local defense/dual-track flow
+1. Start with [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) for the cleanest public-path attack example.
+2. Move to [`attacks/attack.py`](attacks/attack.py) and [`guardrails/guardrail.py`](guardrails/guardrail.py) for the canonical package-local pair.
+3. Add stronger or experimental variants only when you are comparing strategies rather than learning the package surface.
 
 ## Related Docs
 
 - [`../docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md)
 - [`../docs/KAGGLE_REDTEAM_GUIDE.md`](../docs/KAGGLE_REDTEAM_GUIDE.md)
+- [`../docs/ATTACKS_GUIDE.md`](../docs/ATTACKS_GUIDE.md)
 - [`../docs/GUARDRAILS_GUIDE.md`](../docs/GUARDRAILS_GUIDE.md)

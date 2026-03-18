@@ -49,7 +49,7 @@ def deduplicate_web_corpus():
         json.dump(web_data, f, indent=2)
 
     # Print statistics
-    print(f"Web Corpus Deduplication Results:")
+print("Web Corpus Deduplication Results:")
     print(f"  Original pages: {original_count}")
     print(f"  Unique pages: {len(unique_pages)}")
     print(f"  Duplicates removed: {duplicates_removed}")
@@ -62,14 +62,14 @@ def deduplicate_web_corpus():
 
     # Show top repeated titles (if any remain)
     top_titles = sorted(title_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-    print(f"  Top 5 most common titles:")
+print("  Top 5 most common titles:")
     for title, count in top_titles:
         print(f"    - '{title[:50]}...' appears {count} time(s)")
     print()
 
     # Show top repeated content (if any remain)
     top_content = sorted(content_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-    print(f"  Top 5 most common content strings:")
+print("  Top 5 most common content strings:")
     for content, count in top_content:
         preview = content.replace("\n", " ")[:50]
         print(f"    - '{preview}...' appears {count} time(s)")

@@ -28,7 +28,7 @@ repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from examples.guardrails.guardrail_simple import Guardrail as SimpleGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -247,11 +247,11 @@ async def main():
 
         if n100_types > n1_types:
             improvement = ((n100_types - n1_types) / max(n1_types, 1)) * 100
-            print(f"\n✓ Diversity improves with ensemble size:")
+        print("\n✓ Diversity improves with ensemble size:")
             print(f"  N=1: {n1_types} types → N={all_results[-1]['n_agents']}: {n100_types} types")
             print(f"  Improvement: +{improvement:.0f}%")
         else:
-            print(f"\n✗ No diversity improvement observed")
+        print("\n✗ No diversity improvement observed")
             print(f"  N=1: {n1_types} types, N={all_results[-1]['n_agents']}: {n100_types} types")
 
     print(f"\n💾 Detailed results saved to: {output_path}")

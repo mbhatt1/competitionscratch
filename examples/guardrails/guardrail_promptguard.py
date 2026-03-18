@@ -4,35 +4,27 @@ The runtime currently passes `last_user`, recent tool/source history, and the
 pending tool call metadata into `decide(...)`. It does not pass raw tool
 outputs directly. This example therefore uses Prompt-Guard to score the latest
 user turn and, for dangerous sink calls, the pending tool arguments.
+
+This is intentionally a heavyweight example: the first scan loads model weights
+via `transformers`, so it starts much more slowly than the rule-based examples.
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Mapping
 from functools import lru_cache
-from pathlib import Path
-from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
+from typing import Any, Protocol, cast
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
 
+class _TextClassifier(Protocol):
+    def __call__(self, text: str) -> list[dict[str, Any]] | dict[str, Any]: ...
+
+
 @lru_cache(maxsize=1)
-def _load_promptguard_classifier() -> Any:
+def _load_promptguard_classifier() -> _TextClassifier:
     try:
         from transformers import pipeline
 
@@ -43,7 +35,7 @@ def _load_promptguard_classifier() -> Any:
             device=-1,
         )
         print("[PROMPT-GUARD] Model loaded successfully")
-        return classifier
+        return cast(_TextClassifier, classifier)
     except ImportError:
         print("[PROMPT-GUARD] ERROR: transformers library not installed")
         print("[PROMPT-GUARD] Install with: pip install transformers torch")
@@ -58,7 +50,7 @@ class Guardrail(GuardrailBase):
 
     def __init__(self) -> None:
         super().__init__()
-        self.classifier = _load_promptguard_classifier()
+        self.classifier: _TextClassifier | None = None
         self.dangerous_tools = {
             "fs.delete",
             "fs.write",
@@ -68,13 +60,17 @@ class Guardrail(GuardrailBase):
         }
 
     def _scan_text(self, text: str, threshold: float = 0.5) -> tuple[bool, str, float]:
-        if not self.classifier:
-            return False, "BENIGN", 0.0
+        classifier = self.classifier
+        if classifier is None:
+            classifier = _load_promptguard_classifier()
+            self.classifier = classifier
 
         try:
             text_to_scan = text[:2000] if len(text) > 2000 else text
-            result = self.classifier(text_to_scan)
-            if isinstance(result, list) and result:
+            result = classifier(text_to_scan)
+            if isinstance(result, list):
+                if not result:
+                    return False, "EMPTY", 0.0
                 result = result[0]
 
             label = result.get("label", "BENIGN")

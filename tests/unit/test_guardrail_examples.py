@@ -37,5 +37,12 @@ def test_promptguard_example_caches_classifier_across_instances(monkeypatch) -> 
     guardrail_one = module.Guardrail()
     guardrail_two = module.Guardrail()
 
+    assert len(pipeline_calls) == 0
+    assert guardrail_one.classifier is None
+    assert guardrail_two.classifier is None
+
+    guardrail_one._scan_text("first check")
+    guardrail_two._scan_text("second check")
+
     assert len(pipeline_calls) == 1
     assert guardrail_one.classifier is guardrail_two.classifier

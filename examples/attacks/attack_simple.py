@@ -1,23 +1,8 @@
 """Experimental hook-based attack example using the current hook registry."""
 
-import sys
 import time
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk import get_hook_registry
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig

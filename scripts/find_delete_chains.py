@@ -177,12 +177,12 @@ secret_deletes_with_guard = sum(
     1 for c in delete_chains_with_guard_success if "secret" in c["path"].lower()
 )
 
-print(f"\nNo Guardrail:")
+print("\nNo Guardrail:")
 print(f"  Total deletions: {len(delete_chains_success)}")
 print(f"  Secret deletions: {secret_deletes_no_guard} (CRITICAL)")
 print(f"  Other deletions: {len(delete_chains_success) - secret_deletes_no_guard}")
 
-print(f"\nWith Guardrail:")
+print("\nWith Guardrail:")
 print(f"  Total deletions: {len(delete_chains_with_guard_success)}")
 print(f"  Secret deletions: {secret_deletes_with_guard} (CRITICAL)")
 print(f"  Other deletions: {len(delete_chains_with_guard_success) - secret_deletes_with_guard}")

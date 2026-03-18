@@ -27,7 +27,7 @@ repo_root = setup_imports()
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -72,7 +72,7 @@ def extract_stats(findings):
 print("=" * 70)
 print("ENSEMBLE vs ENHANCED EXPERIMENT")
 print("=" * 70)
-print(f"\nHypothesis: Multiple simple agents with different seeds > Single enhanced agent")
+print("\nHypothesis: Multiple simple agents with different seeds > Single enhanced agent")
 print(f"Started: {datetime.now().strftime('%H:%M:%S')}\n")
 
 results = {

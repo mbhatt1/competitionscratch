@@ -33,7 +33,7 @@ repo_root = setup_imports()
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from examples.guardrails.guardrail_prompt_injection import Guardrail as PromptInjectionGuardrail
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 # Verify API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -393,7 +393,7 @@ async def run_all_experiments_async(model, seeds):
     print(
         f"\nRunning {len(base_experiments)} base configs × {len(seeds)} seeds = {len(all_experiments)} total experiments..."
     )
-    print(f"Parallelization: 4 workers\n")
+    print("Parallelization: 4 workers\n")
 
     # Run in parallel using ThreadPoolExecutor
     loop = asyncio.get_event_loop()
@@ -502,7 +502,7 @@ async def main():
     print("\n" + "=" * 70)
     print("RESULTS SUMMARY")
     print("=" * 70)
-    print(f"\n📊 Main Experiments:")
+    print("\n📊 Main Experiments:")
     print(
         f"  General 150s (no guard): {results['general_150s']['no_guard']['total_findings']} findings"
     )

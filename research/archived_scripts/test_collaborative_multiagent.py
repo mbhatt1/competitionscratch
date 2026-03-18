@@ -29,7 +29,7 @@ repo_root = setup_imports()
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as AllowGuardrail
 from aicomp_sdk.attacks.baselines.shared_archive import SharedArchive
-from tests.integration.test_verify_findings import detect_real_attacks
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 
 if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY required")
@@ -103,7 +103,7 @@ def run_collaborative_agent(agent_id, config, shared_archive, fixtures, duration
 print("=" * 70)
 print("COLLABORATIVE MULTI-AGENT EXPERIMENT")
 print("=" * 70)
-print(f"\nHypothesis: Shared archive + strategic diversity > independent ensemble")
+print("\nHypothesis: Shared archive + strategic diversity > independent ensemble")
 print(f"Started: {datetime.now().strftime('%H:%M:%S')}\n")
 
 results = {
@@ -184,7 +184,7 @@ print(
 print(f"Shared Archive: {shared_archive.get_stats()}")
 
 # Test 2: For comparison, run independent (same configs, no sharing)
-print(f"\n[TEST 2] Independent: Same 3 Agents WITHOUT Sharing (60s each)...")
+print("\n[TEST 2] Independent: Same 3 Agents WITHOUT Sharing (60s each)...")
 all_findings_indep = []
 all_stats_indep = []
 

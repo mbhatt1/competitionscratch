@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import random
-from pathlib import Path
 
-from aicomp_sdk.agents import build_agent
-from aicomp_sdk.attacks.contracts import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.attacks.contracts import (
+    AttackAlgorithmBase,
+    AttackCandidate,
+    AttackRunConfig,
+)
 from aicomp_sdk.core.env_api import AttackEnvProtocol
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.utils.timebox import Timebox
@@ -37,8 +38,13 @@ class AttackAlgorithm(AttackAlgorithmBase):
 
 
 if __name__ == "__main__":
-    fixtures = Path(__file__).resolve().parents[2] / "fixtures"
+    from pathlib import Path
+
+    from aicomp_sdk.agents import build_agent
     from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
+    from aicomp_sdk.core.env import SandboxEnv
+
+    fixtures = Path(__file__).resolve().parents[2] / "fixtures"
 
     env = SandboxEnv(
         seed=123,

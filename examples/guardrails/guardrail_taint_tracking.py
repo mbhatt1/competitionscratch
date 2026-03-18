@@ -1,22 +1,7 @@
 """Stateful taint-tracking guardrail example for local sandbox experiments."""
 
-import sys
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in (current.parent, *current.parents):
-        if (parent / "aicomp_sdk").is_dir():
-            return parent
-    return current.parent
-
-
-_REPO_ROOT = _repo_root()
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
@@ -90,7 +75,7 @@ class Guardrail(GuardrailBase):
         if context.get("user_confirmed_safe", False) or context.get("user_authorized", False):
             # User explicitly authorized this operation
             if self.tainted:
-                print(f"[TAINT] User authorized operation - clearing taint")
+                print("[TAINT] User authorized operation - clearing taint")
                 self.tainted = False
                 self.taint_source = None
             return Decision.allow("User explicitly authorized this operation")
@@ -134,81 +119,3 @@ class Guardrail(GuardrailBase):
         self.taint_source = None
         self.operation_log = []
         self.taint_operation_count = 0
-
-
-if __name__ == "__main__":
-    # Test the guardrail
-    guard = Guardrail()
-
-    print("=" * 70)
-    print("TAINT TRACKING GUARDRAIL TESTS")
-    print("=" * 70)
-
-    # Test 1: Normal operation without untrusted access
-    print("\n[Test 1] Normal fs.delete from user (no taint):")
-    context: dict[str, Any] = {"recent_sources": ["user", "file"]}
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 2: Access untrusted source (should taint session)
-    print("\n[Test 2] Access web.open (should taint session):")
-    context = {"recent_sources": ["user", "web"]}
-    decision = guard.decide("web.open", {"id": "demo"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 3: Try fs.delete in tainted session (should block)
-    print("\n[Test 3] Try fs.delete in tainted session:")
-    context = {"recent_sources": ["user", "web"]}
-    decision = guard.decide("fs.delete", {"path": "secret.txt"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 4: Read operation in tainted session (should allow - read is safe)
-    print("\n[Test 4] Try fs.read in tainted session:")
-    context = {"recent_sources": ["user", "web"]}
-    decision = guard.decide("fs.read", {"path": "readme.txt"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 5: User authorized operation (should clear taint)
-    print("\n[Test 5] fs.delete with user authorization:")
-    context = {"recent_sources": ["user"], "user_confirmed_safe": True}
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 6: After taint cleared, dangerous op should work
-    print("\n[Test 6] fs.delete after taint cleared:")
-    context = {"recent_sources": ["user"]}
-    decision = guard.decide("fs.delete", {"path": "temp.txt"}, context)
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 7: Taint again and try shell.run
-    print("\n[Test 7] Taint via email, then try shell.run:")
-    guard.decide("email.read", {"id": "msg1"}, {"recent_sources": []})
-    decision = guard.decide("shell.run", {"cmd": "echo test"}, {"recent_sources": []})
-    print(f"  Result: {decision.action} - {decision.reason}")
-    print(f"  Tainted: {guard.tainted}")
-
-    # Test 8: Persistent taint across many operations
-    print("\n[Test 8] Taint persists across 100 read operations:")
-    guard.reset_session()
-    guard.decide("web.open", {"id": "demo"}, {})
-    for i in range(100):
-        guard.decide("fs.read", {"path": f"file{i}.txt"}, {})
-    decision = guard.decide("fs.delete", {"path": "secret.txt"}, {})
-    print(f"  After 100 reads, tainted: {guard.tainted}")
-    print(f"  Delete blocked: {decision.action == 'DENY'}")
-    print(f"  Result: {decision.action}")
-
-    print("\n" + "=" * 70)
-    print("TESTS COMPLETE")
-    print("=" * 70)
-    print(f"\nKey Features Demonstrated:")
-    print(f"  ✓ Persistent taint tracking across entire session")
-    print(f"  ✓ Complete isolation (block dangerous ops when tainted)")
-    print(f"  ✓ User override to clear taint")
-    print(f"  ✓ Taint survives 100+ operations (no window limit)")

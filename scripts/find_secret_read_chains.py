@@ -185,7 +185,7 @@ for i, chain in enumerate(secret_chains_success[:10], 1):
     print(f"    Chain: {chain['chain']}")
     print(f"    Secret preview: {chain['output_preview']}")
     if chain["followed_by_exfil"]:
-        print(f"    ⚠️  EXFILTRATED after read!")
+                print("    ⚠️  EXFILTRATED after read!")
     print(f"    Tool sequence: {' -> '.join(chain['tool_sequence'][:8])}")
 
 print(f"\n{'=' * 70}")
@@ -207,12 +207,12 @@ print(f"\n{'=' * 70}")
 print("SUMMARY - CONFIDENTIALITY BREACHES")
 print(f"{'=' * 70}")
 
-print(f"\nNo Guardrail:")
+print("\nNo Guardrail:")
 print(f"  Secret reads: {len(secret_chains_success)}")
 print(f"  With exfiltration: {exfil_count} (CRITICAL)")
 print(f"  Read-only: {len(secret_chains_success) - exfil_count} (HIGH)")
 
-print(f"\nWith Guardrail:")
+print("\nWith Guardrail:")
 print(f"  Secret reads: {len(secret_chains_guard_success)}")
 print(f"  With exfiltration: {exfil_guard_count} (CRITICAL)")
 print(f"  Read-only: {len(secret_chains_guard_success) - exfil_guard_count} (HIGH)")

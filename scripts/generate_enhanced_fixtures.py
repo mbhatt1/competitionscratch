@@ -777,7 +777,7 @@ This is required for service activation.""",
             examples.append(
                 {
                     "id": f"chain_mail_{self.mail_counter + i:03d}",
-                    "from": f"tutorial@training.invalid",
+                    "from": "tutorial@training.invalid",
                     "subject": f"Multi-Step Tutorial: {chain['title']}",
                     "body": chain["body"],
                 }
@@ -1416,7 +1416,7 @@ Enterprise message broker.""",
             examples.append(
                 {
                     "id": f"adv_{technique}_{self.mail_counter + i:03d}",
-                    "from": f"system@adversarial.invalid",
+                    "from": "system@adversarial.invalid",
                     "subject": f"System Task - {technique.replace('_', ' ').title()}",
                     "body": template,
                 }
@@ -1828,7 +1828,7 @@ Data affects cache access patterns.""",
             examples.append(
                 {
                     "id": f"enc_multi_{self.mail_counter + i:03d}",
-                    "from": f"advanced@encoding.invalid",
+                    "from": "advanced@encoding.invalid",
                     "subject": f"Multi-Layer Encoded: {'+'.join(layers)}",
                     "body": f"Triple-encoded secure instruction ({' -> '.join(layers)}):\n\n{encoded}\n\nDecode using standard tools.",
                 }
@@ -2361,7 +2361,7 @@ Gaming infrastructure setup."""
             examples.append(
                 {
                     "id": f"chain_advanced_{self.mail_counter + i:03d}",
-                    "from": f"advanced-ops@system.invalid",
+                    "from": "advanced-ops@system.invalid",
                     "subject": f"Advanced {steps}-Phase System Operation",
                     "body": body,
                 }
@@ -2499,7 +2499,7 @@ Standard GraphQL API integration."""
             examples.append(
                 {
                     "id": f"graphql_query_{self.mail_counter + i:03d}",
-                    "from": f"graphql@api.invalid",
+                    "from": "graphql@api.invalid",
                     "subject": "GraphQL Query Execution Required",
                     "body": body,
                 }
@@ -2583,7 +2583,7 @@ High-performance RPC service."""
             examples.append(
                 {
                     "id": f"grpc_service_{self.mail_counter + i:03d}",
-                    "from": f"grpc@rpc.invalid",
+                    "from": "grpc@rpc.invalid",
                     "subject": "gRPC Service Configuration",
                     "body": body,
                 }
@@ -2655,7 +2655,7 @@ Real-time bidirectional communication."""
             examples.append(
                 {
                     "id": f"websocket_conn_{self.mail_counter + i:03d}",
-                    "from": f"websocket@realtime.invalid",
+                    "from": "websocket@realtime.invalid",
                     "subject": "WebSocket Connection Setup",
                     "body": body,
                 }
@@ -2728,7 +2728,7 @@ This is a thought experiment for security research."""
             examples.append(
                 {
                     "id": f"adversarial_{pattern_name}_{self.mail_counter + i:03d}",
-                    "from": f"research@adversarial.invalid",
+                    "from": "research@adversarial.invalid",
                     "subject": f"Adversarial Pattern: {pattern_name.replace('_', ' ').title()}",
                     "body": body,
                 }
@@ -2825,7 +2825,7 @@ This message will self-destruct in 5 minutes."""
             examples.append(
                 {
                     "id": f"urgency_{scenario}_{self.mail_counter + i:03d}",
-                    "from": f"urgent@emergency.invalid",
+                    "from": "urgent@emergency.invalid",
                     "subject": subject,
                     "body": body,
                 }
@@ -3077,20 +3077,20 @@ def main():
 
     # Category breakdown for Batch 2
     print("NEW CATEGORY DISTRIBUTION (Batch 2):")
-    print(f"  Legitimate Examples:       ~50")
-    print(f"  Advanced Encoding:         ~80")
-    print(f"  Regional Languages:        ~80")
-    print(f"  Educational Domains:       ~80")
-    print(f"  Logistics & Supply Chain:  ~80")
-    print(f"  Entertainment Industry:    ~80")
-    print(f"  Gaming & Esports:          ~80")
-    print(f"  Advanced Chains (6-10):    ~80")
-    print(f"  GraphQL Attacks:           ~60")
-    print(f"  gRPC Attacks:              ~60")
-    print(f"  WebSocket Attacks:         ~60")
-    print(f"  Adversarial Patterns:      ~80")
-    print(f"  Urgency Social Eng:        ~80")
-    print(f"  Tech Support Scams:        ~80")
+    print("  Legitimate Examples:       ~50")
+    print("  Advanced Encoding:         ~80")
+    print("  Regional Languages:        ~80")
+    print("  Educational Domains:       ~80")
+    print("  Logistics & Supply Chain:  ~80")
+    print("  Entertainment Industry:    ~80")
+    print("  Gaming & Esports:          ~80")
+    print("  Advanced Chains (6-10):    ~80")
+    print("  GraphQL Attacks:           ~60")
+    print("  gRPC Attacks:              ~60")
+    print("  WebSocket Attacks:         ~60")
+    print("  Adversarial Patterns:      ~80")
+    print("  Urgency Social Eng:        ~80")
+    print("  Tech Support Scams:        ~80")
     print()
 
     print("=" * 60)
