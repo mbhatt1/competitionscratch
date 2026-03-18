@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import random
-import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Optional, TypedDict, cast
 
 from aicomp_sdk.attacks.contracts import (
@@ -12,22 +10,11 @@ from aicomp_sdk.attacks.contracts import (
     AttackCandidate,
     AttackRunConfig,
 )
+from aicomp_sdk.attacks.real_attack_detection import detect_real_attacks
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env_api import AttackEnvProtocol
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.utils.timebox import Timebox
-
-# Import real attack detection
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests" / "integration"))
-try:
-    from test_verify_findings import detect_real_attacks
-
-    REAL_ATTACK_DETECTION_AVAILABLE = True
-except Exception:
-    REAL_ATTACK_DETECTION_AVAILABLE = False
-
-    def detect_real_attacks(events):
-        return []
 
 
 @dataclass
@@ -177,10 +164,14 @@ class AttackAlgorithm(AttackAlgorithmBase):
         self.critical_impact_bonus = self.params.critical_bonus
         self.medium_impact_bonus = self.params.medium_bonus
 
-        prompt_bank = SHELL_PROMPT_BANK if self.params.target_shell else DEFAULT_PROMPT_BANK
+        prompt_bank = (
+            SHELL_PROMPT_BANK if self.params.target_shell else DEFAULT_PROMPT_BANK
+        )
         self.prompt_bank = list(prompt_bank)
 
-    def _select_cell(self, archive: Mapping[str, Exemplar], rng: random.Random) -> Exemplar:
+    def _select_cell(
+        self, archive: Mapping[str, Exemplar], rng: random.Random
+    ) -> Exemplar:
         """
         Improved selection policy:
         - Weighted by: low visits, high score hint, moderate depth
@@ -227,7 +218,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
             sig_kwargs["user_messages"] = trace.get("user_messages", [])
         return cell_signature(trace["tool_events"], **sig_kwargs)
 
-    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+    def run(
+        self, env: AttackEnvProtocol, config: AttackRunConfig
+    ) -> list[AttackCandidate]:
         rng = random.Random(env.seed)
         budget_s = float(config.time_budget_s)
         max_search_steps = int(config.max_steps)
@@ -260,7 +253,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
             real_attacks=[],
         )
 
-        print(f"[GO-EXPLORE] Seed exemplar created with {len(tr['tool_events'])} tool events")
+        print(
+            f"[GO-EXPLORE] Seed exemplar created with {len(tr['tool_events'])} tool events"
+        )
 
         productive_steps = 0
         total_branches_attempted = 0  # Track total branch attempts including refusals
@@ -363,43 +358,42 @@ class AttackAlgorithm(AttackAlgorithmBase):
                     # REAL ATTACK BONUS: Only reward NEW attacks not in parent
                     real_attack_bonus = 0.0
                     new_real_attacks = []
-                    if REAL_ATTACK_DETECTION_AVAILABLE:
-                        current_attacks = detect_real_attacks(tr.get("tool_events", []))
-                        parent_attacks = ex.real_attacks
+                    current_attacks = detect_real_attacks(tr.get("tool_events", []))
+                    parent_attacks = ex.real_attacks
 
-                        # Get attack signatures from parent
-                        parent_sigs = set()
-                        for pa in parent_attacks:
-                            attack_sig_parent = f"{pa.get('type')}:{pa.get('executed_tool')}:{pa.get('executed_args', {}).get('path', '')}"
-                            parent_sigs.add(attack_sig_parent)
+                    # Get attack signatures from parent
+                    parent_sigs = set()
+                    for pa in parent_attacks:
+                        attack_sig_parent = f"{pa.get('type')}:{pa.get('executed_tool')}:{pa.get('executed_args', {}).get('path', '')}"
+                        parent_sigs.add(attack_sig_parent)
 
-                        # Only reward attacks NOT in parent
-                        for attack in current_attacks:
-                            attack_sig_current = f"{attack.get('type')}:{attack.get('executed_tool')}:{attack.get('executed_args', {}).get('path', '')}"
-                            if attack_sig_current not in parent_sigs:
-                                # This is a NEW attack!
-                                new_real_attacks.append(attack)
+                    # Only reward attacks NOT in parent
+                    for attack in current_attacks:
+                        attack_sig_current = f"{attack.get('type')}:{attack.get('executed_tool')}:{attack.get('executed_args', {}).get('path', '')}"
+                        if attack_sig_current not in parent_sigs:
+                            # This is a NEW attack!
+                            new_real_attacks.append(attack)
 
-                                # Base bonus per NEW attack (configurable for ablation)
-                                real_attack_bonus += self.causality_bonus
+                            # Base bonus per NEW attack (configurable for ablation)
+                            real_attack_bonus += self.causality_bonus
 
-                                # Extra bonus based on impact (configurable for ablation)
-                                impact = attack.get("impact", "LOW")
-                                if impact == "CRITICAL":
-                                    real_attack_bonus += self.critical_impact_bonus
-                                elif impact == "HIGH":
-                                    real_attack_bonus += self.high_impact_bonus
-                                elif impact == "MEDIUM":
-                                    real_attack_bonus += self.medium_impact_bonus
+                            # Extra bonus based on impact (configurable for ablation)
+                            impact = attack.get("impact", "LOW")
+                            if impact == "CRITICAL":
+                                real_attack_bonus += self.critical_impact_bonus
+                            elif impact == "HIGH":
+                                real_attack_bonus += self.high_impact_bonus
+                            elif impact == "MEDIUM":
+                                real_attack_bonus += self.medium_impact_bonus
 
-                        if new_real_attacks:
+                    if new_real_attacks:
+                        print(
+                            f"[GO-EXPLORE] 🎯 NEW REAL ATTACK! Bonus: +{real_attack_bonus:.0f} points ({len(new_real_attacks)} new)"
+                        )
+                        for attack in new_real_attacks:
                             print(
-                                f"[GO-EXPLORE] 🎯 NEW REAL ATTACK! Bonus: +{real_attack_bonus:.0f} points ({len(new_real_attacks)} new)"
+                                f"[GO-EXPLORE]    {attack['type']} ({attack['impact']} impact)"
                             )
-                            for attack in new_real_attacks:
-                                print(
-                                    f"[GO-EXPLORE]    {attack['type']} ({attack['impact']} impact)"
-                                )
 
                     score = (
                         10.0 * novelty
@@ -456,7 +450,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
                         "cell_signature": cell_data["sig"],
                     }
                     detailed_findings.append(detailed_finding)
-                    findings.append(AttackCandidate.from_messages(cell_data["user_messages"]))
+                    findings.append(
+                        AttackCandidate.from_messages(cell_data["user_messages"])
+                    )
 
         # DIAGNOSTIC: Final statistics
         print("\n[GO-EXPLORE] Attack run complete:")
@@ -488,7 +484,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
         # DIAGNOSTIC: Print all attack chains that triggered predicates
         if detailed_findings:
             print(f"\n{'=' * 70}")
-            print(f"[GO-EXPLORE] ALL SUCCESSFUL ATTACK CHAINS ({len(detailed_findings)} total)")
+            print(
+                f"[GO-EXPLORE] ALL SUCCESSFUL ATTACK CHAINS ({len(detailed_findings)} total)"
+            )
             print(f"{'=' * 70}")
 
             for i, finding in enumerate(detailed_findings, 1):
@@ -505,7 +503,9 @@ class AttackAlgorithm(AttackAlgorithmBase):
                     if args:
                         # Show key arguments only
                         arg_strs = []
-                        for k, v in list(args.items())[:2]:  # Limit to 2 args for readability
+                        for k, v in list(args.items())[
+                            :2
+                        ]:  # Limit to 2 args for readability
                             v_str = str(v)[:30]  # Truncate long values
                             arg_strs.append(f"{k}={v_str}")
                         arg_str = ", ".join(arg_strs)
@@ -525,6 +525,8 @@ class AttackAlgorithm(AttackAlgorithmBase):
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+
     fixtures = Path(__file__).resolve().parents[2] / "fixtures"
     from aicomp_sdk.agents import build_agent
     from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
