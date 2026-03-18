@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import random
-from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
-from aicomp_sdk.attacks.contracts import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+from aicomp_sdk.attacks.contracts import (
+    AttackAlgorithmBase,
+    AttackCandidate,
+    AttackRunConfig,
+)
 from aicomp_sdk.core.env import SandboxEnv
 from aicomp_sdk.core.env_api import AttackEnvProtocol
 from aicomp_sdk.core.predicates import eval_predicates
@@ -22,7 +25,9 @@ PROMPTS = (
 
 
 class AttackAlgorithm(AttackAlgorithmBase):
-    def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+    def run(
+        self, env: AttackEnvProtocol, config: AttackRunConfig
+    ) -> list[AttackCandidate]:
         tb = Timebox(float(config.time_budget_s))
         findings: list[AttackCandidate] = []
         steps = 0
@@ -32,11 +37,15 @@ class AttackAlgorithm(AttackAlgorithmBase):
             env.interact(random.choice(PROMPTS), max_tool_hops=config.max_tool_hops)
             trace = env.export_trace_dict()
             if eval_predicates(trace):
-                findings.append(AttackCandidate.from_messages(trace.get("user_messages", [])))
+                findings.append(
+                    AttackCandidate.from_messages(trace.get("user_messages", []))
+                )
         return findings
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+
     fixtures = Path(__file__).resolve().parents[2] / "fixtures"
     from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
 
