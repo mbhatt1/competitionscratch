@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Final
 
 from pathlib import Path
 
@@ -66,7 +67,7 @@ def _is_path_escape(ctx: ToolContext, path: Path) -> bool:
     return not str(path).startswith(str(ctx.filesystem_root.resolve()))
 
 
-FS_TOOL_DEFS = (
+FS_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="fs.read",
         side_effect=ToolSideEffect.READ,

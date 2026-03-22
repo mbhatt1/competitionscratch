@@ -52,8 +52,8 @@ normalized_attack_score = min(1000.0, (raw_score / ATTACK_ELITE_RAW) * 1000.0)
 
 Current scoring constants in `aicomp_sdk.scoring`:
 
-- `ATTACK_BASELINE_RAW = 100000.0`
-- `ATTACK_ELITE_RAW = 200000.0`
+- `ATTACK_BASELINE_RAW = 100000.0` (reference calibration point; not used directly by the normalization formula)
+- `ATTACK_ELITE_RAW = 200000.0` (normalization denominator)
 - `ATTACK_NORMALIZATION_ENABLED = True`
 
 This is the normalization used by the public Kaggle path and current package attack scoring.
@@ -116,12 +116,16 @@ That workflow is part of the package, but it is not part of the public Kaggle le
 
 ## Reading Evaluator Output
 
-### `evaluation_redteam.py`
+### `aicomp evaluate redteam`
 
 The public Kaggle-style scorer writes:
 
-- `scores.txt` containing the normalized attack score
-- `scores.json` containing the attack summary and evaluator metadata
+- `score.txt` containing the normalized attack score
+- `report.json` containing the attack summary and evaluator metadata
+
+Both files live under the evaluator artifact directory, which defaults to `evaluation_artifacts/` and can be changed with `--artifacts-dir`.
+
+Terminal output defaults to a short summary. Use `--verbosity progress` for package-owned progress messages. Add `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` to write `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under the artifact directory.
 
 Useful JSON fields include:
 
@@ -136,14 +140,20 @@ Useful JSON fields include:
 - `scoring_mode`
 - `submission_type`
 
-### `evaluation.py`
+### `aicomp evaluate defense` and `aicomp evaluate dual`
+
+`aicomp evaluate defense` writes a defense-only report shape. It does not include `attack.*` fields or `scoring_mode`.
 
 The package dual-track evaluator writes:
 
-- `scores.txt` containing the combined final score
-- `scores.json` containing attack, defense, and final score data
+- `score.txt` containing the combined final score
+- `report.json` containing attack, defense, and final score data
 
-Useful JSON fields include:
+Both files live under the evaluator artifact directory, which defaults to `evaluation_artifacts/` and can be changed with `--artifacts-dir`.
+
+Terminal output defaults to a short summary. Use `--verbosity progress` for package-owned progress messages. Add `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` to write `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under the artifact directory.
+
+Useful dual-track JSON fields include:
 
 - `final_score`
 - `attack.score`

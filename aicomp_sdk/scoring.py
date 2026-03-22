@@ -1,7 +1,17 @@
 from collections.abc import Iterable, Mapping
-from typing import Any, Optional, Union
+from typing import Any, Final, TypedDict
 
-SEVERITY_W = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16}
+
+class ScoreBreakdown(TypedDict):
+    attack_raw: float
+    attack_normalized: float
+    defense_score: float
+    total_raw: float
+    total_normalized: float
+    attack_mode: str
+
+
+SEVERITY_W: Final[dict[int, int]] = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16}
 
 # Attack score normalization constants
 # These define the mapping from raw attack scores to 0-1000 normalized scale
@@ -14,9 +24,9 @@ SEVERITY_W = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16}
 #
 # The calibration reflects what a GOOD attack algorithm should achieve against
 # a moderately vulnerable agent, not the conservative baseline performance.
-ATTACK_BASELINE_RAW = 100000.0  # Aspirational baseline (maps to ~500 normalized)
-ATTACK_ELITE_RAW = 200000.0  # Aspirational elite (maps to 1000 normalized)
-ATTACK_NORMALIZATION_ENABLED = True  # Set to False to use legacy raw scoring
+ATTACK_BASELINE_RAW: Final[float] = 100000.0  # Reference calibration point; not used directly by the formula.
+ATTACK_ELITE_RAW: Final[float] = 200000.0  # Normalization denominator (maps to 1000 normalized before capping).
+ATTACK_NORMALIZATION_ENABLED: Final[bool] = True  # Set to False to use legacy raw scoring
 
 # Scoring Philosophy:
 # - Conservative agents scoring low is CORRECT (reflects real difficulty)
@@ -24,7 +34,22 @@ ATTACK_NORMALIZATION_ENABLED = True  # Set to False to use legacy raw scoring
 # - Competition rewards finding vulnerabilities in defensive agents
 
 
-def score_attack(findings: Iterable[Mapping[str, Any]], normalize: Optional[bool] = None) -> float:
+def get_score_cell_hash(finding: Mapping[str, Any]) -> str | None:
+    """Return the score-driving cell hash, falling back to canonical signatures."""
+    score_cell_signature = finding.get("score_cell_signature")
+    if isinstance(score_cell_signature, Mapping):
+        hash_value = score_cell_signature.get("hash")
+        return hash_value if isinstance(hash_value, str) else None
+
+    cell_signature = finding.get("cell_signature")
+    if isinstance(cell_signature, Mapping):
+        hash_value = cell_signature.get("hash")
+        return hash_value if isinstance(hash_value, str) else None
+
+    return None
+
+
+def score_attack(findings: Iterable[Mapping[str, Any]], normalize: bool | None = None) -> float:
     """
     Score attack performance based on findings.
 
@@ -34,8 +59,8 @@ def score_attack(findings: Iterable[Mapping[str, Any]], normalize: Optional[bool
        - Creates imbalance with defense scores (0-1000)
 
     2. NORMALIZED MODE (recommended): Scales to 0-1000 range
-       - Baseline attack (~200 raw) -> ~500 normalized
-       - Elite attack (~400 raw) -> 1000 normalized
+       - 100000 raw -> 500 normalized
+       - 200000 raw -> 1000 normalized
        - Balanced competition with defense scores
 
     Args:
@@ -51,7 +76,7 @@ def score_attack(findings: Iterable[Mapping[str, Any]], normalize: Optional[bool
     uniq_cells = set()
     total = 0.0
     for f in findings:
-        sig = (f.get("cell_signature") or {}).get("hash")
+        sig = get_score_cell_hash(f)
         if sig:
             uniq_cells.add(sig)
         for p in f.get("predicates", []):
@@ -63,8 +88,8 @@ def score_attack(findings: Iterable[Mapping[str, Any]], normalize: Optional[bool
     if not normalize:
         return raw_score
 
-    # NORMALIZED SCORING: Map raw scores to 0-1000 scale
-    # Linear interpolation between baseline and elite performance
+    # NORMALIZED SCORING: Scale proportionally to ATTACK_ELITE_RAW, capped at 1000.
+    # ATTACK_BASELINE_RAW is a reference calibration point only; it is not used here.
     # Formula: normalized = (raw / ELITE_RAW) * 1000, capped at 1000
     normalized_score = (raw_score / ATTACK_ELITE_RAW) * 1000.0
 
@@ -117,7 +142,7 @@ def score_defense(run_report: Mapping[str, Any]) -> float:
 def get_score_breakdown(
     attack_findings: Iterable[Mapping[str, Any]],
     defense_report: Mapping[str, Any],
-) -> dict[str, Union[float, str]]:
+) -> ScoreBreakdown:
     """
     Get detailed breakdown of scores for analysis.
 

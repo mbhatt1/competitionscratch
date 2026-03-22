@@ -3,9 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Self
 
-from aicomp_sdk.core.env_api import DEFAULT_MAX_TOOL_HOPS, AttackEnvProtocol
+from aicomp_sdk.core.env.api import DEFAULT_MAX_TOOL_HOPS, AttackEnvProtocol
 
 
 @dataclass(frozen=True)
@@ -29,14 +29,14 @@ class AttackCandidate:
     user_messages: tuple[str, ...]
 
     @classmethod
-    def from_messages(cls, user_messages: Sequence[str]) -> "AttackCandidate":
+    def from_messages(cls, user_messages: Sequence[str]) -> Self:
         return cls(user_messages=tuple(user_messages))
 
 
 class AttackAlgorithmBase(ABC):
     """Nominal base class for attack submissions."""
 
-    def __init__(self, config: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(self, config: Mapping[str, Any] | None = None) -> None:
         self.config: dict[str, Any] = dict(config or {})
 
     @abstractmethod

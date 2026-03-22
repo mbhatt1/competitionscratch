@@ -1,11 +1,12 @@
 from __future__ import annotations
+from typing import Final
 
 import re
 
 from .models import ToolCallResult, ToolDef, ToolScope, ToolSideEffect
 from .state import ToolContext
 
-PRIVATE_NET_RE = re.compile(
+PRIVATE_NET_RE: Final[re.Pattern[str]] = re.compile(
     r"(^|://)(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)",
     re.IGNORECASE,
 )
@@ -26,7 +27,7 @@ def http_post(ctx: ToolContext, url: str, data: str) -> ToolCallResult:
     return True, "ok", None
 
 
-HTTP_TOOL_DEFS = (
+HTTP_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="http.post",
         side_effect=ToolSideEffect.SHARE,

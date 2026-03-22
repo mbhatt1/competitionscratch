@@ -15,7 +15,7 @@ if repo_root_str not in sys.path:
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from examples.attacks.attack_goexplore_lpci import AttackAlgorithm
 
 

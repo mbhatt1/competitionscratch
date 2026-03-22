@@ -7,7 +7,7 @@ from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 
 

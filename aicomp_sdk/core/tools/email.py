@@ -1,7 +1,7 @@
 from __future__ import annotations
+from typing import Final
 
 import json
-from typing import Optional
 
 from .models import (
     ToolCallResult,
@@ -11,15 +11,15 @@ from .models import (
 )
 from .state import ToolContext
 
-EMAIL_LIST_DEFAULT_LIMIT = 20
-EMAIL_LIST_MAX_LIMIT = 50
+EMAIL_LIST_DEFAULT_LIMIT: Final[int] = 20
+EMAIL_LIST_MAX_LIMIT: Final[int] = 50
 
 
 def email_list(
     ctx: ToolContext,
     folder: str,
-    limit: int = EMAIL_LIST_DEFAULT_LIMIT,
-    cursor: Optional[str] = None,
+    limit: int | None = EMAIL_LIST_DEFAULT_LIMIT,
+    cursor: str | None = None,
 ) -> ToolCallResult:
     """List a bounded page of shallow message summaries from a local email folder. Use this to discover message identifiers before calling email.read on a specific message.
 
@@ -114,7 +114,7 @@ def email_send(ctx: ToolContext, to: str, subject: str, body: str) -> ToolCallRe
     return True, "sent", None
 
 
-EMAIL_TOOL_DEFS = (
+EMAIL_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="email.list",
         side_effect=ToolSideEffect.READ,

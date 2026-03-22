@@ -17,12 +17,12 @@ repo_root_str = str(repo_root)
 if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
 
-from aicomp_sdk.agents import build_agent
+from aicomp_sdk.agents import build_agent, build_agent_factory
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.core.env.sandbox import SandboxEnv
+from aicomp_sdk.evaluation import RedteamRunOptions, eval_attack
 
 
 def _select_openai_demo_agent() -> str:
@@ -40,6 +40,15 @@ def _build_demo_env(*, seed: int, fixtures_dir: Path) -> SandboxEnv:
     )
 
 
+def _build_demo_options() -> RedteamRunOptions:
+    return RedteamRunOptions(
+        run_config=AttackRunConfig(time_budget_s=30, max_steps=100),
+        attack_config={"max_turns": 6, "branch_batch": 8},
+        seed=42,
+        guardrail_factory=BaselineGuardrail,
+    )
+
+
 def main() -> None:
     """Run Go-Explore demo with OpenAI."""
     print("=" * 70)
@@ -53,12 +62,16 @@ def main() -> None:
         print("\n✓ OPENAI_API_KEY found\n")
 
     fixtures = repo_root / "fixtures"
-    env = _build_demo_env(seed=42, fixtures_dir=fixtures)
 
     print("Running improved Go-Explore with OpenAI agent...\n")
-    attacker = AttackAlgorithm({"max_turns": 6, "branch_batch": 8})
-    findings = attacker.run(env, AttackRunConfig(time_budget_s=30, max_steps=100))
-    detailed_findings = attacker.last_run_details
+    findings = eval_attack(
+        AttackAlgorithm,
+        30,
+        build_agent_factory(_select_openai_demo_agent()),
+        "sandbox",
+        fixtures_dir=fixtures,
+        options=_build_demo_options(),
+    )
 
     print(f"\n{'=' * 70}")
     print("RESULTS")
@@ -67,9 +80,9 @@ def main() -> None:
     print(f"Total findings: {len(findings)}")
 
     validated = []
-    for i, finding in enumerate(detailed_findings, 1):
+    for i, finding in enumerate(findings, 1):
         trace = finding.get("trace", {})
-        predicates = eval_predicates(trace)
+        predicates = finding.get("predicates", [])
 
         if predicates:
             validated.append(finding)

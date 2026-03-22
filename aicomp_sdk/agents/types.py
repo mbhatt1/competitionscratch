@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, Optional, TypedDict, Union
+from typing import Any, Final, TypedDict
 
-JsonScalar = Optional[Union[bool, int, float, str]]
-JsonValue = Union[JsonScalar, Sequence["JsonValue"], Mapping[str, "JsonValue"]]
+JsonScalar = bool | int | float | str | None
+JsonValue = JsonScalar | Sequence["JsonValue"] | Mapping[str, "JsonValue"]
 JsonObject = Mapping[str, JsonValue]
 
 AGENT_STATE_VERSION: Final[int] = 1
@@ -65,14 +65,9 @@ class ToolResultEvent:
     result: ToolResult
 
 
-ConversationEvent = Union[
-    UserMessageEvent,
-    AssistantMessageEvent,
-    ToolRequestEvent,
-    ToolResultEvent,
-]
+ConversationEvent = UserMessageEvent | AssistantMessageEvent | ToolRequestEvent | ToolResultEvent
 
-RuntimeEvent = Union[InstructionEvent, ConversationEvent]
+RuntimeEvent = InstructionEvent | ConversationEvent
 
 
 @dataclass(frozen=True)
@@ -80,7 +75,7 @@ class ToolCallDecision:
     """A decision to call exactly one tool next."""
 
     call: ToolCall
-    assistant_message: Optional[str] = None
+    assistant_message: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,7 +85,7 @@ class FinalResponseDecision:
     text: str
 
 
-AgentDecision = Union[ToolCallDecision, FinalResponseDecision]
+AgentDecision = ToolCallDecision | FinalResponseDecision
 
 
 class AgentStateSnapshot(TypedDict):

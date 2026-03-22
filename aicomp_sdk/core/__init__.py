@@ -2,34 +2,55 @@
 
 from typing import Any
 
-from .cells import *
-from .env import SandboxEnv
-from .env_api import (
+from .cells import cell_signature
+from .env.sandbox import SandboxEnv
+from .env.api import (
     AttackEnvProtocol,
     DiagnosticsEnv,
     EnvInteractionResult,
+    EnvRunDiagnostics,
     EnvSelection,
     RunDiagnostics,
-    parse_env_selection,
+    coerce_env_selection,
 )
 
 try:
-    from .gym_env import GymAttackEnv as _GymAttackEnv
+    from .env.gym import GymAttackEnv as _GymAttackEnv
 except ImportError:
     GymAttackEnv: Any = None
 else:
     GymAttackEnv = _GymAttackEnv
-from .predicates import *
-from .tools import *
-from .trace import *
+from .predicates import eval_predicates
+from .tools import (
+    RuntimeToolSpec,
+    ToolContext,
+    ToolDef,
+    ToolHandler,
+    ToolScope,
+    ToolSideEffect,
+    ToolSuite,
+)
+from .trace import ToolEvent, Trace
 
 __all__ = [
-    "SandboxEnv",
-    "GymAttackEnv",
     "AttackEnvProtocol",
     "DiagnosticsEnv",
     "EnvInteractionResult",
+    "EnvRunDiagnostics",
     "EnvSelection",
+    "GymAttackEnv",
     "RunDiagnostics",
-    "parse_env_selection",
+    "SandboxEnv",
+    "RuntimeToolSpec",
+    "ToolContext",
+    "ToolDef",
+    "ToolEvent",
+    "ToolHandler",
+    "ToolScope",
+    "ToolSideEffect",
+    "ToolSuite",
+    "Trace",
+    "cell_signature",
+    "coerce_env_selection",
+    "eval_predicates",
 ]

@@ -30,7 +30,7 @@ Stable contract:
 
 ```python
 class AttackAlgorithmBase(ABC):
-    def __init__(self, config: Optional[Mapping[str, Any]] = None) -> None: ...
+    def __init__(self, config: Mapping[str, Any] | None = None) -> None: ...
     def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]: ...
 ```
 
@@ -68,7 +68,7 @@ class AttackCandidate:
     user_messages: tuple[str, ...]
 
     @classmethod
-    def from_messages(cls, user_messages: Sequence[str]) -> "AttackCandidate": ...
+    def from_messages(cls, user_messages: Sequence[str]) -> Self: ...
 ```
 
 Current replay validation limits:
@@ -237,29 +237,27 @@ Current canonical tools:
 
 ## Evaluators
 
-### `evaluation_redteam.py`
+Command choice:
+
+- Use `aicomp evaluate` for scorer-style runs and stable machine-readable artifacts.
+- Use `aicomp test` for local iteration with saved history plus `compare` / `visualize`.
+
+### `aicomp evaluate`
 
 Current purpose:
 
-- public Kaggle-style standalone scorer
-- expects `attack.py`
-- defaults to `--budget-s 1800`
-- defaults to `--env gym`
-- reports normalized attack score only
-
-Implementation note: this entrypoint lives at [`../evaluation_redteam.py`](../evaluation_redteam.py).
-
-### `evaluation.py`
-
-Current purpose:
-
-- package dual-track evaluator
-- expects `--submission_zip submission.zip`
-- defaults to `--budget-s 3600`
-- splits budget evenly between attack and defense
+- standalone evaluator for redteam, defense, and dual-track workflows
+- expects the `redteam`, `defense`, or `dual` subcommand
+- expects a positional submission path: a Python file for `redteam`/`defense`, or `submission.zip` for `dual`
+- defaults to `--budget-s 1800` for redteam and defense, `3600` total for dual
 - defaults to `--env sandbox`
-
-Implementation note: this entrypoint lives at [`../evaluation.py`](../evaluation.py).
+- defaults to `--artifacts-dir evaluation_artifacts`
+- defaults to `--verbosity summary`
+- supports `--verbosity {summary, progress, debug}`
+- writes `score.txt` and `report.json` under the artifact directory
+- supports `--save-transcript` for `transcript.log`
+- supports `--save-framework-events` for `framework.jsonl`
+- supports `--save-agent-debug` for `agent-debug.jsonl`
 
 ## CLI
 
@@ -273,6 +271,7 @@ Current subcommands:
 
 - `init`
 - `validate`
+- `evaluate`
 - `test`
 - `compare`
 - `history`
@@ -282,29 +281,33 @@ Current subcommands:
 
 Most important current options:
 
-- `--track {auto, redteam, dual, defense}`
+- explicit track subcommands: `redteam`, `defense`, `dual`
 - `--budget-s` with default `3600`
+  This becomes `3600` attack seconds for `redteam`, `3600` defense seconds for `defense`, and `1800`/`1800` for `dual`.
 - `--agent`
+- `--verbosity {summary, progress, debug}`
+- `--transcript-file PATH`
+- `--event-log-file PATH`
+- `--agent-debug-jsonl PATH`
 - `--env`
-- `--quick`
-- `--fixtures_dir`
+- `--fixtures-dir`
 
 Current env defaults:
 
-- `redteam` defaults to `gym`
-- `defense` and `dual` default to `sandbox`
+- `redteam`, `defense`, and `dual` all default to `sandbox`
+- pass `--env gym` explicitly when you want GymAttackEnv
 
 ### Common CLI Examples
 
 ```bash
 aicomp init attack
 aicomp init guardrail
-aicomp validate attack.py
-aicomp validate guardrail.py --type guardrail
-aicomp test attack.py --track redteam --quick
-aicomp test attack.py --track redteam --budget-s 1800 --env gym
-aicomp test guardrail.py --track defense --quick
-aicomp test submission.zip --track dual --quick
+aicomp validate redteam attack.py
+aicomp validate defense guardrail.py
+aicomp evaluate redteam attack.py --budget-s 60
+aicomp test redteam attack.py --budget-s 1800 --env gym
+aicomp test defense guardrail.py --budget-s 60
+aicomp test dual submission.zip --budget-s 60
 ```
 
 ## Scoring Helpers

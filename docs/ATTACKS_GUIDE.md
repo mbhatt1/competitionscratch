@@ -15,20 +15,22 @@ aicomp init attack
 Validate the file shape:
 
 ```bash
-aicomp validate attack.py
+aicomp validate redteam attack.py
 ```
 
 Run a deterministic smoke test:
 
 ```bash
-aicomp test attack.py --track redteam --quick --agent deterministic
+aicomp test redteam attack.py --budget-s 60 --agent deterministic
 ```
 
 If you want evaluator-level parity with the public Kaggle path:
 
 ```bash
-python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
 ```
+
+The standalone evaluator defaults to a short terminal summary. Add `--verbosity progress` for package-owned progress messages, plus `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` when you want `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under `--artifacts-dir`.
 
 Use the `deterministic` agent when you want an offline check without API keys.
 
@@ -87,7 +89,7 @@ Replay validation currently enforces:
 Start with the cheapest loop that proves you can generate replayable findings:
 
 1. build a tiny prompt bank
-2. run the attack locally with `--quick`
+2. run the attack locally with a short budget such as `--budget-s 60`
 3. inspect `tool_events`, `predicates`, and `egress`
 4. keep only replayable `AttackCandidate` chains
 5. add branching or state restoration after you have working signal
@@ -117,9 +119,11 @@ Both attack environments preserve the same practical helpers:
 
 Current red-team defaults:
 
-- public Kaggle path: `gym`
-- `aicomp test --track redteam`: `gym`
+- `aicomp evaluate redteam`: `sandbox`
+- `aicomp test redteam`: `sandbox`
 - package dual-track evaluation: `sandbox`
+
+Pass `--env gym` explicitly when you want GymAttackEnv for Kaggle-style parity.
 
 If you use `GymAttackEnv` directly:
 

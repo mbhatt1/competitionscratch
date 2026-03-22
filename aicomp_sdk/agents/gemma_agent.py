@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Final, Any
 
 from aicomp_sdk.agents.debug import AgentDebugSink
 from aicomp_sdk.agents.hf_chat_template.hf_agent import (
@@ -39,22 +39,22 @@ from aicomp_sdk.agents.types import (
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
-DEFAULT_GEMMA_MODEL_ID = "google/gemma-3-4b-it"
+DEFAULT_GEMMA_MODEL_ID: Final[str] = "google/gemma-3-4b-it"
 
 
 def build_gemma_backend_config(
     *,
-    model_path: Optional[str] = None,
-    model_id: Optional[str] = None,
+    model_path: str | None = None,
+    model_id: str | None = None,
     local_files_only: bool = True,
     device_map: str = "auto",
     torch_dtype: str = "auto",
-    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
-    model_kwargs: Optional[Mapping[str, Any]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
+    tokenizer_kwargs: Mapping[str, Any] | None = None,
+    model_kwargs: Mapping[str, Any] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
     max_new_tokens: int = 256,
-    generation_kwargs: Optional[Mapping[str, Any]] = None,
+    generation_kwargs: Mapping[str, Any] | None = None,
 ) -> HFBackendConfig:
     return _build_hf_backend_config(
         default_model_id=DEFAULT_GEMMA_MODEL_ID,
@@ -76,17 +76,17 @@ def build_gemma_backend_config(
 
 def build_gemma_backend(
     *,
-    model_path: Optional[str] = None,
-    model_id: Optional[str] = None,
+    model_path: str | None = None,
+    model_id: str | None = None,
     local_files_only: bool = True,
     device_map: str = "auto",
     torch_dtype: str = "auto",
-    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
-    model_kwargs: Optional[Mapping[str, Any]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
+    tokenizer_kwargs: Mapping[str, Any] | None = None,
+    model_kwargs: Mapping[str, Any] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
     max_new_tokens: int = 256,
-    generation_kwargs: Optional[Mapping[str, Any]] = None,
+    generation_kwargs: Mapping[str, Any] | None = None,
 ) -> HFChatTemplateBackend:
     return HFChatTemplateBackend.from_pretrained(
         build_gemma_backend_config(
@@ -214,12 +214,12 @@ class GemmaAgent(AgentProtocol):
 
     def __init__(
         self,
-        backend: Optional[HFGenerationBackendProtocol] = None,
+        backend: HFGenerationBackendProtocol | None = None,
         *,
-        profile: Optional[HFModelProfile] = None,
-        parser: Optional[HFResponseParser] = None,
-        request_builder: Optional[HFRequestBuilder] = None,
-        debug_sink: Optional[AgentDebugSink] = None,
+        profile: HFModelProfile | None = None,
+        parser: HFResponseParser | None = None,
+        request_builder: HFRequestBuilder | None = None,
+        debug_sink: AgentDebugSink | None = None,
     ) -> None:
         resolved_backend = backend or build_gemma_backend()
         resolved_profile = profile or HFModelProfile(instruction_role="system")

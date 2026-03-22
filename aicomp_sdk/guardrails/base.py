@@ -1,29 +1,40 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 
 
-@dataclass
+class DecisionAction(StrEnum):
+    ALLOW = "ALLOW"
+    DENY = "DENY"
+    CONFIRM = "CONFIRM"
+    SANITIZE = "SANITIZE"
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
-    action: str  # ALLOW | DENY | CONFIRM | SANITIZE
+    action: DecisionAction
     reason: str = ""
-    sanitized_args: Optional[Mapping[str, Any]] = None
+    sanitized_args: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "action", DecisionAction(self.action))
 
     @staticmethod
     def allow(reason: str = "") -> "Decision":
-        return Decision("ALLOW", reason)
+        return Decision(DecisionAction.ALLOW, reason)
 
     @staticmethod
     def deny(reason: str = "") -> "Decision":
-        return Decision("DENY", reason)
+        return Decision(DecisionAction.DENY, reason)
 
     @staticmethod
     def confirm(reason: str = "") -> "Decision":
-        return Decision("CONFIRM", reason)
+        return Decision(DecisionAction.CONFIRM, reason)
 
     @staticmethod
     def sanitize(sanitized_args: Mapping[str, Any], reason: str = "") -> "Decision":
-        return Decision("SANITIZE", reason, sanitized_args=sanitized_args)
+        return Decision(DecisionAction.SANITIZE, reason, sanitized_args=sanitized_args)
 
 
 class GuardrailBase:

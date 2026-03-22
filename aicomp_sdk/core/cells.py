@@ -1,10 +1,26 @@
 import hashlib
 from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, TypedDict
 
 
-def _h(s: str) -> str:
+class CellSignature(TypedDict):
+    tool_seq_ngram: list[str]
+    side_effects: list[str]
+    scopes: list[str]
+    sources: list[str]
+    outcomes: list[str]
+    secret_read: bool
+    egress_count: int
+    sensitive_tools: list[str]
+    guardrail_blocks: list[str]
+    n_tools: int
+    n_msgs: int
+    user_intent: list[str]
+    hash: str
+
+
+def _short_hash(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
 
 
@@ -24,12 +40,12 @@ def _bucket_url(url: str) -> str:
 def cell_signature(
     tool_events: Sequence[Mapping[str, Any]],
     n_tool: int = 5,
-    egress_data: Optional[Collection[Mapping[str, Any]]] = None,
-    user_messages: Optional[Sequence[str]] = None,
+    egress_data: Collection[Mapping[str, Any]] | None = None,
+    user_messages: Sequence[str] | None = None,
     use_args: bool = True,
     use_outputs: bool = True,
     args_count: int = 5,
-) -> dict[str, object]:
+) -> CellSignature:
     """
     Enhanced cell signature that tracks meaningful attack progress:
     - Tool sequences and sources
@@ -51,11 +67,13 @@ def cell_signature(
     n_tool = min(n_tool, args_count)
 
     # Basic tool sequence features
-    seq = [e["name"] for e in tool_events][-n_tool:]
-    se = [e["side_effect"] for e in tool_events][-n_tool:]
-    sc = [e["scope"] for e in tool_events][-n_tool:]
-    src = [e["source"] for e in tool_events][-min(2, len(tool_events)) :]
-    out = [("ok" if e.get("ok") else "err") for e in tool_events][-min(3, len(tool_events)) :]
+    tool_sequence = [e["name"] for e in tool_events][-n_tool:]
+    side_effects = [e["side_effect"] for e in tool_events][-n_tool:]
+    scopes = [e["scope"] for e in tool_events][-n_tool:]
+    sources = [e["source"] for e in tool_events][-min(2, len(tool_events)) :]
+    outcomes = [("ok" if e.get("ok") else "err") for e in tool_events][
+        -min(3, len(tool_events)) :
+    ]
 
     # Progress indicators
     secret_read = any(
@@ -103,7 +121,7 @@ def cell_signature(
         for e in tool_events[-3:]:
             if e.get("ok") and e.get("output"):
                 output_sample = str(e["output"])[:50]
-                output_samples.append(_h(output_sample)[:8])
+                output_samples.append(_short_hash(output_sample)[:8])
 
     # Track guardrail blocks (last 3 errors)
     blocks = []
@@ -118,34 +136,34 @@ def cell_signature(
     user_intent_hash = []
     for msg in user_messages[-3:]:
         # Hash each message to keep signature compact
-        user_intent_hash.append(_h(msg)[:8])
+        user_intent_hash.append(_short_hash(msg)[:8])
 
     # Build signature string with all features (more granular + user intent)
     sig_parts = (
-        seq
+        tool_sequence
         + ["--"]
-        + se
+        + side_effects
         + ["--"]
-        + sc
+        + scopes
         + ["--"]
-        + src
+        + sources
         + ["--"]
-        + out
+        + outcomes
         + ["--"]
         + [f"secret_read:{secret_read}"]
         + ["--"]
         + [f"egress:{egress_count}"]
         + ["--"]
         + [f"n_tools:{len(tool_events)}"]
-        + ["--"]  # Add tool count for differentiation
+        + ["--"]
         + [f"n_msgs:{len(user_messages)}"]
-        + ["--"]  # Add message count
+        + ["--"]
         + tool_args_signature
         + ["--"]
         + output_samples
         + ["--"]
         + user_intent_hash
-        + ["--"]  # USER INTENT - key differentiation!
+        + ["--"]
         + blocks
     )
     sig_str = "|".join(sig_parts)
@@ -153,17 +171,17 @@ def cell_signature(
     # TODO: We could use a dataclass here to help with typing or pydantic if
     # we want to support serialization and validation.
     return {
-        "tool_seq_ngram": seq,
-        "side_effects": se,
-        "scopes": sc,
-        "sources": src,
-        "outcomes": out,
+        "tool_seq_ngram": tool_sequence,
+        "side_effects": side_effects,
+        "scopes": scopes,
+        "sources": sources,
+        "outcomes": outcomes,
         "secret_read": secret_read,
         "egress_count": egress_count,
-        "sensitive_tools": tool_args_signature,  # Now includes all tools with args
+        "sensitive_tools": tool_args_signature,
         "guardrail_blocks": blocks,
         "n_tools": len(tool_events),
         "n_msgs": len(user_messages),
-        "user_intent": user_intent_hash,  # Track intended actions
-        "hash": _h(sig_str),
+        "user_intent": user_intent_hash,
+        "hash": _short_hash(sig_str),
     }

@@ -10,8 +10,8 @@ from typing import Any
 
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail as BaselineGuardrail
+from aicomp_sdk.evaluation.ops import eval_defense
 from aicomp_sdk.scoring import score_defense
-from evaluation import eval_defense
 
 
 def run_baseline_defense(budget_s: float = 30.0) -> tuple[dict[str, Any], float]:

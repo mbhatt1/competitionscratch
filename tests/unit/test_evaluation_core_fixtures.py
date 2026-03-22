@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aicomp_sdk import evaluation_core
+import aicomp_sdk.evaluation.ops as evaluation_core
 
 
 def _write_fixture_tree(root: Path) -> None:

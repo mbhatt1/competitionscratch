@@ -4,12 +4,16 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
-from aicomp_sdk.core.env_api import DiagnosticsEnv, EnvInteractionResult
+from aicomp_sdk.core.env.api import DiagnosticsEnv, EnvInteractionResult, EnvRunDiagnostics, RunDiagnostics
+from aicomp_sdk.guardrails.base import GuardrailBase
 
 
 @dataclass
 class _FakeEnv:
     seed: int = 123
+    trace: Any = None
+    tools: Any = None
+    guardrail: GuardrailBase = field(default_factory=GuardrailBase)
     _messages: list[str] = field(default_factory=list)
 
     def reset(self) -> None:
@@ -61,6 +65,13 @@ def test_diagnostics_env_accumulates_seed_and_exploration_interactions() -> None
     assert env.run_diagnostics.successful_tool_calls == 2
     assert env.run_diagnostics.failed_tool_calls == 0
     assert env.run_diagnostics.agent_refusals == 1
+
+
+def test_diagnostics_env_uses_role_specific_env_run_diagnostics_type() -> None:
+    env = DiagnosticsEnv(_FakeEnv())
+
+    assert isinstance(env.run_diagnostics, EnvRunDiagnostics)
+    assert RunDiagnostics is EnvRunDiagnostics
 
 
 def test_diagnostics_env_delegates_snapshot_restore_and_export() -> None:

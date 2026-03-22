@@ -13,8 +13,8 @@ from .factory import (
     AgentSelection,
     build_agent,
     build_agent_factory,
+    coerce_agent_selection,
     format_agent_selection,
-    parse_agent_selection,
     require_agent_selection_configuration,
 )
 from .gemma_agent import (
@@ -85,7 +85,7 @@ __all__ = [
     "build_gemma_backend",
     "build_gemma_backend_config",
     "build_hf_response_parser",
+    "coerce_agent_selection",
     "format_agent_selection",
-    "parse_agent_selection",
     "require_agent_selection_configuration",
 ]

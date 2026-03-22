@@ -17,7 +17,7 @@ from aicomp_sdk.agents import (
 )
 from aicomp_sdk.agents import factory as agent_factory
 from aicomp_sdk.agents import (
-    parse_agent_selection,
+    coerce_agent_selection,
 )
 from aicomp_sdk.agents.gpt_oss_agent import build_gpt_oss_backend_config
 
@@ -29,19 +29,19 @@ class _BackendStub:
         return None
 
 
-def test_parse_agent_selection_from_string() -> None:
-    assert parse_agent_selection("auto") is AgentSelection.AUTO
-    assert parse_agent_selection("gpt_oss") is AgentSelection.GPT_OSS
-    assert parse_agent_selection("gemma") is AgentSelection.GEMMA
+def test_coerce_agent_selection_from_string() -> None:
+    assert coerce_agent_selection("auto") is AgentSelection.AUTO
+    assert coerce_agent_selection("gpt_oss") is AgentSelection.GPT_OSS
+    assert coerce_agent_selection("gemma") is AgentSelection.GEMMA
 
 
-def test_parse_agent_selection_from_enum() -> None:
-    assert parse_agent_selection(AgentSelection.OPENAI) is AgentSelection.OPENAI
+def test_coerce_agent_selection_from_enum() -> None:
+    assert coerce_agent_selection(AgentSelection.OPENAI) is AgentSelection.OPENAI
 
 
-def test_parse_agent_selection_rejects_invalid_value() -> None:
+def test_coerce_agent_selection_rejects_invalid_value() -> None:
     with pytest.raises(ValueError, match="Unsupported agent selection: invalid"):
-        parse_agent_selection("invalid")
+        coerce_agent_selection("invalid")
 
 
 def test_build_agent_deterministic_returns_expected_agent() -> None:

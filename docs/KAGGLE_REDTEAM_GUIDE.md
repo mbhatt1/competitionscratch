@@ -20,16 +20,17 @@ The package also supports package guardrail-only and package dual-track workflow
 
 ## Filename and Class Requirements
 
-The standalone Kaggle-style scorer enforces the filename:
+For the public Kaggle path, use the required submission filename:
 
 ```bash
-python evaluation_redteam.py --submission attack.py
+aicomp evaluate redteam attack.py
 ```
 
 Current enforcement:
 
-- the file must be named `attack.py`
 - the module must define `AttackAlgorithm`
+- local `aicomp evaluate redteam` runs accept any `.py` filename
+- the submitted public artifact should still be named `attack.py`
 
 Package attack-only testing is more flexible and can evaluate any `.py` file that defines `AttackAlgorithm`, but the public Kaggle path expects `attack.py`.
 
@@ -48,20 +49,32 @@ The safest return shape is a list of replayable `AttackCandidate` message chains
 
 ## Public Evaluator Defaults
 
-`evaluation_redteam.py` currently defaults to:
+`aicomp evaluate redteam` currently defaults to:
 
 - `--budget-s 1800`
-- `--env gym`
+- `--env sandbox`
 - normalized attack scoring
+
+Pass `--env gym` when you want local behavior that matches the public Kaggle environment.
 
 It also writes:
 
-- `scores.txt` with the normalized attack score
-- `scores.json` with the attack summary and evaluator metadata
+- `score.txt` with the normalized attack score
+- `report.json` with the attack summary and evaluator metadata
+
+Both files are written under the evaluator artifact directory, which defaults to `evaluation_artifacts/` and can be changed with `--artifacts-dir`.
+
+Current output control:
+
+- terminal output defaults to a short summary
+- use `--verbosity progress` for package-owned progress messages
+- use `--save-transcript` for `transcript.log`
+- use `--save-framework-events` for `framework.jsonl`
+- use `--save-agent-debug` for `agent-debug.jsonl`
 
 ## Environment Contract
 
-The public Kaggle path defaults to `GymAttackEnv`.
+The public Kaggle environment uses `GymAttackEnv`, but local CLI runs only use it when you pass `--env gym`.
 
 Current Gym-style behavior:
 
@@ -106,14 +119,15 @@ Use these when you want local behavior that matches the public Kaggle path as cl
 Fast smoke test:
 
 ```bash
-aicomp test attack.py --track redteam --quick --agent deterministic
+aicomp test redteam attack.py --budget-s 60 --agent deterministic
 ```
 
 Public-contract scorer:
 
 ```bash
-python evaluation_redteam.py \
-  --submission attack.py \
+aicomp evaluate \
+  redteam \
+  attack.py \
   --budget-s 60 \
   --agent deterministic \
   --env gym
@@ -122,7 +136,7 @@ python evaluation_redteam.py \
 Official-budget CLI equivalent:
 
 ```bash
-aicomp test attack.py --track redteam --budget-s 1800 --agent deterministic --env gym
+aicomp test redteam attack.py --budget-s 1800 --agent deterministic --env gym
 ```
 
 ## What This Page Does Not Cover

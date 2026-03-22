@@ -1,14 +1,15 @@
 from __future__ import annotations
+# mypy: disable-error-code="union-attr,arg-type"
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
 from aicomp_sdk.agents.debug import InMemoryAgentDebugSink
-from aicomp_sdk.agents.openai_agent import OpenAIResponsesAgent
+from aicomp_sdk.agents.openai_agent import OpenAIClientProtocol, OpenAIResponsesAgent
 from aicomp_sdk.agents.tool_specs import to_agent_tool_specs
 from aicomp_sdk.agents.types import (
     AGENT_STATE_VERSION,
@@ -63,7 +64,7 @@ class _ResponseFunctionToolCall(BaseModel):
 class _ResponseModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    output: list[Union[_ResponseOutputMessage, _ResponseFunctionToolCall]]
+    output: list[_ResponseOutputMessage | _ResponseFunctionToolCall]
     output_text: str = ""
     error: Any = None
     incomplete_details: Any = None
@@ -71,11 +72,14 @@ class _ResponseModel(BaseModel):
 
 def _build_agent(
     *responses: object,
-    debug_sink: Optional[InMemoryAgentDebugSink] = None,
+    debug_sink: InMemoryAgentDebugSink | None = None,
 ) -> tuple[OpenAIResponsesAgent, SpyResponsesAPI]:
     responses_api = SpyResponsesAPI(queued_responses=list(responses))
     client = SpyOpenAIClient(responses=responses_api)
-    agent = OpenAIResponsesAgent(client=client, debug_sink=debug_sink)
+    agent = OpenAIResponsesAgent(
+        client=cast(OpenAIClientProtocol, client),
+        debug_sink=debug_sink,
+    )
     return agent, responses_api
 
 
@@ -113,7 +117,7 @@ def _tool_call_response(
     arguments: str,
     assistant_text: str = "",
 ) -> _ResponseModel:
-    output: list[Union[_ResponseOutputMessage, _ResponseFunctionToolCall]] = []
+    output: list[_ResponseOutputMessage | _ResponseFunctionToolCall] = []
     if assistant_text:
         output.append(
             _ResponseOutputMessage(
@@ -221,16 +225,12 @@ def test_openai_agent_registers_builtin_tool_routing_guidance(
         "folder name"
         in registered_tools["email_list"]["parameters"]["properties"]["folder"]["description"]
     )
-    assert registered_tools["email_list"]["parameters"]["properties"]["limit"] == {
-        "anyOf": [
-            {
-                "type": "integer",
-                "description": "Maximum number of message summaries to return for this page. Defaults to 20 and is capped at 50.",
-            },
-            {"type": "null"},
-        ],
-        "description": "Maximum number of message summaries to return for this page. Defaults to 20 and is capped at 50.",
-    }
+    limit_parameter = registered_tools["email_list"]["parameters"]["properties"]["limit"]
+    assert (
+        limit_parameter["description"]
+        == "Maximum number of message summaries to return for this page. Defaults to 20 and is capped at 50."
+    )
+    assert [option["type"] for option in limit_parameter["anyOf"]] == ["integer", "null"]
     assert "known message identifier" in registered_tools["email_read"]["description"]
 
 

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any, Self
 
 from .hf_types import HFBackendConfig, HFGenerationRequest, HFGenerationResponse
 
 
 def _resolve_hf_optional_override(
-    explicit_value: Optional[str],
+    explicit_value: str | None,
     *,
     env_var: str,
-) -> Optional[str]:
+) -> str | None:
     if explicit_value is not None:
         stripped_value = explicit_value.strip()
         return stripped_value or None
@@ -25,17 +25,17 @@ def _build_hf_backend_config(
     default_model_id: str,
     model_id_env_var: str,
     model_path_env_var: str,
-    model_path: Optional[str] = None,
-    model_id: Optional[str] = None,
+    model_path: str | None = None,
+    model_id: str | None = None,
     local_files_only: bool = True,
     device_map: str = "auto",
     torch_dtype: str = "auto",
-    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
-    model_kwargs: Optional[Mapping[str, Any]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
+    tokenizer_kwargs: Mapping[str, Any] | None = None,
+    model_kwargs: Mapping[str, Any] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
     max_new_tokens: int = 256,
-    generation_kwargs: Optional[Mapping[str, Any]] = None,
+    generation_kwargs: Mapping[str, Any] | None = None,
 ) -> HFBackendConfig:
     resolved_generation_kwargs = (
         dict(generation_kwargs) if generation_kwargs is not None else {"do_sample": False}
@@ -75,11 +75,15 @@ class HFChatTemplateBackend:
         self.config = config
 
     @classmethod
-    def from_pretrained(cls, config: HFBackendConfig) -> HFChatTemplateBackend:
+    def from_pretrained(cls, config: HFBackendConfig) -> Self:
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
         except Exception as err:
-            raise RuntimeError("Transformers SDK is not available") from err
+            exc = RuntimeError("Transformers SDK is not available")
+            exc.add_note(
+                "Install the 'transformers' dependency before using local HF chat-template agents."
+            )
+            raise exc from err
 
         source = config.model_source()
         try:
@@ -92,7 +96,9 @@ class HFChatTemplateBackend:
                 **config.model_loader_kwargs(),
             )
         except Exception as err:
-            raise RuntimeError(f"Failed to load HF chat-template backend from '{source}'") from err
+            exc = RuntimeError(f"Failed to load HF chat-template backend from '{source}'")
+            exc.add_note(f"Model source: {source}")
+            raise exc from err
 
         return cls(tokenizer=tokenizer, model=model, config=config)
 

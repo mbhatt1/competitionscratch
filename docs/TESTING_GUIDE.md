@@ -51,8 +51,9 @@ Run:
 ```bash
 pytest tests/unit/test_cli_test_command.py -v
 pytest tests/unit/test_cli_validate_command.py -v
+pytest tests/unit/test_evaluation_defense.py -v
+pytest tests/unit/test_evaluation_dual.py -v
 pytest tests/unit/test_evaluation_redteam.py -v
-pytest tests/unit/test_evaluation_legacy.py -v
 pytest tests/unit/test_evaluation_env_selection.py -v
 ```
 

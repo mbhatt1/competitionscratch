@@ -4,7 +4,9 @@ Use this directory when you want runnable examples for the current package surfa
 
 The package supports attack-only, guardrail-only, and dual-track workflows. The public Kaggle path still requires `attack.py` as the submission filename, so attack examples become public-path compatible when you copy or rename them to `attack.py`.
 
-The files under `attacks/` and `guardrails/` are clean submission examples, not standalone CLI programs. Use the smoke wrappers in this directory, `aicomp validate`, `aicomp test`, or the evaluator scripts when you want to run them locally.
+The files under `attacks/` and `guardrails/` are clean submission examples, not standalone CLI programs. Use the smoke wrappers in this directory, `aicomp validate`, `aicomp test`, or `aicomp evaluate` when you want to run them locally.
+
+The standalone evaluator defaults to a short terminal summary. Add `--verbosity progress` for package-owned progress messages, plus `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` when you want `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under `--artifacts-dir`.
 
 ## Choose a Starting Point
 
@@ -35,7 +37,7 @@ Use this path if:
 
 - you want a package-local dual-track pair with current contracts
 - you want a concise smoke test before packaging `submission.zip`
-- you want examples that map cleanly to [`../evaluation.py`](../evaluation.py)
+- you want examples that map cleanly to `aicomp evaluate dual`
 
 ### I want stronger or more specialized package examples
 
@@ -117,7 +119,7 @@ Then copy the example into the public submission shape:
 
 ```bash
 cp examples/attacks/attack_gym_step.py attack.py
-python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
 ### Package guardrail-only example
@@ -125,8 +127,8 @@ python evaluation_redteam.py --submission attack.py --budget-s 60 --agent determ
 Validate and test the example directly:
 
 ```bash
-aicomp validate examples/guardrails/guardrail.py --type guardrail
-aicomp test examples/guardrails/guardrail.py --track defense --quick --agent deterministic
+aicomp validate defense examples/guardrails/guardrail.py
+aicomp test defense examples/guardrails/guardrail.py --budget-s 60 --agent deterministic
 ```
 
 ### Package dual-track example
@@ -143,5 +145,5 @@ Then package the canonical pair for the standalone dual-track evaluator:
 cp examples/attacks/attack.py attack.py
 cp examples/guardrails/guardrail.py guardrail.py
 zip submission.zip attack.py guardrail.py
-python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
+aicomp evaluate dual submission.zip --budget-s 60 --agent deterministic --env sandbox
 ```

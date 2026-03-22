@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Final, TYPE_CHECKING, Any
 
 from aicomp_sdk.agents.types import AgentToolSpec, JsonObject
 
@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     from aicomp_sdk.core.tools import RuntimeToolSpec
 
 
-_OPENAI_TOOL_NAME_SAFE_CHARS_RE = re.compile(r"[^A-Za-z0-9_-]+")
-_OPENAI_TOOL_NAME_MAX_LEN = 64
+_OPENAI_TOOL_NAME_SAFE_CHARS_RE: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9_-]+")
+_OPENAI_TOOL_NAME_MAX_LEN: Final[int] = 64
 
 
 def serialize_tool_output(value: Any) -> str:
@@ -27,7 +27,7 @@ def serialize_tool_output(value: Any) -> str:
 def to_openai_function_tool(
     spec: AgentToolSpec,
     *,
-    name_override: Optional[str] = None,
+    name_override: str | None = None,
 ) -> JsonObject:
     return {
         "type": "function",
@@ -98,7 +98,7 @@ def _sanitize_openai_tool_name(name: str) -> str:
 
 
 def _with_hash_suffix(base_name: str, raw_name: str) -> str:
-    digest = hashlib.sha1(raw_name.encode("utf-8")).hexdigest()[:8]
+    digest = hashlib.sha1(raw_name.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
     max_base_length = _OPENAI_TOOL_NAME_MAX_LEN - len(digest) - 1
     trimmed = base_name[:max_base_length].rstrip("_-")
     if not trimmed:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from aicomp_sdk.agents.types import (
     AgentDecision,
@@ -140,7 +140,7 @@ def _get_non_empty_string(value: object) -> str | None:
     return stripped or None
 
 
-def _extract_top_level_json_object(text: str) -> Optional[Mapping[str, object]]:
+def _extract_top_level_json_object(text: str) -> Mapping[str, object] | None:
     stripped = text.strip()
     if not stripped:
         return None

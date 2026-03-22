@@ -9,8 +9,9 @@ Creates properly structured attack.py or guardrail.py templates with:
 """
 
 from pathlib import Path
+from typing import Final
 
-ATTACK_TEMPLATE = '''"""
+ATTACK_TEMPLATE: Final[str] = '''"""
 AI Agent Security Competition - Attack Submission
 
 TODO: Implement your attack strategy to find security vulnerabilities
@@ -22,7 +23,7 @@ Your goal: Find sequences of agent actions that violate security predicates
 
 import time
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Final, Any
 
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 
@@ -38,7 +39,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
     You have a time budget to find as many unique vulnerabilities as possible.
     """
     
-    def __init__(self, config: Optional[Mapping[str, Any]] = None):
+    def __init__(self, config: Mapping[str, Any] | None = None):
         """
         Initialize the attack algorithm.
         
@@ -159,7 +160,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
 '''
 
 
-GUARDRAIL_TEMPLATE = '''"""
+GUARDRAIL_TEMPLATE: Final[str] = '''"""
 AI Agent Security Competition - Guardrail Submission
 
 TODO: Implement your defensive guardrail to protect AI agents
@@ -310,8 +311,13 @@ def run_init(args) -> int:
     # Get template
     if submission_type == "attack":
         template = ATTACK_TEMPLATE
+        validate_track = "redteam"
+        test_command = f"aicomp test redteam {output_path} --budget-s 60"
     else:
         template = GUARDRAIL_TEMPLATE
+        validate_track = "defense"
+        test_command = f"aicomp test defense {output_path} --budget-s 60"
+    validate_command = f"aicomp validate {validate_track} {output_path}"
 
     # Write template
     try:
@@ -321,8 +327,8 @@ def run_init(args) -> int:
         print()
         print_info("Next steps:")
         print(f"  1. Edit {output_path} and implement the TODO sections")
-        print(f"  2. Validate your submission: aicomp validate {output_path}")
-        print(f"  3. Test your submission: aicomp test {output_path} --quick")
+        print(f"  2. Validate your submission: {validate_command}")
+        print(f"  3. Test your submission: {test_command}")
         print()
         print_info("For more help:")
         print("  - See examples in: examples/attacks/ and examples/guardrails/")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional, Protocol
+from typing import Any, Literal, Protocol
 
 from aicomp_sdk.agents.types import AgentDecision, AgentToolSpec, JsonObject
 from aicomp_sdk.core.runtime_history import RuntimeHistory
@@ -11,14 +11,14 @@ from aicomp_sdk.core.runtime_history import RuntimeHistory
 @dataclass(frozen=True)
 class HFBackendConfig:
     model_id: str
-    model_path: Optional[str] = None
+    model_path: str | None = None
     local_files_only: bool = True
     device_map: str = "auto"
     torch_dtype: str = "auto"
     tokenizer_kwargs: Mapping[str, Any] = field(default_factory=dict)
     model_kwargs: Mapping[str, Any] = field(default_factory=dict)
-    trust_remote_code: Optional[bool] = None
-    attn_implementation: Optional[str] = None
+    trust_remote_code: bool | None = None
+    attn_implementation: str | None = None
     max_new_tokens: int = 256
     generation_kwargs: Mapping[str, Any] = field(default_factory=lambda: {"do_sample": False})
 
@@ -73,8 +73,8 @@ class HFBackendConfig:
 @dataclass(frozen=True)
 class HFModelProfile:
     instruction_role: Literal["system", "developer"] = "system"
-    chat_template: Optional[str] = None
-    assistant_prefill: Optional[str] = None
+    chat_template: str | None = None
+    assistant_prefill: str | None = None
     continue_final_message: bool = False
 
     def __post_init__(self) -> None:
@@ -88,7 +88,7 @@ class HFModelProfile:
 class HFGenerationRequest:
     messages: list[dict[str, Any]]
     tools: list[JsonObject]
-    chat_template: Optional[str]
+    chat_template: str | None
     add_generation_prompt: bool
     continue_final_message: bool
     max_new_tokens: int
@@ -106,7 +106,7 @@ class HFGenerationRequest:
 class HFGenerationResponse:
     text: str
     raw_text: str
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
 
 
 class HFGenerationBackendProtocol(Protocol):

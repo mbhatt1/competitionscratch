@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aicomp-sdk"
-version = "2.0.1"
+version = "2.1.0"
 description = "AI Agent Security Competition SDK - Red teaming framework for tool-using AI agents"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Competition Organizers" }]
@@ -29,8 +29,6 @@ classifiers = [
   "Topic :: Security",
   "Topic :: Software Development :: Testing",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent",
@@ -80,7 +78,7 @@ aicomp_sdk = [
 
 [tool.black]
 line-length = 100
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py311', 'py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -106,7 +104,7 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -117,6 +115,11 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["openai.types.responses.response_create_params"]
+follow_imports = "normal"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -6,7 +6,7 @@ Comprehensive test for data-flow guardrail with extensive benign test suite.
 from pathlib import Path
 
 from aicomp_sdk.agents import build_agent
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 
 from tests.integration.guardrail_fixtures import PatternGuardrail, TaintTrackingGuardrail
 

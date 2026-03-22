@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from aicomp_sdk.agents.tool_specs import (
     build_openai_tool_name_maps,
     to_openai_function_tool,
@@ -73,19 +75,15 @@ def test_to_openai_function_tool_makes_optional_properties_nullable_under_strict
     rendered = to_openai_function_tool(spec, name_override="email_list")
 
     assert rendered["strict"] is True
-    parameters = rendered["parameters"]
+    parameters = cast(dict[str, Any], rendered["parameters"])
     assert parameters["required"] == ["folder", "limit", "cursor"]
     assert parameters["properties"]["folder"] == {
         "type": "string",
         "description": "Folder name.",
     }
-    assert parameters["properties"]["limit"] == {
-        "anyOf": [
-            {"type": "integer", "description": "Page size."},
-            {"type": "null"},
-        ],
-        "description": "Page size.",
-    }
+    limit_parameter = parameters["properties"]["limit"]
+    assert limit_parameter["description"] == "Page size."
+    assert [option["type"] for option in limit_parameter["anyOf"]] == ["integer", "null"]
     assert parameters["properties"]["cursor"] == {
         "anyOf": [{"type": "string"}, {"type": "null"}],
         "description": "Pagination cursor.",

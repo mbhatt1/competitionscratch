@@ -1,6 +1,6 @@
 """Guardrail system for defense strategies."""
 
-from .base import Decision, GuardrailBase
+from .base import Decision, DecisionAction, GuardrailBase
 from .hooks import (
     HookCallback,
     HookContext,
@@ -28,6 +28,7 @@ from .optimal import Guardrail as OptimalGuardrail
 __all__ = [
     "GuardrailBase",
     "Decision",
+    "DecisionAction",
     "OptimalGuardrail",
     # Simple Hooks API (recommended)
     "attack_hook",

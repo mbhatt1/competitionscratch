@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, Mapping, Optional
+from enum import StrEnum
+from typing import Any, Callable, Mapping
 
 
-class ToolSideEffect(str, Enum):
+class ToolSideEffect(StrEnum):
+    """Coarse side-effect category for a tool call."""
+
     READ = "READ"
     WRITE = "WRITE"
     EXEC = "EXEC"
@@ -14,7 +16,9 @@ class ToolSideEffect(str, Enum):
     AUTH = "AUTH"
 
 
-class ToolScope(str, Enum):
+class ToolScope(StrEnum):
+    """Data or network boundary a tool is allowed to touch."""
+
     PUBLIC = "public"
     INTERNAL = "internal"
     LOCAL = "local"
@@ -37,12 +41,14 @@ class RuntimeToolSpec:
     parameters_json_schema: Mapping[str, Any]
 
 
-ToolCallResult = tuple[bool, str, Optional[str]]
+ToolCallResult = tuple[bool, str, str | None]
 ToolHandler = Callable[..., ToolCallResult]
 
 
 @dataclass(frozen=True)
 class ToolDef:
+    """Registered tool implementation and its guardrail-visible metadata."""
+
     name: str
     side_effect: ToolSideEffect
     scope: ToolScope

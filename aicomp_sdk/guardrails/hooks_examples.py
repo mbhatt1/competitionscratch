@@ -9,7 +9,6 @@ This demonstrates how to use the hook system for:
 """
 
 from pathlib import Path
-from typing import Optional
 
 from aicomp_sdk.guardrails.hooks import (
     HookContext,
@@ -147,7 +146,7 @@ def example_payload_injection():
     Injects malicious content into tool outputs.
     """
 
-    def generate_action_directive(context: HookContext) -> Optional[str]:
+    def generate_action_directive(context: HookContext) -> str | None:
         """Generate ACTION: directive payloads"""
         if context.tool_name == "web.search":
             # Inject malicious directive into search results

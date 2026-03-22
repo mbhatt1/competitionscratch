@@ -1,8 +1,9 @@
 from __future__ import annotations
+# mypy: disable-error-code="call-arg,union-attr"
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -16,8 +17,8 @@ from aicomp_sdk.agents.types import (
     ToolCallDecision,
     UserMessageEvent,
 )
-from aicomp_sdk.core.env import EnvSnapshot, SandboxEnv
-from aicomp_sdk.core.env_api import (
+from aicomp_sdk.core.env.sandbox import EnvSnapshot, SandboxEnv
+from aicomp_sdk.core.env.api import (
     DEFAULT_MAX_TOOL_HOPS,
     MAX_USER_MESSAGE_CHARS,
     AttackEnvProtocol,
@@ -25,6 +26,7 @@ from aicomp_sdk.core.env_api import (
     EnvInteractionResult,
 )
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
+from aicomp_sdk.guardrails.hooks import get_hook_registry
 
 
 @dataclass
@@ -62,7 +64,7 @@ def _tool_decision(
     args: dict[str, Any],
     *,
     call_id: str = "call_000001",
-    assistant_message: Optional[str] = None,
+    assistant_message: str | None = None,
 ) -> ToolCallDecision:
     return ToolCallDecision(
         call=ToolCall(call_id=call_id, tool_name=tool_name, arguments=args),
@@ -97,6 +99,31 @@ def test_env_initialization_with_agent(temp_fixtures: Path) -> None:
     assert "filesystem tools for local files" in instructions
     assert "email tools for email folders and message identifiers" in instructions
     assert agent.reset_calls == 1
+
+
+def test_env_defaults_to_isolated_copy_of_global_hook_registry(temp_fixtures: Path) -> None:
+    global_registry = get_hook_registry()
+    global_registry.clear_all()
+
+    try:
+        global_registry.set_persistent_state("template_key", "template_value")
+
+        env_one = SandboxEnv(seed=1, fixtures_dir=temp_fixtures, agent=StubAgent())
+        env_two = SandboxEnv(seed=2, fixtures_dir=temp_fixtures, agent=StubAgent())
+
+        assert env_one.hook_registry is not global_registry
+        assert env_two.hook_registry is not global_registry
+        assert env_one.hook_registry is not env_two.hook_registry
+        assert env_one.hook_registry.get_persistent_state("template_key") == "template_value"
+        assert env_two.hook_registry.get_persistent_state("template_key") == "template_value"
+
+        env_one.hook_registry.set_persistent_state("template_key", "env_one_value")
+
+        assert env_one.hook_registry.get_persistent_state("template_key") == "env_one_value"
+        assert env_two.hook_registry.get_persistent_state("template_key") == "template_value"
+        assert global_registry.get_persistent_state("template_key") == "template_value"
+    finally:
+        global_registry.clear_all()
 
 
 def test_env_requires_explicit_agent(temp_fixtures: Path) -> None:

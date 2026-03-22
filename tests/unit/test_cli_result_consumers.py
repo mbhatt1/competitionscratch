@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 import pytest
 
@@ -234,8 +235,8 @@ def test_matplotlib_visualizations_mark_non_evaluated_axes(
 
     assert create_matplotlib_visualizations(_attack_only_result(), tmp_path) is True
 
-    score_panel_text = fake_pyplot.axes_matrix[0][0].text_calls[0][0][2]
-    defense_panel_text = fake_pyplot.axes_matrix[1][0].text_calls[0][0][2]
+    score_panel_text = cast(str, fake_pyplot.axes_matrix[0][0].text_calls[0][0][2])
+    defense_panel_text = cast(str, fake_pyplot.axes_matrix[1][0].text_calls[0][0][2])
     assert "Only Attack track evaluated" in score_panel_text
     assert "Not evaluated in this run." in defense_panel_text
     assert fake_pyplot.axes_matrix[1][0].axis_calls == ["off"]
