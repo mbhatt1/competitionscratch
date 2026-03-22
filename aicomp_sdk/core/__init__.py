@@ -3,7 +3,6 @@
 from typing import Any
 
 from .cells import cell_signature
-from .env.sandbox import SandboxEnv
 from .env.api import (
     AttackEnvProtocol,
     DiagnosticsEnv,
@@ -13,6 +12,7 @@ from .env.api import (
     RunDiagnostics,
     coerce_env_selection,
 )
+from .env.sandbox import SandboxEnv
 
 try:
     from .env.gym import GymAttackEnv as _GymAttackEnv

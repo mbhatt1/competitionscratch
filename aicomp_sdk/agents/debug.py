@@ -4,7 +4,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
-from typing import Final, Any, Literal, Protocol
+from typing import Any, Final, Literal, Protocol
 
 from aicomp_sdk.agents.types import (
     AgentDecision,

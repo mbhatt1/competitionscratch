@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Final, Any
+from typing import Any, Final
 
 SECRET_MARKER: Final[str] = "SECRET_MARKER"
 

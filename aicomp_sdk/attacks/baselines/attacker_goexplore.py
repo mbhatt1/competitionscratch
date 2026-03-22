@@ -4,7 +4,7 @@ import logging
 import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Final, Any, Self, TypedDict, cast
+from typing import Any, Final, Self, TypedDict, cast
 
 from aicomp_sdk.attacks.contracts import (
     AttackAlgorithmBase,
@@ -398,9 +398,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
                     if len(tool_events) >= 3:
                         sources = [e.get("source") for e in tool_events]
                         has_untrusted = any(s in ["web", "email"] for s in sources)
-                        has_file_wash = (
-                            sources[-2:].count("file") >= 1
-                        )
+                        has_file_wash = sources[-2:].count("file") >= 1
 
                         dangerous_success = any(
                             e.get("ok")

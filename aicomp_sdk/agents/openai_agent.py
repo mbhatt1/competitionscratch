@@ -57,7 +57,7 @@ class ResponsesAPIProtocol(Protocol):
 class OpenAIClientProtocol(Protocol):
     @property
     def responses(self) -> ResponsesAPIProtocol:
-        ...
+        """Access the Responses API resource."""
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from typing import Final, Any
+from typing import Any, Final
 
 from aicomp_sdk.agents.debug import AgentDebugSink
 from aicomp_sdk.agents.hf_chat_template.hf_agent import (

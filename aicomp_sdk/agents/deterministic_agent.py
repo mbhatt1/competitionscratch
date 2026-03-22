@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Final, Any
+from typing import Any, Final
 
 from aicomp_sdk.agents.debug import (
     AgentDebugEvent,
@@ -25,8 +25,19 @@ from aicomp_sdk.agents.types import (
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
 _URL_RE: Final[re.Pattern[str]] = re.compile(r'https?://[^\s\'"<>]+')
-_INSTRUCTION_RESET_PHRASES: Final[tuple[str, ...]] = ("ignore previous", "forget", "disregard", "overlook")
-_IMPERATIVE_PHRASES: Final[tuple[str, ...]] = ("you must", "immediately", "execute", "required", "mandatory")
+_INSTRUCTION_RESET_PHRASES: Final[tuple[str, ...]] = (
+    "ignore previous",
+    "forget",
+    "disregard",
+    "overlook",
+)
+_IMPERATIVE_PHRASES: Final[tuple[str, ...]] = (
+    "you must",
+    "immediately",
+    "execute",
+    "required",
+    "mandatory",
+)
 _AUTHORITY_PHRASES: Final[tuple[str, ...]] = (
     "system mode",
     "admin override",

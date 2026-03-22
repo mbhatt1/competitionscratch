@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 from textwrap import dedent
-from typing import Final, Callable, TextIO
+from typing import Callable, Final, TextIO
 
 from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity
 from aicomp_sdk.evaluation.tracks import EvaluationTrack

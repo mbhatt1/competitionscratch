@@ -9,7 +9,7 @@ from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from types import ModuleType
-from typing import Final, Any
+from typing import Any, Final
 
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
 

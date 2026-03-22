@@ -32,13 +32,13 @@ def coerce_evaluator_verbosity(value: str | EvaluatorVerbosity) -> EvaluatorVerb
 
 class ProgressReporter(Protocol):
     def info(self, event: str, message: str, **fields: object) -> None:
-        ...
+        """Record an informational evaluator event."""
 
     def progress(self, event: str, message: str, **fields: object) -> None:
-        ...
+        """Record a progress-oriented evaluator event."""
 
     def debug(self, event: str, message: str, **fields: object) -> None:
-        ...
+        """Record a debug-level evaluator event."""
 
 
 _LEGACY_PROGRESS_PREFIXES: Final[tuple[str, ...]] = (

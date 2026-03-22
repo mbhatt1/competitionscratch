@@ -310,9 +310,7 @@ def execute_evaluation(
     if track is not EvaluationTrack.DUAL:
         raise AssertionError(f"Unhandled evaluation track: {track}")
     if attack_cls is None or guardrail_cls is None:
-        raise ValueError(
-            "Dual-track evaluation requires both attack_cls and guardrail_cls."
-        )
+        raise ValueError("Dual-track evaluation requires both attack_cls and guardrail_cls.")
 
     _record_framework_phase_event(
         output_controller,

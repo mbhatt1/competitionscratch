@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
-from typing import Final, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from aicomp_sdk.agents.types import AgentToolSpec, JsonObject
 

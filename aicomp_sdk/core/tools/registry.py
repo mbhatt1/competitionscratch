@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Final
 
 from .email import EMAIL_TOOL_DEFS

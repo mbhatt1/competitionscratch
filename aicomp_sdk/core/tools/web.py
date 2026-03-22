@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Final
 
 import json
+from typing import Final
 
 from .models import ToolCallResult, ToolDef, ToolScope, ToolSideEffect
 from .state import ToolContext

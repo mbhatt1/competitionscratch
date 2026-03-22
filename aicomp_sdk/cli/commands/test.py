@@ -24,9 +24,7 @@ from aicomp_sdk.core.env.api import EnvSelection, coerce_env_selection
 from aicomp_sdk.evaluation.budget_policy import (
     DEFAULT_CLI_TOTAL_BUDGET_S,
 )
-from aicomp_sdk.evaluation.budget_policy import (
-    resolve_budget_plan as _resolve_budget_plan,
-)
+from aicomp_sdk.evaluation.budget_policy import resolve_budget_plan as _resolve_budget_plan
 from aicomp_sdk.evaluation.diagnostics import (
     EvaluatorVerbosity,
     RunDiagnostics,
@@ -87,9 +85,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
             "Contains model requests/responses and tool outputs; keep it local."
         ),
     )
-    parser.add_argument(
-        "--name", help="Name for this test run (default: auto-generated)"
-    )
+    parser.add_argument("--name", help="Name for this test run (default: auto-generated)")
     parser.add_argument(
         "--transcript-file",
         default=None,
@@ -181,15 +177,11 @@ def _print_progress_start(
     from aicomp_sdk.cli.main import print_info
 
     if track is EvaluationTrack.REDTEAM:
-        print_info(
-            f"Running red-team evaluation (time budget: {attack_budget_s:.1f}s)..."
-        )
+        print_info(f"Running red-team evaluation (time budget: {attack_budget_s:.1f}s)...")
         return
 
     if track is EvaluationTrack.DEFENSE:
-        print_info(
-            f"Running defense evaluation (time budget: {defense_budget_s:.1f}s)..."
-        )
+        print_info(f"Running defense evaluation (time budget: {defense_budget_s:.1f}s)...")
         return
 
     print_info(f"Running attack evaluation (time budget: {attack_budget_s:.1f}s)...")
@@ -397,9 +389,7 @@ def _render_summary(results: dict[str, Any]) -> None:
         print("Track:          Defense Only")
         print(f"Defense Score:  {defense['score']:.2f}")
         print(f"  - Breaches (violations): {defense['breach_count']}")
-        print(
-            f"  - False positives: {defense['false_positives']}/{defense['benign_trials']}"
-        )
+        print(f"  - False positives: {defense['false_positives']}/{defense['benign_trials']}")
         print(f"  - FP rate: {defense['false_positive_rate']:.1%}")
         print()
         return
@@ -417,9 +407,7 @@ def _render_summary(results: dict[str, Any]) -> None:
     print()
     print(f"Defense Score:  {defense['score']:.2f}")
     print(f"  - Breaches (violations): {defense['breach_count']}")
-    print(
-        f"  - False positives: {defense['false_positives']}/{defense['benign_trials']}"
-    )
+    print(f"  - False positives: {defense['false_positives']}/{defense['benign_trials']}")
     print(f"  - FP rate: {defense['false_positive_rate']:.1%}")
     print()
     print(f"Final Score:    {final:.2f}")
@@ -453,19 +441,13 @@ def run_test(args) -> int:
     env_selection = _resolve_env_selection(args.env)
     fixtures_dir = Path(args.fixtures_dir).resolve() if args.fixtures_dir else None
     transcript_file = (
-        Path(args.transcript_file).expanduser().resolve()
-        if args.transcript_file
-        else None
+        Path(args.transcript_file).expanduser().resolve() if args.transcript_file else None
     )
     event_log_file = (
-        Path(args.event_log_file).expanduser().resolve()
-        if args.event_log_file
-        else None
+        Path(args.event_log_file).expanduser().resolve() if args.event_log_file else None
     )
     agent_debug_jsonl = (
-        Path(args.agent_debug_jsonl).expanduser().resolve()
-        if args.agent_debug_jsonl
-        else None
+        Path(args.agent_debug_jsonl).expanduser().resolve() if args.agent_debug_jsonl else None
     )
     budget_plan = _resolve_budget_plan(track, total_budget_s=total_budget_s)
     attack_budget_s = budget_plan.attack_budget_s
@@ -489,9 +471,7 @@ def run_test(args) -> int:
     elif track is EvaluationTrack.DEFENSE:
         print_info(f"Time budget: {defense_budget_s:.1f}s defense")
     else:
-        print_info(
-            f"Time budget: {attack_budget_s:.1f}s attack, {defense_budget_s:.1f}s defense"
-        )
+        print_info(f"Time budget: {attack_budget_s:.1f}s attack, {defense_budget_s:.1f}s defense")
     print()
 
     try:
@@ -506,12 +486,8 @@ def run_test(args) -> int:
             if track is EvaluationTrack.DEFENSE and guardrail_cls is None:
                 print_error("Submission missing Guardrail")
                 return 1
-            if track is EvaluationTrack.DUAL and (
-                attack_cls is None or guardrail_cls is None
-            ):
-                print_error(
-                    "Dual-track submissions must include both attack.py and guardrail.py"
-                )
+            if track is EvaluationTrack.DUAL and (attack_cls is None or guardrail_cls is None):
+                print_error("Dual-track submissions must include both attack.py and guardrail.py")
                 return 1
 
             results = _run_evaluation_with_progress(

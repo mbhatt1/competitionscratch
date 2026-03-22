@@ -71,9 +71,7 @@ def cell_signature(
     side_effects = [e["side_effect"] for e in tool_events][-n_tool:]
     scopes = [e["scope"] for e in tool_events][-n_tool:]
     sources = [e["source"] for e in tool_events][-min(2, len(tool_events)) :]
-    outcomes = [("ok" if e.get("ok") else "err") for e in tool_events][
-        -min(3, len(tool_events)) :
-    ]
+    outcomes = [("ok" if e.get("ok") else "err") for e in tool_events][-min(3, len(tool_events)) :]
 
     # Progress indicators
     secret_read = any(

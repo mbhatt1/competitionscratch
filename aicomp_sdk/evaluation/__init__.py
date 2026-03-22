@@ -1,7 +1,7 @@
 """Evaluator subsystem namespace."""
 
 from importlib import import_module
-from typing import Final, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from .budget_policy import (
     DEFAULT_ATTACK_BUDGET_S,
@@ -18,6 +18,7 @@ from .diagnostics import (
     RunDiagnostics,
     coerce_evaluator_verbosity,
 )
+from .reports import ReportProfile, build_evaluation_report
 from .runner import (
     AttackExecution,
     DefenseExecution,
@@ -25,7 +26,6 @@ from .runner import (
     execute_evaluation,
     resolve_agent_factory,
 )
-from .reports import ReportProfile, build_evaluation_report
 from .tracks import EvaluationTrack
 
 if TYPE_CHECKING:

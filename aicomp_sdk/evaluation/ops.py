@@ -9,19 +9,19 @@ from collections.abc import Iterable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final, Any, Callable, NotRequired, TypedDict, cast
+from typing import Any, Callable, Final, NotRequired, TypedDict, cast
 
 from aicomp_sdk.agents import AgentFactory
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm as BaselineAttacker
 from aicomp_sdk.core.cells import CellSignature, cell_signature
-from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.env.api import (
     MAX_USER_MESSAGE_CHARS,
     AttackEnvProtocol,
     EnvSelection,
     coerce_env_selection,
 )
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.evaluation.diagnostics import RunDiagnostics
 from aicomp_sdk.guardrails.base import GuardrailBase

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import inspect
-from typing import Final, Any, get_type_hints
+from typing import Any, Final, get_type_hints
 
 from pydantic import TypeAdapter
 
 from .models import RuntimeToolSpec, ToolDef, ToolHandler
 from .state import ToolContext
 
-_GOOGLE_DOCSTRING_SECTION_HEADERS: Final[frozenset[str]] = frozenset({"Args:", "Returns:", "Raises:", "Examples:"})
+_GOOGLE_DOCSTRING_SECTION_HEADERS: Final[frozenset[str]] = frozenset(
+    {"Args:", "Returns:", "Raises:", "Examples:"}
+)
 _MISSING_ARGS_SECTION_ERROR: Final[str] = (
     "Tool handlers with visible parameters must document them in a Google-style Args section"
 )

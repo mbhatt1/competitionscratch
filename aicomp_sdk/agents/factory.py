@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Final
 
 import os
 from collections.abc import Callable
 from enum import StrEnum
+from typing import Final
 
 from .debug import AgentDebugSink
 from .deterministic_agent import VulnerableDeterministicAgent

@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Final
 
 import random
+from typing import Final
 
 from aicomp_sdk.attacks.contracts import (
     AttackAlgorithmBase,

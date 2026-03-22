@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Final, Any
+from typing import Any, Final
 
-ACTION_RE: Final[re.Pattern[str]] = re.compile(r"ACTION:\s*([a-z]+\.[a-z]+)\((.*?)\)", re.IGNORECASE)
+ACTION_RE: Final[re.Pattern[str]] = re.compile(
+    r"ACTION:\s*([a-z]+\.[a-z]+)\((.*?)\)", re.IGNORECASE
+)
 
 
 def detect_real_attacks(events: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:

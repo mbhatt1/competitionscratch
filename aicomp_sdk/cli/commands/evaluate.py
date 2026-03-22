@@ -7,7 +7,7 @@ import json
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Any, cast
+from typing import Any, Final, cast
 
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.cli.commands.options import add_shared_execution_arguments
@@ -15,13 +15,13 @@ from aicomp_sdk.evaluation.budget_policy import (
     resolve_standalone_budget_plan as _resolve_budget_plan,
 )
 from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity, RunDiagnostics
+from aicomp_sdk.evaluation.reports import ReportProfile, build_evaluation_report
 from aicomp_sdk.evaluation.runner import (
     AttackExecution,
     DefenseExecution,
     EvaluationExecution,
     execute_evaluation,
 )
-from aicomp_sdk.evaluation.reports import ReportProfile, build_evaluation_report
 from aicomp_sdk.evaluation.submissions import load_track_modules
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
 
@@ -298,9 +298,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     fixtures_dir = Path(args.fixtures_dir).resolve() if args.fixtures_dir else None
     artifacts = _resolve_artifacts(args.artifacts_dir)
     transcript_file = artifacts.transcript_path if args.save_transcript else None
-    framework_events_file = (
-        artifacts.framework_events_path if args.save_framework_events else None
-    )
+    framework_events_file = artifacts.framework_events_path if args.save_framework_events else None
     agent_debug_jsonl = artifacts.agent_debug_path if args.save_agent_debug else None
 
     with RunDiagnostics(
@@ -338,9 +336,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
                 raise SystemExit("Submission missing AttackAlgorithm")
             if track is EvaluationTrack.DEFENSE and guardrail_cls is None:
                 raise SystemExit("Submission missing Guardrail")
-            if track is EvaluationTrack.DUAL and (
-                attack_cls is None or guardrail_cls is None
-            ):
+            if track is EvaluationTrack.DUAL and (attack_cls is None or guardrail_cls is None):
                 raise SystemExit(
                     "Dual-track submissions must include both attack.py and guardrail.py"
                 )
@@ -357,9 +353,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
                 agent_debug_jsonl=agent_debug_jsonl,
                 agent_factory=build_agent_factory(
                     args.agent,
-                    debug_sink=output_controller.make_agent_debug_sink(
-                        agent_debug_jsonl
-                    ),
+                    debug_sink=output_controller.make_agent_debug_sink(agent_debug_jsonl),
                 ),
                 event_style="evaluate",
             )
