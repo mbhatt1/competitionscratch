@@ -17,9 +17,9 @@ The package supports three workflows:
 Examples:
 
 ```bash
-aicomp test attack.py --track redteam --quick
-aicomp test guardrail.py --track defense --quick
-aicomp test submission.zip --track dual --quick
+aicomp test redteam attack.py --budget-s 60
+aicomp test defense guardrail.py --budget-s 60
+aicomp test dual submission.zip --budget-s 60
 ```
 
 The public Kaggle competition uses the attack-only path.
@@ -39,9 +39,9 @@ Submit `attack.py` only.
 
 ### Does the file have to be named `attack.py`?
 
-For the public Kaggle path, yes. `evaluation_redteam.py` rejects other filenames.
+For the public Kaggle contract, yes: the file you submit should still be `attack.py`.
 
-For package attack-only testing, no. `aicomp test --track redteam` can evaluate any `.py` file that defines `AttackAlgorithm`.
+For local evaluation, no. Both `aicomp evaluate redteam` and `aicomp test redteam` can evaluate any `.py` file that defines `AttackAlgorithm`.
 
 ### What class name is required?
 
@@ -103,7 +103,7 @@ No. Current `GymAttackEnv.step(...)` returns `0.0`, but leaderboard scoring is e
 
 ### Can I still use `env.interact(...)` in Kaggle-style evaluation?
 
-Yes. The red-team scorer defaults to `GymAttackEnv`, but that environment still exposes:
+Yes. When you run with `--env gym`, `GymAttackEnv` still exposes:
 
 - `interact(...)`
 - `export_trace_dict()`
@@ -116,21 +116,23 @@ If you want to mirror the official Kaggle default, use `1800` seconds.
 
 Important distinction:
 
-- `evaluation_redteam.py` defaults to `1800`
-- `aicomp test` defaults to `3600` because it supports package attack-only, guardrail-only, and dual-track evaluation
+- `aicomp evaluate redteam` defaults to `1800`
+- `aicomp evaluate defense` defaults to `1800`
+- `aicomp evaluate dual` defaults to `3600` total, split to `1800` attack and `1800` defense
+- `aicomp test` defaults to `3600` total; that becomes `3600` for redteam, `3600` for defense, and `1800`/`1800` for dual
 
 ### How do I test locally without an API key?
 
 Use the deterministic agent:
 
 ```bash
-aicomp test attack.py --track redteam --quick --agent deterministic
+aicomp test redteam attack.py --budget-s 60 --agent deterministic
 ```
 
 Or:
 
 ```bash
-python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
 ### Which agent backends exist today?

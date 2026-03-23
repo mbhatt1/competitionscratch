@@ -15,24 +15,25 @@ from .attacks import (
     AttackCandidate,
     AttackRunConfig,
 )
-from .core.env import SandboxEnv
-from .core.env_api import (
+from .core.env.api import (
     AttackEnvProtocol,
     DiagnosticsEnv,
     EnvInteractionResult,
+    EnvRunDiagnostics,
     EnvSelection,
     RunDiagnostics,
-    parse_env_selection,
+    coerce_env_selection,
 )
+from .core.env.sandbox import SandboxEnv
 
 try:
-    from .core.gym_env import GymAttackEnv as _GymAttackEnv
+    from .core.env.gym import GymAttackEnv as _GymAttackEnv
 except ImportError:
     GymAttackEnv: Any = None
 else:
     GymAttackEnv = _GymAttackEnv
 
-from .guardrails.base import Decision, GuardrailBase
+from .guardrails.base import Decision, DecisionAction, GuardrailBase
 
 # Advanced hooks API (for power users)
 from .guardrails.hooks import (
@@ -65,13 +66,15 @@ __all__ = [
     "SandboxEnv",
     "GymAttackEnv",
     "AttackEnvProtocol",
+    "coerce_env_selection",
     "DiagnosticsEnv",
+    "EnvRunDiagnostics",
     "EnvInteractionResult",
     "EnvSelection",
     "RunDiagnostics",
-    "parse_env_selection",
     "GuardrailBase",
     "Decision",
+    "DecisionAction",
     "AttackAlgorithmBase",
     "AttackCandidate",
     "AttackRunConfig",

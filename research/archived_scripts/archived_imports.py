@@ -77,7 +77,7 @@ def create_archived_sandbox_env(
     agent_selection: str,
 ):
     """Create a SandboxEnv using the current explicit-agent API."""
-    from aicomp_sdk.core.env import SandboxEnv
+    from aicomp_sdk.core.env.sandbox import SandboxEnv
 
     return SandboxEnv(
         seed=seed,

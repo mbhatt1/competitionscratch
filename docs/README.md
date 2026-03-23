@@ -21,7 +21,7 @@ Start here:
 
 Use this path if:
 - you are submitting `attack.py`
-- you want behavior that matches `evaluation_redteam.py`
+- you want behavior that matches `aicomp evaluate redteam`
 - you care about the public leaderboard contract
 
 ### I am developing attacks with the package
@@ -33,7 +33,7 @@ Start here:
 
 Use this path if:
 - you are iterating on `AttackAlgorithm`
-- you want to use `aicomp test --track redteam`
+- you want to use `aicomp test redteam`
 - you need package-level attack experimentation outside the public Kaggle flow
 
 ### I am developing guardrails
@@ -46,7 +46,7 @@ Start here:
 
 Use this path if:
 - you are writing `guardrail.py`
-- you want to test defense-only behavior with `aicomp test --track defense`
+- you want to test defense-only behavior with `aicomp test defense`
 - you want to understand the current context keys and decision types
 
 ### I am evaluating attacks and defenses together
@@ -67,8 +67,8 @@ Use this path if:
 These ideas appear throughout the docs:
 
 - Replay-based scoring: evaluators replay returned attack candidates and recompute traces, predicates, and cell signatures before scoring.
-- Workflow split: `evaluation_redteam.py` is the public attack-only scorer; `aicomp test` supports attack-only, guardrail-only, and dual-track package workflows; `evaluation.py` is the standalone dual-track evaluator.
-- Environment defaults: red-team evaluation defaults to `gym`; guardrail-only and dual-track package evaluation default to `sandbox`.
+- Workflow split: `aicomp evaluate redteam` is the public attack-only standalone scorer; `aicomp evaluate defense` and `aicomp evaluate dual`, plus `aicomp test`, support guardrail-only and dual-track package workflows.
+- Environment defaults: local evaluator runs default to `sandbox`; pass `--env gym` explicitly when you want GymAttackEnv.
 - Submission shapes: public Kaggle uses `attack.py`; package workflows also support `guardrail.py` and `submission.zip`.
 
 ## Recommended Reading Order
@@ -88,14 +88,15 @@ Examples:
 - [`../examples/guardrails/guardrail_optimal.py`](../examples/guardrails/guardrail_optimal.py)
 
 Useful validation paths:
-- `aicomp test attack.py --track redteam --quick`
-- `aicomp test guardrail.py --track defense --quick`
-- `aicomp test submission.zip --track dual --quick`
+- `aicomp test redteam attack.py --budget-s 60`
+- `aicomp test defense guardrail.py --budget-s 60`
+- `aicomp test dual submission.zip --budget-s 60`
 
 ## Quick Reference
 
 - Public Kaggle submission shape: `attack.py`
-- Public Kaggle entrypoint: [`../evaluation_redteam.py`](../evaluation_redteam.py)
-- Package dual-track entrypoints: [`../evaluation.py`](../evaluation.py) and `aicomp test --track dual`
+- Standalone evaluator entrypoint: `aicomp evaluate`
+- Public Kaggle mode: `aicomp evaluate redteam`
+- Package dual-track entrypoints: `aicomp evaluate dual` and `aicomp test dual`
 - Default public attack budget: `1800` seconds
-- Default `aicomp test` budget: `3600` seconds total
+- Default `aicomp test` budget: `3600` seconds total, which becomes `3600` for single-track runs or `1800`/`1800` for dual-track runs

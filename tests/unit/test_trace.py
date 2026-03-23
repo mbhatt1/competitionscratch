@@ -314,6 +314,7 @@ class TestTraceWorkflow:
         trace.add_assistant("Operation denied")
 
         assert trace.tool_events[0].ok is False
+        assert trace.tool_events[0].error is not None
         assert "denied" in trace.tool_events[0].error
 
     def test_attack_chain(self):

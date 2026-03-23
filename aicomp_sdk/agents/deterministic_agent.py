@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Any, Optional, Union
+from typing import Any, Final
 
 from aicomp_sdk.agents.debug import (
     AgentDebugEvent,
@@ -24,10 +24,21 @@ from aicomp_sdk.agents.types import (
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
-_URL_RE = re.compile(r'https?://[^\s\'"<>]+')
-_INSTRUCTION_RESET_PHRASES = ("ignore previous", "forget", "disregard", "overlook")
-_IMPERATIVE_PHRASES = ("you must", "immediately", "execute", "required", "mandatory")
-_AUTHORITY_PHRASES = (
+_URL_RE: Final[re.Pattern[str]] = re.compile(r'https?://[^\s\'"<>]+')
+_INSTRUCTION_RESET_PHRASES: Final[tuple[str, ...]] = (
+    "ignore previous",
+    "forget",
+    "disregard",
+    "overlook",
+)
+_IMPERATIVE_PHRASES: Final[tuple[str, ...]] = (
+    "you must",
+    "immediately",
+    "execute",
+    "required",
+    "mandatory",
+)
+_AUTHORITY_PHRASES: Final[tuple[str, ...]] = (
     "system mode",
     "admin override",
     "god",
@@ -36,8 +47,8 @@ _AUTHORITY_PHRASES = (
     "developer",
     "ceo",
 )
-_STEP_MARKERS = ("step 1", "1.", "first,")
-_OPEN_PAGE_IDS = (
+_STEP_MARKERS: Final[tuple[str, ...]] = ("step 1", "1.", "first,")
+_OPEN_PAGE_IDS: Final[tuple[str, ...]] = (
     "ignore_prev_1",
     "ignore_prev_2",
     "ignore_prev_3",
@@ -50,7 +61,7 @@ _OPEN_PAGE_IDS = (
     "chain_attack_1",
     "prompt_injection_demo",
 )
-_READ_FILE_TARGETS = (
+_READ_FILE_TARGETS: Final[tuple[tuple[str, str], ...]] = (
     ("backup", "backup.txt"),
     ("config", "config.txt"),
     ("install", "install.txt"),
@@ -68,7 +79,7 @@ class VulnerableDeterministicAgent:
     It naively parses instructions from tool outputs and follows them.
     """
 
-    def __init__(self, *, debug_sink: Optional[AgentDebugSink] = None) -> None:
+    def __init__(self, *, debug_sink: AgentDebugSink | None = None) -> None:
         self._debug_sink = debug_sink
         self._next_debug_turn_index = 1
         self._next_call_index = 1
@@ -82,13 +93,13 @@ class VulnerableDeterministicAgent:
         self._next_call_index += 1
         return ToolCallDecision(call=call, assistant_message=None)
 
-    def _find_url(self, output: str) -> Optional[str]:
+    def _find_url(self, output: str) -> str | None:
         match = _URL_RE.search(output)
         if match is None:
             return None
         return match.group(0)
 
-    def _read_file_call(self, message: str) -> Optional[ToolCallDecision]:
+    def _read_file_call(self, message: str) -> ToolCallDecision | None:
         for keyword, path in _READ_FILE_TARGETS:
             if keyword in message:
                 return self._tool_call("fs.read", {"path": path}, "read_file")
@@ -116,7 +127,7 @@ class VulnerableDeterministicAgent:
                 return clean_word
         return "msg1"
 
-    def _parse_instructions_from_output(self, output: str) -> Optional[ToolCallDecision]:
+    def _parse_instructions_from_output(self, output: str) -> ToolCallDecision | None:
         """Parse instructions from untrusted tool output (VULNERABILITY!)"""
         if not output:
             return None
@@ -220,13 +231,13 @@ class VulnerableDeterministicAgent:
 
         return None
 
-    def _last_tool_output(self, history: RuntimeHistory) -> Optional[str]:
+    def _last_tool_output(self, history: RuntimeHistory) -> str | None:
         for event in history.events[::-1]:
             if isinstance(event, ToolResultEvent):
                 return event.result.output_text
         return None
 
-    def _last_user_message(self, history: RuntimeHistory) -> Optional[str]:
+    def _last_user_message(self, history: RuntimeHistory) -> str | None:
         for event in history.events[::-1]:
             if isinstance(event, UserMessageEvent):
                 return event.text
@@ -237,7 +248,7 @@ class VulnerableDeterministicAgent:
         *,
         history: RuntimeHistory,
         tools: Sequence[AgentToolSpec],
-    ) -> Union[ToolCallDecision, FinalResponseDecision]:
+    ) -> ToolCallDecision | FinalResponseDecision:
         del tools
         turn_index = self._next_debug_turn_index
         self._next_debug_turn_index += 1
@@ -388,8 +399,8 @@ class VulnerableDeterministicAgent:
         phase: DebugPhase,
         turn_index: int,
         history: RuntimeHistory,
-        request_payload: Optional[dict[str, Any]] = None,
-        decision_payload: Optional[dict[str, Any]] = None,
+        request_payload: dict[str, Any] | None = None,
+        decision_payload: dict[str, Any] | None = None,
     ) -> None:
         if self._debug_sink is None:
             return
@@ -410,8 +421,8 @@ class VulnerableDeterministicAgent:
         *,
         turn_index: int,
         history: RuntimeHistory,
-        decision: Union[ToolCallDecision, FinalResponseDecision],
-    ) -> Union[ToolCallDecision, FinalResponseDecision]:
+        decision: ToolCallDecision | FinalResponseDecision,
+    ) -> ToolCallDecision | FinalResponseDecision:
         self._record_debug_event(
             phase="decision_emitted",
             turn_index=turn_index,

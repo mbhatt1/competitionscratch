@@ -12,7 +12,7 @@ from aicomp_sdk.attacks import AttackRunConfig
 # Import the baseline Go-Explore attacker
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 
 
 def main() -> None:

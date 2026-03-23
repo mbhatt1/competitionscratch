@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from aicomp_sdk.agents.types import (
     AssistantMessageEvent,
@@ -72,7 +71,7 @@ class RuntimeHistory:
 
     def split_trailing_tool_roundtrip(
         self,
-    ) -> Optional[Tuple[RuntimeHistory, ToolRequestEvent, ToolResultEvent]]:
+    ) -> tuple[RuntimeHistory, ToolRequestEvent, ToolResultEvent] | None:
         """
         If the history ends with exactly one trailing ToolRequestEvent followed by its
         matching ToolResultEvent, return (base_history, request_event, result_event).

@@ -5,10 +5,11 @@ Provides multiple interception points for attack detection, payload injection,
 and security testing similar to the LPCI framework.
 """
 
+import copy
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, Callable, TypedDict
 
 
 class HookStage(Enum):
@@ -31,18 +32,18 @@ class HookContext:
     """Context passed to hook callbacks"""
 
     stage: HookStage
-    tool_name: Optional[str] = None
-    tool_args: Optional[dict[str, Any]] = None
-    tool_output: Optional[str] = None
-    guardrail_decision: Optional[Any] = None
-    trace: Optional[Any] = None
+    tool_name: str | None = None
+    tool_args: dict[str, Any] | None = None
+    tool_output: str | None = None
+    guardrail_decision: Any | None = None
+    trace: Any | None = None
     context: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     # Allow hooks to modify the flow
-    modified_args: Optional[dict[str, Any]] = None
-    modified_output: Optional[str] = None
-    injected_content: Optional[str] = None
+    modified_args: dict[str, Any] | None = None
+    modified_output: str | None = None
+    injected_content: str | None = None
     should_block: bool = False
     should_trigger: bool = False
 
@@ -52,7 +53,7 @@ class HookResult:
     """Result from a hook execution"""
 
     continue_execution: bool = True
-    modified_context: Optional[HookContext] = None
+    modified_context: HookContext | None = None
     payload_detected: bool = False
     trigger_activated: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -186,6 +187,20 @@ class HookRegistry:
         self._trigger_conditions = []
         self._payload_storage = []
 
+    def clone(self) -> "HookRegistry":
+        """Return an isolated copy of the current hook registrations and state.
+
+        This preserves the simple decorator workflow, where hooks are registered
+        onto the process-global template before env construction, without sharing
+        mutable runtime state across env instances.
+        """
+        cloned = HookRegistry()
+        cloned._hooks = {stage: list(entries) for stage, entries in self._hooks.items()}
+        cloned._persistent_state = copy.deepcopy(self._persistent_state)
+        cloned._trigger_conditions = copy.deepcopy(self._trigger_conditions)
+        cloned._payload_storage = copy.deepcopy(self._payload_storage)
+        return cloned
+
 
 # Global hook registry
 _global_registry = HookRegistry()
@@ -200,7 +215,7 @@ def get_hook_registry() -> HookRegistry:
 
 
 def create_payload_injection_hook(
-    stage: HookStage, payload_generator: Callable[[HookContext], Optional[str]]
+    stage: HookStage, payload_generator: Callable[[HookContext], str | None]
 ) -> HookCallback:
     """Create a hook that injects payloads (like LPCI payload generation)"""
 

@@ -9,13 +9,15 @@ files.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
 import io
 import sys
+from collections.abc import Sequence
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Optional
+from typing import Final
+
+from aicomp_sdk.agents import AgentSelection
 
 DEFAULT_BUDGET_S: Final[float] = 5.0
 
@@ -30,16 +32,14 @@ def _repo_root() -> Path:
 
 
 REPO_ROOT: Final[Path] = _repo_root()
-DEFAULT_ATTACK_PATH: Final[Path] = (
-    REPO_ROOT / "examples" / "attacks" / "attack_gym_step.py"
-)
+DEFAULT_ATTACK_PATH: Final[Path] = REPO_ROOT / "examples" / "attacks" / "attack_gym_step.py"
 
 
 @dataclass(frozen=True)
 class CliArgs:
     submission_path: Path
     budget_s: float
-    agent: str
+    agent: AgentSelection
 
 
 def _ensure_repo_root_on_sys_path(repo_root: Path) -> None:
@@ -60,7 +60,7 @@ def _positive_float(raw: str) -> float:
     return value
 
 
-def _parse_args(argv: Optional[Sequence[str]] = None) -> CliArgs:
+def _parse_args(argv: Sequence[str] | None = None) -> CliArgs:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -79,7 +79,9 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> CliArgs:
     )
     parser.add_argument(
         "--agent",
-        default="deterministic",
+        type=AgentSelection,
+        choices=list(AgentSelection),
+        default=AgentSelection.DETERMINISTIC,
         help="Agent selection for the smoke test.",
     )
     args = parser.parse_args(argv)
@@ -97,8 +99,8 @@ def _display_path(path: Path, *, repo_root: Path) -> str:
         return str(path)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = _parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parse_args(argv)
 
     submission_path = args.submission_path.resolve()
     if not submission_path.is_file():
@@ -107,11 +109,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     _ensure_repo_root_on_sys_path(REPO_ROOT)
 
     from aicomp_sdk.agents import build_agent_factory
-    from aicomp_sdk.evaluation_core import (
-        eval_attack,
-        load_module_from_file,
-        summarize_attack_findings,
-    )
+    from aicomp_sdk.evaluation.ops import eval_attack, summarize_attack_findings
+    from aicomp_sdk.evaluation.submissions import load_module_from_file
 
     module = load_module_from_file(submission_path, "examples_attack_submission")
     attack_cls = getattr(module, "AttackAlgorithm", None)
@@ -136,10 +135,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"Attack raw:        {summary['score_raw']:.2f}")
     print(f"Findings:          {summary['findings_count']}")
     print(f"Unique cells:      {summary['unique_cells']}")
-    print(
-        "Note: short smoke runs check evaluator compatibility and may yield 0 findings."
-    )
-    print("For a longer public-contract run, use evaluation_redteam.py with attack.py.")
+    print("Note: short smoke runs check evaluator compatibility and may yield 0 findings.")
+    print("For a longer public-contract run, use " "`aicomp evaluate redteam attack.py`.")
     return 0
 
 

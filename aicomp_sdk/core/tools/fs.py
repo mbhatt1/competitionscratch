@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 from .models import ToolCallResult, ToolDef, ToolScope, ToolSideEffect
 from .state import ToolContext
@@ -66,7 +67,7 @@ def _is_path_escape(ctx: ToolContext, path: Path) -> bool:
     return not str(path).startswith(str(ctx.filesystem_root.resolve()))
 
 
-FS_TOOL_DEFS = (
+FS_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="fs.read",
         side_effect=ToolSideEffect.READ,

@@ -4,21 +4,63 @@ Main CLI entry point for aicomp_sdk.
 Provides subcommands for common operations on competition submissions.
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
-from typing import Callable, Optional, TextIO
+from textwrap import dedent
+from typing import Callable, Final, TextIO
 
-from aicomp_sdk.agents import AgentSelection
-from aicomp_sdk.core.env_api import EnvSelection
+from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity
+from aicomp_sdk.evaluation.tracks import EvaluationTrack
+
+
+def _load_rich_print() -> Callable[[str], None] | None:
+    """Return a rich-backed print function when rich is available."""
+
+    try:
+        from rich.console import Console
+    except ImportError:
+        return None
+    return Console().print
+
 
 # Try to import rich for beautiful output, fall back to plain output.
-RICH_PRINT: Optional[Callable[[str], None]]
-try:
-    from rich.console import Console
+RICH_PRINT: Final[Callable[[str], None] | None] = _load_rich_print()
 
-    RICH_PRINT = Console().print
-except ImportError:
-    RICH_PRINT = None
+
+CLI_EPILOG: Final[str] = dedent("""\
+    Examples:
+      Create attack template:
+        aicomp init attack
+
+      Create guardrail template:
+        aicomp init guardrail
+
+      Validate attack submission:
+        aicomp validate redteam attack.py
+
+      Run scorer-style evaluation and write artifacts:
+        aicomp evaluate redteam attack.py
+
+      Run local dual-track evaluation and save history:
+        aicomp test dual submission.zip
+
+      Show past results:
+        aicomp history
+
+      Compare two runs:
+        aicomp compare run1 run2
+
+      Generate charts:
+        aicomp visualize latest
+
+    For more help on a command: aicomp <command> --help
+
+    Command choice:
+      Use `aicomp evaluate` for scorer-style runs and stable machine-readable artifacts.
+      Use `aicomp test` for local iteration with saved history, compare, and visualize.
+    """)
 
 
 def _print_message(
@@ -26,7 +68,7 @@ def _print_message(
     color: str,
     message: str,
     *,
-    fallback_file: Optional[TextIO] = None,
+    fallback_file: TextIO | None = None,
 ) -> None:
     """Print with rich formatting when available, else plain text."""
     if RICH_PRINT is not None:
@@ -56,34 +98,7 @@ def print_warning(message: str) -> None:
     _print_message("⚠", "yellow", message)
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create the main argument parser with all subcommands."""
-    parser = argparse.ArgumentParser(
-        prog="aicomp",
-        description="AI Agent Security Competition CLI - Tools for creating and testing submissions",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  aicomp init attack              # Create attack template
-  aicomp init guardrail           # Create guardrail template
-  aicomp validate attack.py       # Validate attack submission
-  aicomp test attack.py           # Run Kaggle-style red-team evaluation
-  aicomp test attack.py --agent openai --agent-debug-jsonl /tmp/agent.jsonl
-                                 # Run with agent backend debug JSONL logging
-  aicomp test submission.zip      # Run legacy local dual-track evaluation
-  aicomp test attack.py --env sandbox  # Run attack-only eval on SandboxEnv
-  aicomp test --quick attack.py   # Quick red-team smoke test
-  aicomp history                  # Show past results
-  aicomp compare run1 run2        # Compare two runs
-  aicomp visualize latest         # Generate charts
-
-For more help on a command: aicomp <command> --help
-        """,
-    )
-
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # Init command
+def _add_init_parser(subparsers: argparse._SubParsersAction) -> None:
     init_parser = subparsers.add_parser(
         "init",
         help="Create submission templates",
@@ -97,77 +112,44 @@ For more help on a command: aicomp <command> --help
     )
     init_parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing file")
 
-    # Validate command
+
+def _add_validate_parser(subparsers: argparse._SubParsersAction) -> None:
     validate_parser = subparsers.add_parser(
         "validate",
         help="Validate submission file",
         description="Fast validation (<5s) to check submission structure and imports",
     )
-    validate_parser.add_argument("file", help="Path to submission file (attack.py or guardrail.py)")
-    validate_parser.add_argument(
-        "--type",
-        choices=["attack", "guardrail", "auto"],
-        default="auto",
-        help="Submission type (default: auto-detect)",
+    validate_subparsers = validate_parser.add_subparsers(dest="track", required=True)
+
+    validate_redteam_parser = validate_subparsers.add_parser(
+        EvaluationTrack.REDTEAM.value,
+        help="Validate a Python attack module that defines AttackAlgorithm.",
+    )
+    validate_redteam_parser.add_argument(
+        "file",
+        help="Path to a Python attack module.",
     )
 
-    # Test command
-    test_parser = subparsers.add_parser(
-        "test",
-        help="Run evaluation tests",
-        description="Evaluate submission with progress tracking and save results",
+    validate_defense_parser = validate_subparsers.add_parser(
+        EvaluationTrack.DEFENSE.value,
+        help="Validate a Python guardrail module that defines Guardrail.",
     )
-    test_parser.add_argument("submission", help="Path to submission file or zip")
-    test_parser.add_argument(
-        "--budget-s",
-        type=float,
-        default=3600.0,
-        help="Total evaluation budget in seconds (default: 3600)",
+    validate_defense_parser.add_argument(
+        "file",
+        help="Path to a Python guardrail module.",
     )
-    test_parser.add_argument(
-        "--track",
-        choices=["auto", "redteam", "dual", "defense"],
-        default="auto",
-        help="Evaluation track (default: auto-detect from submission type)",
-    )
-    test_parser.add_argument(
-        "--fixtures_dir",
-        default=None,
-        help=(
-            "Optional fixtures root override. Defaults to AICOMP_FIXTURES_DIR, then packaged "
-            "fixtures, then legacy repo fixtures."
-        ),
-    )
-    test_parser.add_argument(
-        "--agent",
-        choices=[member.value for member in AgentSelection],
-        default="auto",
-        help="Blue-agent selection policy for evaluation runs (default: auto)",
-    )
-    test_parser.add_argument(
-        "--agent-debug-jsonl",
-        default=None,
-        help=(
-            "Optional local JSONL file for raw agent backend debug events. "
-            "Contains model requests/responses and tool outputs; keep it local."
-        ),
-    )
-    test_parser.add_argument(
-        "--env",
-        choices=[member.value for member in EnvSelection],
-        default=None,
-        help=(
-            "Attack environment selection. Defaults to gym for redteam, sandbox for dual "
-            "and defense."
-        ),
-    )
-    test_parser.add_argument(
-        "--quick", action="store_true", help="Quick test with reduced time budget"
-    )
-    test_parser.add_argument("--name", help="Name for this test run (default: auto-generated)")
-    test_parser.add_argument("--verbose", action="store_true", help="Show detailed output")
 
-    # Compare command
+    validate_dual_parser = validate_subparsers.add_parser(
+        EvaluationTrack.DUAL.value,
+        help="Validate a submission zip containing attack.py and guardrail.py.",
+    )
+    validate_dual_parser.add_argument(
+        "file",
+        help="Path to a submission zip containing attack.py and guardrail.py.",
+    )
+
+
+def _add_compare_parser(subparsers: argparse._SubParsersAction) -> None:
     compare_parser = subparsers.add_parser(
         "compare",
         help="Compare evaluation results",
@@ -182,7 +164,8 @@ For more help on a command: aicomp <command> --help
         help="Which metrics to compare (default: all)",
     )
 
-    # History command
+
+def _add_history_parser(subparsers: argparse._SubParsersAction) -> None:
     history_parser = subparsers.add_parser(
         "history",
         help="Show evaluation history",
@@ -199,7 +182,8 @@ For more help on a command: aicomp <command> --help
     )
     history_parser.add_argument("--filter", help="Filter by submission name")
 
-    # Visualize command
+
+def _add_visualize_parser(subparsers: argparse._SubParsersAction) -> None:
     visualize_parser = subparsers.add_parser(
         "visualize",
         help="Generate visualizations",
@@ -212,12 +196,69 @@ For more help on a command: aicomp <command> --help
     )
     visualize_parser.add_argument(
         "--format",
-        choices=["png", "html", "both"],
+        choices=["png", "markdown", "both"],
         default="png",
         help="Output format (default: png)",
     )
 
+
+def create_parser() -> argparse.ArgumentParser:
+    """Create the main argument parser with all subcommands."""
+    parser = argparse.ArgumentParser(
+        prog="aicomp",
+        description="AI Agent Security Competition CLI - Tools for creating and testing submissions",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=CLI_EPILOG,
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    _add_init_parser(subparsers)
+    _add_validate_parser(subparsers)
+
+    from aicomp_sdk.cli.commands.evaluate import add_evaluate_parser
+    from aicomp_sdk.cli.commands.test import add_test_parser
+
+    add_evaluate_parser(subparsers)
+    add_test_parser(subparsers)
+    _add_compare_parser(subparsers)
+    _add_history_parser(subparsers)
+    _add_visualize_parser(subparsers)
     return parser
+
+
+def _run_command(args: argparse.Namespace) -> int:
+    match args.command:
+        case "init":
+            from aicomp_sdk.cli.commands.init import run_init
+
+            return run_init(args)
+        case "validate":
+            from aicomp_sdk.cli.commands.validate import run_validate
+
+            return run_validate(args)
+        case "test":
+            from aicomp_sdk.cli.commands.test import run_test
+
+            return run_test(args)
+        case "evaluate":
+            from aicomp_sdk.cli.commands.evaluate import run_evaluate
+
+            return run_evaluate(args)
+        case "compare":
+            from aicomp_sdk.cli.commands.compare import run_compare
+
+            return run_compare(args)
+        case "history":
+            from aicomp_sdk.cli.commands.history import run_history
+
+            return run_history(args)
+        case "visualize":
+            from aicomp_sdk.cli.commands.visualize import run_visualize
+
+            return run_visualize(args)
+        case _:
+            print_error(f"Unknown command: {args.command}")
+            return 1
 
 
 def main() -> int:
@@ -230,47 +271,13 @@ def main() -> int:
         return 0
 
     try:
-        # Import command modules lazily to avoid unnecessary imports
-        if args.command == "init":
-            from aicomp_sdk.cli.commands.init import run_init
-
-            return run_init(args)
-
-        elif args.command == "validate":
-            from aicomp_sdk.cli.commands.validate import run_validate
-
-            return run_validate(args)
-
-        elif args.command == "test":
-            from aicomp_sdk.cli.commands.test import run_test
-
-            return run_test(args)
-
-        elif args.command == "compare":
-            from aicomp_sdk.cli.commands.compare import run_compare
-
-            return run_compare(args)
-
-        elif args.command == "history":
-            from aicomp_sdk.cli.commands.history import run_history
-
-            return run_history(args)
-
-        elif args.command == "visualize":
-            from aicomp_sdk.cli.commands.visualize import run_visualize
-
-            return run_visualize(args)
-
-        else:
-            print_error(f"Unknown command: {args.command}")
-            return 1
-
+        return _run_command(args)
     except KeyboardInterrupt:
         print_warning("\nOperation cancelled by user")
         return 130
     except Exception as e:
         print_error(f"Error: {e}")
-        if "--verbose" in sys.argv or "-v" in sys.argv:
+        if getattr(args, "verbosity", None) is EvaluatorVerbosity.DEBUG:
             import traceback
 
             traceback.print_exc()

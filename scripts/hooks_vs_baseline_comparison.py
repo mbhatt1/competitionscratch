@@ -19,7 +19,7 @@ if str(REPO_ROOT) not in sys.path:
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
 

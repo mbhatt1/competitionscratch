@@ -10,19 +10,19 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.agents import factory as agent_factory
-from aicomp_sdk.agents.openai_agent import OpenAIResponsesAgent
+from aicomp_sdk.agents.openai_agent import OpenAIClientProtocol, OpenAIResponsesAgent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_rules import Guardrail
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.env_api import DiagnosticsEnv, EnvInteractionResult
+from aicomp_sdk.core.env.sandbox import SandboxEnv
+from aicomp_sdk.core.env.api import DiagnosticsEnv, EnvInteractionResult
 from aicomp_sdk.scoring import (
     ATTACK_BASELINE_RAW,
     ATTACK_ELITE_RAW,
@@ -96,7 +96,10 @@ def offline_openai_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     ) -> OpenAIResponsesAgent:
         del api_key
         return OpenAIResponsesAgent(
-            client=_OfflineOpenAIClient(responses=_OfflineResponsesAPI()),
+            client=cast(
+                OpenAIClientProtocol,
+                _OfflineOpenAIClient(responses=_OfflineResponsesAPI()),
+            ),
             verbose=verbose,
             debug_sink=debug_sink,
         )
@@ -169,7 +172,7 @@ def run_baseline_attack(
         set(f.get("cell_signature", {}).get("hash") for f in validated if f.get("cell_signature"))
     )
     severity_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-    predicate_counts = {}
+    predicate_counts: dict[str, int] = {}
 
     for f in validated:
         for p in f.get("predicates", []):

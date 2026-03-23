@@ -4,7 +4,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional, Protocol
+from typing import Any, Final, Literal, Protocol
 
 from aicomp_sdk.agents.types import (
     AgentDecision,
@@ -25,31 +25,38 @@ DebugPhase = Literal[
     "parse_error",
 ]
 
-_TEXT_PREVIEW_LIMIT = 80
-_RECENT_EVENT_LIMIT = 2
+_TEXT_PREVIEW_LIMIT: Final[int] = 80
+_RECENT_EVENT_LIMIT: Final[int] = 2
 
 
 @dataclass(frozen=True)
 class AgentDebugEvent:
+    """Structured debug payload emitted by agent backends."""
+
     backend: str
-    model: Optional[str]
+    model: str | None
     phase: DebugPhase
     turn_index: int
     history_summary: Mapping[str, Any]
-    request_payload: Optional[Mapping[str, Any]] = None
-    response_payload: Optional[Mapping[str, Any]] = None
-    decision_payload: Optional[Mapping[str, Any]] = None
-    error: Optional[str] = None
-    latency_ms: Optional[float] = None
+    request_payload: Mapping[str, Any] | None = None
+    response_payload: Mapping[str, Any] | None = None
+    decision_payload: Mapping[str, Any] | None = None
+    error: str | None = None
+    latency_ms: float | None = None
     provider_payload: Mapping[str, Any] = field(default_factory=dict)
+    run_id: str | None = None
 
 
 class AgentDebugSink(Protocol):
+    """Protocol for sinks that persist agent debug events."""
+
     def record(self, event: AgentDebugEvent) -> None:
         """Persist an agent debug event."""
 
 
 class InMemoryAgentDebugSink:
+    """Collect debug events in a list for tests or transient inspection."""
+
     def __init__(self) -> None:
         self.events: list[AgentDebugEvent] = []
 
@@ -58,6 +65,8 @@ class InMemoryAgentDebugSink:
 
 
 class JsonlAgentDebugSink:
+    """Write debug events as JSONL, truncating the target file on init."""
+
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,6 +136,7 @@ def serialize_agent_decision(decision: AgentDecision) -> dict[str, Any]:
 
 def _serialize_debug_event(event: AgentDebugEvent) -> dict[str, Any]:
     return {
+        "run_id": event.run_id,
         "backend": event.backend,
         "model": event.model,
         "phase": event.phase,

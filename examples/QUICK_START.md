@@ -10,6 +10,8 @@ This quickstart focuses on three jobs:
 
 The example files themselves are submission examples. When you want to execute them from the repo, use the smoke wrappers on this page or the package CLI and evaluator commands.
 
+The standalone evaluator defaults to a short terminal summary. Add `--verbosity progress` for package-owned progress messages, plus `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` when you want `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under `--artifacts-dir`.
+
 ## 1. Public-Path Attack Example
 
 Run the canonical attack example smoke test:
@@ -24,7 +26,7 @@ When you want to run the public contract directly, copy the example into the req
 
 ```bash
 cp examples/attacks/attack_gym_step.py attack.py
-python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
 Why the copy step matters: the public Kaggle evaluator requires the submission file to be named `attack.py`.
@@ -34,8 +36,8 @@ Why the copy step matters: the public Kaggle evaluator requires the submission f
 Use the canonical guardrail example directly:
 
 ```bash
-aicomp validate examples/guardrails/guardrail.py --type guardrail
-aicomp test examples/guardrails/guardrail.py --track defense --quick --agent deterministic
+aicomp validate defense examples/guardrails/guardrail.py
+aicomp test defense examples/guardrails/guardrail.py --budget-s 60 --agent deterministic
 ```
 
 Switch to [`guardrails/guardrail_optimal.py`](guardrails/guardrail_optimal.py) when you want a more aggressive blocking policy, or [`guardrails/guardrail_taint_tracking.py`](guardrails/guardrail_taint_tracking.py) when you want a stateful session-taint design.
@@ -54,7 +56,7 @@ When you want to package the pair for the standalone dual-track evaluator:
 cp examples/attacks/attack.py attack.py
 cp examples/guardrails/guardrail.py guardrail.py
 zip submission.zip attack.py guardrail.py
-python evaluation.py --submission_zip submission.zip --budget-s 60 --agent deterministic --env sandbox
+aicomp evaluate dual submission.zip --budget-s 60 --agent deterministic --env sandbox
 ```
 
 ## Advanced and Experimental Examples

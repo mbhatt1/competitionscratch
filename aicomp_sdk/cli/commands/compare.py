@@ -10,10 +10,10 @@ Loads results from .aicomp/history/ and displays:
 import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 
-def _load_json_result(path: Path) -> Optional[dict[str, Any]]:
+def _load_json_result(path: Path) -> dict[str, Any] | None:
     """Load a JSON object result payload from disk."""
     try:
         raw: object = json.loads(path.read_text(encoding="utf-8"))
@@ -28,7 +28,7 @@ def _load_json_result(path: Path) -> Optional[dict[str, Any]]:
     return cast(dict[str, Any], raw)
 
 
-def load_result(run_identifier: str) -> Optional[dict[str, Any]]:
+def load_result(run_identifier: str) -> dict[str, Any] | None:
     """Load a result from history by name or path."""
     # Try as direct path first
     path = Path(run_identifier)
@@ -106,14 +106,12 @@ def compare_metrics(
     name1 = run1.get("run_name", "Run 1")
     name2 = run2.get("run_name", "Run 2")
 
-    # Print header
     print()
     print("=" * 80)
     print(f"COMPARISON: {name1} vs {name2}")
     print("=" * 80)
     print()
 
-    # Compare final score
     if metric_filter in ["all", "final"]:
         final1 = run1.get("final_score", 0)
         final2 = run2.get("final_score", 0)
@@ -124,7 +122,6 @@ def compare_metrics(
         print(f"  {name2:40s} {final2:8.2f}{format_delta(delta, True)}")
         print()
 
-    # Compare attack metrics
     if metric_filter in ["all", "attack"]:
         attack1 = run1.get("attack", {})
         attack2 = run2.get("attack", {})
@@ -195,7 +192,6 @@ def compare_metrics(
 
         print()
 
-    # Compare defense metrics
     if metric_filter in ["all", "defense"]:
         defense1 = run1.get("defense", {})
         defense2 = run2.get("defense", {})
@@ -293,7 +289,6 @@ def run_compare(args) -> int:
     """Execute compare command."""
     from aicomp_sdk.cli.main import print_error, print_info
 
-    # Load both results
     run1_data = load_result(args.run1)
     if run1_data is None:
         print_error(f"Could not find result: {args.run1}")
@@ -314,7 +309,6 @@ def run_compare(args) -> int:
                 print(f"  - {f.stem}")
         return 1
 
-    # Compare
     try:
         compare_metrics(run1_data, run2_data, args.metric)
         return 0

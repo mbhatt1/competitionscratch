@@ -19,7 +19,7 @@ hero:
 features:
   - icon: 🎯
     title: Official Kaggle Red-Team Path
-    details: The public contract is `attack.py` only. Use `evaluation_redteam.py` or `aicomp test --track redteam` to build replayable attacks for the normalized attack leaderboard.
+    details: The public contract is `attack.py` only. Use `aicomp evaluate redteam` or `aicomp test redteam` to build replayable attacks for the normalized attack leaderboard.
 
   - icon: 🛡️
     title: Attack, Guardrail, or Both
@@ -46,16 +46,16 @@ features:
 
 | Workflow | Submission | Primary entrypoint | Default env | Score |
 | --- | --- | --- | --- | --- |
-| Kaggle red-team | `attack.py` | `evaluation_redteam.py` | `gym` | normalized attack score |
-| Package attack-only | `attack.py` | `aicomp test --track redteam` | `gym` | normalized attack score |
-| Package guardrail-only | `guardrail.py` | `aicomp test --track defense` | `sandbox` | defense score |
-| Package dual-track | `submission.zip` with `attack.py` and `guardrail.py` | `evaluation.py` or `aicomp test --track dual` | `sandbox` | attack + defense |
+| Kaggle red-team | `attack.py` | `aicomp evaluate redteam` | `sandbox` | normalized attack score |
+| Package attack-only | `attack.py` | `aicomp test redteam` | `sandbox` | normalized attack score |
+| Package guardrail-only | `guardrail.py` | `aicomp test defense` | `sandbox` | defense score |
+| Package dual-track | `submission.zip` with `attack.py` and `guardrail.py` | `aicomp test dual` | `sandbox` | attack + defense |
 
 Important current defaults:
 
-- `evaluation_redteam.py` defaults to the official Kaggle attack budget of `1800` seconds.
-- `aicomp test` defaults to `3600` seconds total because it supports package attack-only, guardrail-only, and dual-track evaluation.
-- If you want CLI behavior that matches the public Kaggle default, pass `--track redteam --budget-s 1800`.
+- `aicomp evaluate redteam` defaults to the official Kaggle attack budget of `1800` seconds.
+- `aicomp test` defaults to `3600` seconds total because it supports package attack-only, guardrail-only, and dual-track evaluation. That becomes `3600` attack seconds for `redteam`, `3600` defense seconds for `defense`, and `1800`/`1800` for `dual`.
+- If you want CLI behavior that matches the public Kaggle default, run `aicomp evaluate redteam attack.py --env gym`.
 
 ## Install and Run a First Attack
 
@@ -69,8 +69,8 @@ Fastest CLI path:
 
 ```bash
 aicomp init attack
-aicomp validate attack.py
-aicomp test attack.py --track redteam --quick --agent deterministic
+aicomp validate redteam attack.py
+aicomp test redteam attack.py --budget-s 60 --agent deterministic
 ```
 
 Repository checkout path:
@@ -79,15 +79,15 @@ Repository checkout path:
 git clone https://github.com/mbhatt1/competitionscratch.git
 cd competitionscratch
 pip install -e .
-python evaluation_redteam.py --submission attack.py --budget-s 60 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
 ```
 
 Use the `deterministic` agent when you want an offline smoke test without API keys.
 
 The package also supports:
 
-- guardrail-only evaluation with `guardrail.py` and `aicomp test --track defense`
-- dual-track evaluation with `submission.zip` and `aicomp test --track dual` or `evaluation.py`
+- guardrail-only evaluation with `guardrail.py` and `aicomp test defense`
+- dual-track evaluation with `submission.zip` and `aicomp test dual` or `aicomp evaluate dual`
 
 See [Guardrails Guide](GUARDRAILS_GUIDE.md), [Competition Design](COMPETITION_DESIGN.md), and [Examples](../examples/README.md) when you are working outside the public Kaggle attack-only path.
 
@@ -109,7 +109,7 @@ Why the return value is small: the evaluator does not trust attacker-supplied tr
 ## Current SDK Surface
 
 - `SandboxEnv` is the direct SDK environment for package-level experimentation, guardrail-only workflows, and dual-track workflows.
-- `GymAttackEnv` wraps the same sandbox with a Gymnasium-style `reset(...)` and `step(...)` interface and is the default environment for Kaggle-style evaluation.
+- `GymAttackEnv` wraps the same sandbox with a Gymnasium-style `reset(...)` and `step(...)` interface and is available when you explicitly pass `--env gym`.
 - Direct `SandboxEnv(...)` construction changed in `2.0.0`: you must now provide an explicit `agent=` instance.
 - The guardrail contract is `GuardrailBase.decide(...) -> Decision`; guardrail and hook-based APIs are part of the supported package workflow even though the public Kaggle submission shape is attack-only.
 - Current canonical tools are `web.search`, `web.open`, `fs.read`, `fs.write`, `fs.delete`, `shell.run`, `email.list`, `email.read`, `email.send`, and `http.post`.

@@ -9,8 +9,8 @@ If you don't have access, the test will be skipped.
 import pytest
 
 from aicomp_sdk.agents import build_agent_factory
+from aicomp_sdk.evaluation.ops import eval_defense
 from aicomp_sdk.scoring import score_defense
-from evaluation import eval_defense
 
 from tests.integration.guardrail_fixtures import PromptGuardGuardrail
 

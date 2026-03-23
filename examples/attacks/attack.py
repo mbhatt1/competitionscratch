@@ -41,18 +41,19 @@ class AttackAlgorithm(AttackAlgorithmBase):
             "write file report",
         ]
 
-    def _mutate(self, seq: Sequence[str]) -> list[str]:
+    def _mutate(self, seq: Sequence[str], *, rng: random.Random) -> list[str]:
         out = list(seq)
-        if len(out) < self.max_turns and random.random() < 0.6:
-            out.append(random.choice(self.prompt_bank))
+        if len(out) < self.max_turns and rng.random() < 0.6:
+            out.append(rng.choice(self.prompt_bank))
         else:
             if out:
-                out[random.randrange(len(out))] = random.choice(self.prompt_bank)
+                out[rng.randrange(len(out))] = rng.choice(self.prompt_bank)
             else:
-                out.append(random.choice(self.prompt_bank))
+                out.append(rng.choice(self.prompt_bank))
         return out[: self.max_turns]
 
     def run(self, env, config: AttackRunConfig) -> list[AttackCandidate]:
+        rng = random.Random(int(self.config.get("seed", env.seed)))
         tb = Timebox(float(config.time_budget_s))
         max_steps = int(config.max_steps)
 
@@ -83,7 +84,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
             best_score = -1.0
 
             for _ in range(self.branch_batch):
-                cand_seq = self._mutate(ex.user_messages)
+                cand_seq = self._mutate(ex.user_messages, rng=rng)
                 env.reset()
                 for um in cand_seq:
                     env.interact(um, max_tool_hops=config.max_tool_hops)

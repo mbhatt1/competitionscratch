@@ -9,7 +9,7 @@ import json
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, Self, Unpack
 
 from aicomp_sdk.agents.debug import (
     AgentDebugEvent,
@@ -46,15 +46,18 @@ if TYPE_CHECKING:
         ResponseFunctionToolCall,
         ResponseOutputItem,
     )
+    from openai.types.responses.response_create_params import ResponseCreateParamsNonStreaming
 
 
 class ResponsesAPIProtocol(Protocol):
-    def create(self, **kwargs: Response) -> Response:
-        """Create a Responses API request."""
+    def create(self, **kwargs: Unpack[ResponseCreateParamsNonStreaming]) -> Response:
+        """Create a non-streaming Responses API request."""
 
 
 class OpenAIClientProtocol(Protocol):
-    responses: ResponsesAPIProtocol
+    @property
+    def responses(self) -> ResponsesAPIProtocol:
+        """Access the Responses API resource."""
 
 
 @dataclass(frozen=True)
@@ -79,26 +82,26 @@ class OpenAIResponsesAgentState:
         self,
         decision: AgentDecision,
         output_items: Sequence[ResponseOutputItem],
-    ) -> OpenAIResponsesAgentState:
+    ) -> Self:
         pending_response_output_items: list[dict[str, Any]] = []
         if isinstance(decision, ToolCallDecision):
             pending_response_output_items = [
                 item.model_dump(mode="json", exclude_unset=True) for item in output_items
             ]
-        return OpenAIResponsesAgentState(
+        return type(self)(
             next_debug_turn_index=self.next_debug_turn_index + 1,
             pending_response_output_items=pending_response_output_items,
         )
 
-    def cleared_pending_response_output_items(self) -> OpenAIResponsesAgentState:
+    def cleared_pending_response_output_items(self) -> Self:
         if not self.pending_response_output_items:
             return self
-        return OpenAIResponsesAgentState(
+        return type(self)(
             next_debug_turn_index=self.next_debug_turn_index,
         )
 
     @classmethod
-    def from_snapshot_data(cls, data: object) -> OpenAIResponsesAgentState:
+    def from_snapshot_data(cls, data: object) -> Self:
         if not isinstance(data, Mapping):
             raise AgentStateVersionError("Invalid agent snapshot data: expected object")
         try:
@@ -152,7 +155,7 @@ class OpenAIResponsesAgent(AgentProtocol):
         client: OpenAIClientProtocol,
         verbose: bool = False,
         model: str = "gpt-4o-mini",
-        debug_sink: Optional[AgentDebugSink] = None,
+        debug_sink: AgentDebugSink | None = None,
     ) -> None:
         self._client = client
         self.verbose = verbose
@@ -184,7 +187,7 @@ class OpenAIResponsesAgent(AgentProtocol):
             provider_payload=provider_payload,
         )
         started_at = time.perf_counter()
-        response: Response = self._client.responses.create(**request)
+        response = self._client.responses.create(**request)
         latency_ms = (time.perf_counter() - started_at) * 1000.0
         response_payload = response.model_dump(mode="json", exclude_unset=True)
         self._record_debug_event(
@@ -255,8 +258,8 @@ class OpenAIResponsesAgent(AgentProtocol):
         canonical_to_openai: Mapping[str, str],
         *,
         state: OpenAIResponsesAgentState,
-    ) -> dict[str, object]:
-        request = {
+    ) -> ResponseCreateParamsNonStreaming:
+        request: ResponseCreateParamsNonStreaming = {
             "model": self._model,
             "input": self._render_input_items(
                 history,
@@ -372,7 +375,7 @@ class OpenAIResponsesAgent(AgentProtocol):
             raise InvalidModelOutputError(f"Unsupported runtime event: {event!r}")
         return items
 
-    def _render_instructions(self, history: RuntimeHistory) -> Optional[str]:
+    def _render_instructions(self, history: RuntimeHistory) -> str | None:
         if not history.instructions:
             return None
         return "\n\n".join(event.text for event in history.instructions if event.text.strip())
@@ -383,7 +386,7 @@ class OpenAIResponsesAgent(AgentProtocol):
         openai_to_canonical: Mapping[str, str],
     ) -> AgentDecision:
         assistant_text_chunks: list[str] = []
-        function_tool_call: Optional[ResponseFunctionToolCall] = None
+        function_tool_call: ResponseFunctionToolCall | None = None
 
         for output in response.output:
             if output.type == "function_call":
@@ -464,12 +467,12 @@ class OpenAIResponsesAgent(AgentProtocol):
         phase: DebugPhase,
         turn_index: int,
         history: RuntimeHistory,
-        request_payload: Optional[Mapping[str, Any]] = None,
-        response_payload: Optional[Mapping[str, Any]] = None,
-        decision_payload: Optional[Mapping[str, Any]] = None,
-        error: Optional[str] = None,
-        latency_ms: Optional[float] = None,
-        provider_payload: Optional[Mapping[str, Any]] = None,
+        request_payload: Mapping[str, Any] | None = None,
+        response_payload: Mapping[str, Any] | None = None,
+        decision_payload: Mapping[str, Any] | None = None,
+        error: str | None = None,
+        latency_ms: float | None = None,
+        provider_payload: Mapping[str, Any] | None = None,
     ) -> None:
         if self._debug_sink is None:
             return

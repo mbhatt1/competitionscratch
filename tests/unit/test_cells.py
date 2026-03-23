@@ -5,24 +5,24 @@ Tests cell signature generation and hashing functionality.
 
 import pytest
 
-from aicomp_sdk.core.cells import _bucket_path, _bucket_url, _h, cell_signature
+from aicomp_sdk.core.cells import _bucket_path, _bucket_url, _short_hash, cell_signature
 
 
 class TestHelperFunctions:
     """Test helper functions for cell signature generation."""
 
     def test_hash_function_consistency(self):
-        """Test that _h produces consistent hashes."""
+        """Test that _short_hash produces consistent hashes."""
         test_string = "test_string"
-        hash1 = _h(test_string)
-        hash2 = _h(test_string)
+        hash1 = _short_hash(test_string)
+        hash2 = _short_hash(test_string)
         assert hash1 == hash2
         assert len(hash1) == 16  # Should be first 16 chars of sha256
 
     def test_hash_function_uniqueness(self):
         """Test that different strings produce different hashes."""
-        hash1 = _h("string1")
-        hash2 = _h("string2")
+        hash1 = _short_hash("string1")
+        hash2 = _short_hash("string2")
         assert hash1 != hash2
 
     def test_bucket_path_extracts_filename(self):

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import scripts.run_attack_openai as _impl
 
 if TYPE_CHECKING:
-    from aicomp_sdk.core.env import SandboxEnv
+    from aicomp_sdk.core.env.sandbox import SandboxEnv
 
 
 def _select_openai_demo_agent() -> str:

@@ -5,27 +5,27 @@ import json
 import string
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Final, Literal
 
 import gymnasium as gym
 from gymnasium import spaces
 
 from aicomp_sdk.agents.protocol import AgentProtocol
 from aicomp_sdk.core.cells import cell_signature
-from aicomp_sdk.core.env import SandboxEnv
-from aicomp_sdk.core.env_api import (
+from aicomp_sdk.core.env.api import (
     DEFAULT_MAX_TOOL_HOPS,
     MAX_USER_MESSAGE_CHARS,
     EnvInteractionResult,
 )
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 
-MAX_TRACE_SUMMARY_JSON_CHARS = 8_192
-RECENT_TOOL_WINDOW = 8
-RECENT_ERROR_WINDOW = 4
-LAST_OUTPUT_WINDOW = 4
-LAST_OUTPUT_CHARS = 256
-TEXT_CHARSET = string.printable
+MAX_TRACE_SUMMARY_JSON_CHARS: Final[int] = 8_192
+RECENT_TOOL_WINDOW: Final[int] = 8
+RECENT_ERROR_WINDOW: Final[int] = 4
+LAST_OUTPUT_WINDOW: Final[int] = 4
+LAST_OUTPUT_CHARS: Final[int] = 256
+TEXT_CHARSET: Final[str] = string.printable
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -220,7 +220,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
         self,
         *,
         seed: int | None = None,
-        options: Optional[dict[str, Any]] = None,
+        options: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         if seed is not None:
             self.seed = seed

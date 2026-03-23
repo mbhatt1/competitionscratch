@@ -4,6 +4,7 @@ Tests tool specifications and implementations with mocked I/O.
 """
 
 import json
+from typing import Any, cast
 
 import pytest
 
@@ -216,9 +217,13 @@ class TestBuiltinRoutingSemantics:
             "web page identifiers or email message identifiers" in projected["fs.read"].description
         )
         assert "discover message identifiers" in projected["email.list"].description
+        email_list_properties = cast(
+            dict[str, Any],
+            projected["email.list"].parameters_json_schema["properties"],
+        )
         assert (
             "folder name"
-            in projected["email.list"].parameters_json_schema["properties"]["folder"]["description"]
+            in email_list_properties["folder"]["description"]
         )
         assert "known message identifier" in projected["email.read"].description
 

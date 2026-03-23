@@ -6,7 +6,7 @@ import shutil
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Optional
+from typing import Any
 
 from .models import RuntimeToolSpec
 from .registry import TOOL_REGISTRY
@@ -46,7 +46,7 @@ class ToolSuite:
             fs_workspace=fs_workspace,
         )
 
-    def _create_fs_root(self, isolate_fs: bool) -> tuple[Path, Optional[TemporaryDirectory]]:
+    def _create_fs_root(self, isolate_fs: bool) -> tuple[Path, TemporaryDirectory | None]:
         fs_root = self.fixtures_dir / "file_seed"
         if not isolate_fs:
             return fs_root, None
@@ -93,7 +93,7 @@ class ToolSuite:
             if extra:
                 raise ValueError(f"Extra keys: {extra}")
 
-    def call(self, tool_name: str, args: Mapping[str, Any]) -> tuple[bool, str, Optional[str]]:
+    def call(self, tool_name: str, args: Mapping[str, Any]) -> tuple[bool, str, str | None]:
         self.validate(tool_name, args)
         return TOOL_REGISTRY[tool_name].handler(self._context, **dict(args))
 

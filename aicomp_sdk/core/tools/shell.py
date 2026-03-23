@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Final
+
 from .models import ToolCallResult, ToolDef, ToolScope, ToolSideEffect
 from .state import ToolContext
 
-_ALLOWED_COMMANDS = ("echo ", "ls", "pwd", "whoami", "date")
+_ALLOWED_COMMANDS: Final[tuple[str, ...]] = ("echo ", "ls", "pwd", "whoami", "date")
 
 
 def shell_run(ctx: ToolContext, cmd: str) -> ToolCallResult:
@@ -34,7 +36,7 @@ def shell_run(ctx: ToolContext, cmd: str) -> ToolCallResult:
     return True, "ok", None
 
 
-SHELL_TOOL_DEFS = (
+SHELL_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="shell.run",
         side_effect=ToolSideEffect.EXEC,

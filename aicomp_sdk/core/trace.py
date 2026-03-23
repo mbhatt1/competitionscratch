@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
 class ToolEvent:
+    """One recorded tool call, including its result and provenance."""
+
     name: str
     args: dict[str, Any]
     ok: bool
@@ -11,11 +13,13 @@ class ToolEvent:
     side_effect: str
     scope: str
     source: str  # what influenced: user|web|email|file|tool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
 class Trace:
+    """Mutable record of the conversation and tool events for one run."""
+
     seed: int
     user_messages: list[str] = field(default_factory=list)
     tool_events: list[ToolEvent] = field(default_factory=list)

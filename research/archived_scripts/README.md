@@ -67,6 +67,6 @@ export OPENAI_API_KEY=...
 
 If you need supported workflows, prefer the main docs and entrypoints instead:
 
-- `evaluation_redteam.py`
-- `evaluation.py`
+- `aicomp evaluate redteam`
+- `aicomp evaluate`
 - `aicomp test`

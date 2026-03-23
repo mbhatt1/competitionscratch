@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from enum import Enum
-from typing import Optional, Union
+from enum import StrEnum
+from typing import Final
 
 from .debug import AgentDebugSink
 from .deterministic_agent import VulnerableDeterministicAgent
@@ -13,24 +13,19 @@ from .openai_agent import OpenAIResponsesAgent
 from .protocol import AgentProtocol
 
 
-class AgentSelection(str, Enum):
+class AgentSelection(StrEnum):
     AUTO = "auto"
     DETERMINISTIC = "deterministic"
     OPENAI = "openai"
     GPT_OSS = "gpt_oss"
     GEMMA = "gemma"
 
-    def __str__(self) -> str:
-        return self.value
-
 
 AgentFactory = Callable[[], AgentProtocol]
-_DEBUG_AGENT_ENV_VALUES = ("1", "true", "yes")
+_DEBUG_AGENT_ENV_VALUES: Final[tuple[str, ...]] = ("1", "true", "yes")
 
 
-def parse_agent_selection(value: Union[str, AgentSelection]) -> AgentSelection:
-    if isinstance(value, AgentSelection):
-        return value
+def coerce_agent_selection(value: str | AgentSelection) -> AgentSelection:
     try:
         return AgentSelection(value)
     except ValueError as err:
@@ -41,7 +36,7 @@ def _default_verbose() -> bool:
     return os.environ.get("DEBUG_AGENT", "").lower() in _DEBUG_AGENT_ENV_VALUES
 
 
-def _resolve_verbose(verbose: Optional[bool]) -> bool:
+def _resolve_verbose(verbose: bool | None) -> bool:
     if verbose is None:
         return _default_verbose()
     return verbose
@@ -57,12 +52,14 @@ def _require_openai_api_key() -> str:
 def _create_openai_agent(
     api_key: str,
     verbose: bool,
-    debug_sink: Optional[AgentDebugSink] = None,
+    debug_sink: AgentDebugSink | None = None,
 ) -> OpenAIResponsesAgent:
     try:
         from openai import OpenAI
     except Exception as err:
-        raise RuntimeError("OpenAI SDK is not available") from err
+        exc = RuntimeError("OpenAI SDK is not available")
+        exc.add_note("Install the 'openai' dependency before using agent selection 'openai'.")
+        raise exc from err
 
     return OpenAIResponsesAgent(
         client=OpenAI(api_key=api_key),
@@ -73,7 +70,7 @@ def _create_openai_agent(
 
 def _resolve_auto_factory(
     verbose: bool,
-    debug_sink: Optional[AgentDebugSink],
+    debug_sink: AgentDebugSink | None,
 ) -> AgentFactory:
     try:
         backend = build_gpt_oss_backend()
@@ -113,12 +110,12 @@ def require_agent_selection_configuration(selection: AgentSelection) -> None:
 
 
 def build_agent_factory(
-    selection: Union[str, AgentSelection],
+    selection: str | AgentSelection,
     *,
-    verbose: Optional[bool] = None,
-    debug_sink: Optional[AgentDebugSink] = None,
+    verbose: bool | None = None,
+    debug_sink: AgentDebugSink | None = None,
 ) -> AgentFactory:
-    resolved_selection = parse_agent_selection(selection)
+    resolved_selection = coerce_agent_selection(selection)
     resolved_verbose = _resolve_verbose(verbose)
 
     if resolved_selection is AgentSelection.DETERMINISTIC:
@@ -140,9 +137,9 @@ def build_agent_factory(
 
 
 def build_agent(
-    selection: Union[str, AgentSelection],
+    selection: str | AgentSelection,
     *,
-    verbose: Optional[bool] = None,
-    debug_sink: Optional[AgentDebugSink] = None,
+    verbose: bool | None = None,
+    debug_sink: AgentDebugSink | None = None,
 ) -> AgentProtocol:
     return build_agent_factory(selection, verbose=verbose, debug_sink=debug_sink)()

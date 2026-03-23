@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any, Final
 
 from aicomp_sdk.agents.debug import AgentDebugSink
 from aicomp_sdk.agents.hf_chat_template.hf_agent import (
@@ -38,22 +38,22 @@ from aicomp_sdk.agents.types import (
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
-DEFAULT_GPT_OSS_MODEL_ID = "openai/gpt-oss-20b"
+DEFAULT_GPT_OSS_MODEL_ID: Final[str] = "openai/gpt-oss-20b"
 
 
 def build_gpt_oss_backend_config(
     *,
-    model_path: Optional[str] = None,
-    model_id: Optional[str] = None,
+    model_path: str | None = None,
+    model_id: str | None = None,
     local_files_only: bool = True,
     device_map: str = "auto",
     torch_dtype: str = "auto",
-    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
-    model_kwargs: Optional[Mapping[str, Any]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
+    tokenizer_kwargs: Mapping[str, Any] | None = None,
+    model_kwargs: Mapping[str, Any] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
     max_new_tokens: int = 256,
-    generation_kwargs: Optional[Mapping[str, Any]] = None,
+    generation_kwargs: Mapping[str, Any] | None = None,
 ) -> HFBackendConfig:
     return _build_hf_backend_config(
         default_model_id=DEFAULT_GPT_OSS_MODEL_ID,
@@ -75,17 +75,17 @@ def build_gpt_oss_backend_config(
 
 def build_gpt_oss_backend(
     *,
-    model_path: Optional[str] = None,
-    model_id: Optional[str] = None,
+    model_path: str | None = None,
+    model_id: str | None = None,
     local_files_only: bool = True,
     device_map: str = "auto",
     torch_dtype: str = "auto",
-    tokenizer_kwargs: Optional[Mapping[str, Any]] = None,
-    model_kwargs: Optional[Mapping[str, Any]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
+    tokenizer_kwargs: Mapping[str, Any] | None = None,
+    model_kwargs: Mapping[str, Any] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
     max_new_tokens: int = 256,
-    generation_kwargs: Optional[Mapping[str, Any]] = None,
+    generation_kwargs: Mapping[str, Any] | None = None,
 ) -> HFChatTemplateBackend:
     return HFChatTemplateBackend.from_pretrained(
         build_gpt_oss_backend_config(
@@ -140,11 +140,11 @@ class GPTOSSAgent(AgentProtocol):
 
     def __init__(
         self,
-        backend: Optional[HFGenerationBackendProtocol] = None,
+        backend: HFGenerationBackendProtocol | None = None,
         *,
-        profile: Optional[HFModelProfile] = None,
-        parser: Optional[HFResponseParser] = None,
-        debug_sink: Optional[AgentDebugSink] = None,
+        profile: HFModelProfile | None = None,
+        parser: HFResponseParser | None = None,
+        debug_sink: AgentDebugSink | None = None,
     ) -> None:
         resolved_backend = backend or build_gpt_oss_backend()
         resolved_profile = profile or HFModelProfile(instruction_role="system")
@@ -186,7 +186,7 @@ class GPTOSSAgent(AgentProtocol):
         )
 
 
-def _parse_gpt_oss_harmony_response(raw_text: str) -> Optional[dict[str, Any]]:
+def _parse_gpt_oss_harmony_response(raw_text: str) -> dict[str, Any] | None:
     if not raw_text.strip():
         return None
 
@@ -224,12 +224,12 @@ def _parse_gpt_oss_harmony_response(raw_text: str) -> Optional[dict[str, Any]]:
     }
 
 
-_GPT_OSS_TOOL_CALL_PATTERN = re.compile(
+_GPT_OSS_TOOL_CALL_PATTERN: Final[re.Pattern[str]] = re.compile(
     r"<\|channel\|>commentary(?P<header>.*?)<\|message\|>"
     r"(?P<arguments>.*?)(?:<\|call\|>|<\|end\|>|$)",
     re.DOTALL,
 )
-_GPT_OSS_FINAL_MESSAGE_PATTERN = re.compile(
+_GPT_OSS_FINAL_MESSAGE_PATTERN: Final[re.Pattern[str]] = re.compile(
     r"<\|channel\|>final<\|message\|>(?P<content>.*?)(?:<\|end\|>|$)",
     re.DOTALL,
 )

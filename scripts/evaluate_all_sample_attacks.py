@@ -2,7 +2,7 @@
 """
 Evaluate sample attack algorithms against the optimal guardrail (attack-only).
 
-This script runs official `evaluation.eval_attack` across one or more seeds and reports:
+This script runs official `aicomp_sdk.evaluation.ops.eval_attack` across one or more seeds and reports:
 - Attack score (mean/std across seeds)
 - Breaches found (mean/std across seeds)
 - Predicate counts split into:
@@ -31,12 +31,11 @@ from aicomp_sdk.agents import (  # noqa: E402
     AgentSelection,
     build_agent_factory,
     format_agent_selection,
-    parse_agent_selection,
     require_agent_selection_configuration,
 )
-from aicomp_sdk.core.env_api import EnvSelection, parse_env_selection  # noqa: E402
+from aicomp_sdk.core.env.api import EnvSelection  # noqa: E402
+from aicomp_sdk.evaluation.ops import eval_attack  # noqa: E402
 from aicomp_sdk.scoring import score_attack  # noqa: E402
-from evaluation import eval_attack  # noqa: E402
 
 DEFAULT_OUTPUT = repo_root / "attack_evaluation_results.md"
 DEFAULT_SEEDS = [123]
@@ -80,16 +79,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--agent",
-        type=str,
-        default="deterministic",
-        choices=[member.value for member in AgentSelection],
+        type=AgentSelection,
+        default=AgentSelection.DETERMINISTIC,
+        choices=list(AgentSelection),
         help="Agent selection for evaluation runs (default: deterministic).",
     )
     parser.add_argument(
         "--env",
-        type=str,
-        default="sandbox",
-        choices=[member.value for member in EnvSelection],
+        type=EnvSelection,
+        default=EnvSelection.SANDBOX,
+        choices=list(EnvSelection),
         help="Evaluation environment selection (default: sandbox).",
     )
     return parser.parse_args()
@@ -254,8 +253,8 @@ def main() -> None:
     args = parse_args()
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
-    agent_selection = parse_agent_selection(args.agent)
-    env_selection = parse_env_selection(args.env)
+    agent_selection = args.agent
+    env_selection = args.env
 
     try:
         require_agent_selection_configuration(agent_selection)

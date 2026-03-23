@@ -1,26 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Protocol, Union, runtime_checkable
+from enum import StrEnum
+from typing import Any, Final, Protocol, runtime_checkable
 
 from aicomp_sdk.guardrails.base import GuardrailBase
 
-DEFAULT_MAX_TOOL_HOPS = 8
-MAX_USER_MESSAGE_CHARS = 2_000
+DEFAULT_MAX_TOOL_HOPS: Final[int] = 8
+MAX_USER_MESSAGE_CHARS: Final[int] = 2_000
 
 
-class EnvSelection(str, Enum):
+class EnvSelection(StrEnum):
     SANDBOX = "sandbox"
     GYM = "gym"
 
-    def __str__(self) -> str:
-        return self.value
 
-
-def parse_env_selection(value: Union[str, EnvSelection]) -> EnvSelection:
-    if isinstance(value, EnvSelection):
-        return value
+def coerce_env_selection(value: str | EnvSelection) -> EnvSelection:
     try:
         return EnvSelection(value)
     except ValueError as err:
@@ -29,6 +24,8 @@ def parse_env_selection(value: Union[str, EnvSelection]) -> EnvSelection:
 
 @dataclass(frozen=True)
 class EnvInteractionResult:
+    """Summary of one `interact` call and the counters it contributed."""
+
     seed: int
     total_tool_events: int = 0
     tool_events_added: int = 0
@@ -39,7 +36,9 @@ class EnvInteractionResult:
 
 
 @dataclass
-class RunDiagnostics:
+class EnvRunDiagnostics:
+    """Aggregated counters for a sequence of environment interactions."""
+
     interactions: int = 0
     agent_turns: int = 0
     tool_calls: int = 0
@@ -56,35 +55,58 @@ class RunDiagnostics:
         self.agent_refusals += int(result.agent_refused)
 
 
+# Backward-compatible alias for the pre-stabilization public name.
+RunDiagnostics = EnvRunDiagnostics
+
+
 @runtime_checkable
 class AttackEnvProtocol(Protocol):
-    seed: int
-    trace: Any
-    tools: Any
-    guardrail: GuardrailBase
+    """Runtime protocol for attack environments used by the evaluation stack."""
+
+    @property
+    def seed(self) -> int:
+        """Return the environment seed."""
+
+    @seed.setter
+    def seed(self, value: int) -> None:
+        """Set the environment seed."""
+
+    @property
+    def trace(self) -> Any:
+        """Return the current trace object."""
+
+    @property
+    def tools(self) -> Any:
+        """Return the tool suite bound to this environment."""
+
+    @property
+    def guardrail(self) -> GuardrailBase:
+        """Return the active guardrail."""
 
     def reset(self, *args: Any, **kwargs: Any) -> Any:
-        pass
+        """Reset environment state."""
 
     def interact(
         self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
     ) -> EnvInteractionResult:
-        pass
+        """Run one user interaction turn."""
 
     def export_trace_dict(self) -> dict[str, Any]:
-        pass
+        """Return the trace as a serializable dictionary."""
 
     def snapshot(self) -> Any:
-        pass
+        """Capture a restorable environment snapshot."""
 
     def restore(self, snapshot: Any) -> None:
-        pass
+        """Restore a snapshot captured by snapshot()."""
 
 
 class DiagnosticsEnv:
+    """Proxy that forwards env calls while accumulating run diagnostics."""
+
     def __init__(self, inner: AttackEnvProtocol) -> None:
         self._inner = inner
-        self.run_diagnostics = RunDiagnostics()
+        self.run_diagnostics = EnvRunDiagnostics()
 
     @property
     def seed(self) -> int:

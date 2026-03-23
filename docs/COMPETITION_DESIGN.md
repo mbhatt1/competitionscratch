@@ -11,16 +11,17 @@ The repository intentionally exposes two layers of use.
 ### Public Kaggle path
 
 - submission shape: `attack.py`
-- primary entrypoint: [`../evaluation_redteam.py`](../evaluation_redteam.py)
+- primary entrypoint: `aicomp evaluate redteam`
 - default budget: `1800` seconds
-- default environment: `gym`
+- local default environment: `sandbox`
+- public Kaggle environment: `gym`
 - public score: normalized attack score only
 
 ### Package workflows
 
 - submission shapes: `attack.py`, `guardrail.py`, or `submission.zip`
-- primary entrypoints: `aicomp test` for attack-only, guardrail-only, and dual-track evaluation; [`../evaluation.py`](../evaluation.py) for standalone package dual-track evaluation
-- default environment: `gym` for package attack-only evaluation, `sandbox` for package guardrail-only and package dual-track evaluation
+- primary entrypoints: `aicomp test` for attack-only, guardrail-only, and dual-track evaluation; `aicomp evaluate` for standalone redteam, defense, and dual-track evaluation
+- local default environment: `sandbox` for package attack-only, guardrail-only, and dual-track evaluation
 - package scores: normalized attack score, defense score, or combined attack + defense
 
 ## Why Both Exist
@@ -64,16 +65,16 @@ Current evaluator behavior follows the workflow surface:
 - package guardrail-only: full budget goes to defense
 - package dual-track: total budget is split evenly between offense and defense
 
-That is why `evaluation.py --budget-s 3600` yields `1800` seconds for attack and `1800` seconds for defense.
+That is why `aicomp evaluate dual submission.zip --budget-s 3600` yields `1800` seconds for attack and `1800` seconds for defense.
 
-The same split is reflected in `aicomp test --track dual`.
+The same split is reflected in `aicomp test dual`.
 
 ## Environment Choices
 
 The current defaults are deliberate:
 
-- `gym` for the public Kaggle path and package attack-only evaluation because it matches the Kaggle-style surface
-- `sandbox` for package guardrail-only and package dual-track evaluation because direct SDK guardrail work usually wants the underlying environment
+- `sandbox` for local CLI defaults across `aicomp evaluate` and `aicomp test`
+- `gym` when you explicitly pass `--env gym` for Kaggle-style parity on attack-only runs
 
 Both surfaces preserve the same common attack helpers:
 

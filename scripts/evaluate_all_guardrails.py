@@ -2,7 +2,7 @@
 """
 Evaluate all guardrails against the baseline Go-Explore attacker (defense only).
 
-This script runs official `evaluation.eval_defense` across one or more seeds and reports:
+This script runs official `aicomp_sdk.evaluation.ops.eval_defense` across one or more seeds and reports:
 - Defense score (mean/std across seeds)
 - Breaches (mean/std across seeds)
 - False-positive rate (mean/std + aggregate totals)
@@ -32,12 +32,11 @@ from aicomp_sdk.agents import (  # noqa: E402
     AgentSelection,
     build_agent_factory,
     format_agent_selection,
-    parse_agent_selection,
     require_agent_selection_configuration,
 )
-from aicomp_sdk.core.env_api import EnvSelection, parse_env_selection  # noqa: E402
+from aicomp_sdk.core.env.api import EnvSelection  # noqa: E402
+from aicomp_sdk.evaluation.ops import eval_defense  # noqa: E402
 from aicomp_sdk.scoring import score_defense  # noqa: E402
-from evaluation import eval_defense  # noqa: E402
 
 fixtures = repo_root / "fixtures"
 
@@ -93,16 +92,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--agent",
-        type=str,
-        default="deterministic",
-        choices=[member.value for member in AgentSelection],
+        type=AgentSelection,
+        default=AgentSelection.DETERMINISTIC,
+        choices=list(AgentSelection),
         help="Agent selection for evaluation runs (default: deterministic).",
     )
     parser.add_argument(
         "--env",
-        type=str,
-        default="sandbox",
-        choices=[member.value for member in EnvSelection],
+        type=EnvSelection,
+        default=EnvSelection.SANDBOX,
+        choices=list(EnvSelection),
         help="Evaluation environment selection (default: sandbox).",
     )
     return parser.parse_args()
@@ -295,8 +294,8 @@ def main() -> None:
     output_file = Path(args.output)
     seeds = parse_seeds(args.seeds)
     pattern_budget_s = args.pattern_budget_s if args.pattern_budget_s is not None else args.budget_s
-    agent_selection = parse_agent_selection(args.agent)
-    env_selection = parse_env_selection(args.env)
+    agent_selection = args.agent
+    env_selection = args.env
 
     try:
         require_agent_selection_configuration(agent_selection)
@@ -331,7 +330,7 @@ def main() -> None:
         f"- **Pattern guardrail evaluation budget:** {pattern_budget_s:.1f}s "
         f"(effective attacker: {effective_attack_budget(pattern_budget_s):.1f}s)"
     )
-    md_print("- **Go-Explore config (from evaluation.py):** max_turns=4, branch_batch=12")
+    md_print("- **Go-Explore config (from aicomp evaluate):** max_turns=4, branch_batch=12")
     md_print()
 
     results: list[dict[str, Any]] = []

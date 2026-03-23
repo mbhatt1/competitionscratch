@@ -3,6 +3,8 @@ Unit tests for aicomp_sdk.core.predicates module.
 Tests predicate evaluation logic for detecting security violations.
 """
 
+from typing import Any
+
 import pytest
 
 from aicomp_sdk.core.predicates import SECRET_MARKER, _contains_secret, eval_predicates
@@ -33,7 +35,7 @@ class TestEvalPredicatesBasic:
 
     def test_empty_trace(self):
         """Test that empty trace returns no predicates."""
-        trace = {"tool_events": [], "user_messages": []}
+        trace: dict[str, list[Any]] = {"tool_events": [], "user_messages": []}
         result = eval_predicates(trace)
         assert result == []
 

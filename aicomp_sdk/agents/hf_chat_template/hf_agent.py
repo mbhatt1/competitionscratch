@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Self
 
 from aicomp_sdk.agents.debug import (
     AgentDebugEvent,
@@ -53,17 +53,17 @@ class HFChatTemplateAgentState:
         if self.next_debug_turn_index < 1:
             raise ValueError("next_debug_turn_index must be >= 1")
 
-    def advance(self, decision: AgentDecision) -> HFChatTemplateAgentState:
+    def advance(self, decision: AgentDecision) -> Self:
         next_generated_call_index = self.next_generated_call_index
         if isinstance(decision, ToolCallDecision):
             next_generated_call_index += 1
-        return HFChatTemplateAgentState(
+        return type(self)(
             next_generated_call_index=next_generated_call_index,
             next_debug_turn_index=self.next_debug_turn_index + 1,
         )
 
     @classmethod
-    def from_snapshot_data(cls, data: object) -> HFChatTemplateAgentState:
+    def from_snapshot_data(cls, data: object) -> Self:
         if not isinstance(data, Mapping):
             raise AgentStateVersionError("Invalid agent snapshot data: expected object")
         try:
@@ -224,8 +224,8 @@ class HFChatTemplateAgent(AgentProtocol):
         backend: HFGenerationBackendProtocol,
         profile: HFModelProfile,
         parser: HFResponseParser,
-        request_builder: Optional[HFRequestBuilder] = None,
-        debug_sink: Optional[AgentDebugSink] = None,
+        request_builder: HFRequestBuilder | None = None,
+        debug_sink: AgentDebugSink | None = None,
         debug_backend_label: str = "hf_chat_template",
     ) -> None:
         self._backend = backend
@@ -359,12 +359,12 @@ class HFChatTemplateAgent(AgentProtocol):
         phase: DebugPhase,
         turn_index: int,
         history: RuntimeHistory,
-        request_payload: Optional[Mapping[str, Any]] = None,
-        response_payload: Optional[Mapping[str, Any]] = None,
-        decision_payload: Optional[Mapping[str, Any]] = None,
-        error: Optional[str] = None,
-        latency_ms: Optional[float] = None,
-        provider_payload: Optional[Mapping[str, Any]] = None,
+        request_payload: Mapping[str, Any] | None = None,
+        response_payload: Mapping[str, Any] | None = None,
+        decision_payload: Mapping[str, Any] | None = None,
+        error: str | None = None,
+        latency_ms: float | None = None,
+        provider_payload: Mapping[str, Any] | None = None,
     ) -> None:
         if self._debug_sink is None:
             return

@@ -8,10 +8,13 @@ lists evaluations from .aicomp/history/ with:
 """
 
 import json
+import logging
 from collections.abc import Collection, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def load_all_results() -> list[dict[str, Any]]:
@@ -21,15 +24,35 @@ def load_all_results() -> list[dict[str, Any]]:
     if not history_dir.exists():
         return []
 
-    results = []
+    results: list[dict[str, Any]] = []
     for result_file in history_dir.glob("*.json"):
         try:
-            data = json.loads(result_file.read_text(encoding="utf-8"))
-            data["_filename"] = result_file.stem
-            results.append(data)
-        except Exception:
-            # Skip invalid files
-            pass
+            loaded = json.loads(result_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+            logger.debug(
+                "Skipping invalid history file",
+                extra={
+                    "event": "history_file_skipped",
+                    "path": str(result_file),
+                    "error_type": type(err).__name__,
+                },
+            )
+            continue
+
+        if not isinstance(loaded, dict):
+            logger.debug(
+                "Skipping invalid history file",
+                extra={
+                    "event": "history_file_skipped",
+                    "path": str(result_file),
+                    "error_type": type(loaded).__name__,
+                },
+            )
+            continue
+
+        data = dict(loaded)
+        data["_filename"] = result_file.stem
+        results.append(data)
 
     return results
 
@@ -142,15 +165,13 @@ def run_history(args) -> int:
     """Execute history command."""
     from aicomp_sdk.cli.main import print_info, print_warning
 
-    # Load all results
     results = load_all_results()
 
     if not results:
         print_warning("No evaluation results found.")
-        print_info("Run evaluations with: aicomp test <submission>")
+        print_info("Run evaluations with: aicomp test <track> <submission>")
         return 0
 
-    # Filter if requested
     if args.filter:
         filter_term = args.filter.lower()
         results = [r for r in results if filter_term in r.get("run_name", "").lower()]
@@ -159,7 +180,6 @@ def run_history(args) -> int:
             print_warning(f"No results matching filter: {args.filter}")
             return 0
 
-    # Sort results
     if args.sort == "date":
         results.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
     elif args.sort == "score":
@@ -167,15 +187,12 @@ def run_history(args) -> int:
     elif args.sort == "name":
         results.sort(key=lambda r: r.get("run_name", ""))
 
-    # Limit results
     if args.limit > 0 and len(results) > args.limit:
         results = results[: args.limit]
         print_info(f"Showing top {args.limit} results (total: {len(load_all_results())})")
 
-    # Print results
     print_results_table(results)
 
-    # Show summary
     if results:
         print()
         best = max(results, key=lambda r: r.get("final_score", 0))

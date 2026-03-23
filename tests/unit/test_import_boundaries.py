@@ -39,8 +39,6 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "aicomp_sdk/attacks/baselines/attacker_goexplore.py": "library_demo_cleanup_target",
     "aicomp_sdk/cli/main.py": "supported_entrypoint",
     "aicomp_sdk/guardrails/hooks_examples.py": "library_demo_cleanup_target",
-    "evaluation.py": "supported_entrypoint",
-    "evaluation_redteam.py": "supported_entrypoint",
     "run_attack_openai.py": "compat_shim_boundary",
     "scripts/add_injection_sources.py": "repo_script_boundary",
     "scripts/count_injection_sources.py": "repo_script_boundary",
@@ -64,8 +62,6 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
 
 def _iter_inventory_files() -> list[Path]:
     file_paths = [
-        REPO_ROOT / "evaluation.py",
-        REPO_ROOT / "evaluation_redteam.py",
         REPO_ROOT / "run_attack_openai.py",
     ]
     directory_paths = [
@@ -92,9 +88,7 @@ def _find_text_matches(*markers: str) -> set[str]:
     return matches
 
 
-def _import_violations(
-    root: Path, *, forbidden_roots: set[str]
-) -> list[tuple[str, str, int]]:
+def _import_violations(root: Path, *, forbidden_roots: set[str]) -> list[tuple[str, str, int]]:
     violations: list[tuple[str, str, int]] = []
     for path in sorted(root.rglob("*.py")):
         tree = ast.parse(path.read_text(), filename=str(path))
@@ -134,7 +128,8 @@ def test_main_runner_inventory_is_complete() -> None:
 
 def test_package_code_contains_no_repo_bootstrap() -> None:
     package_bootstraps = {
-        path for path in _find_text_matches("sys.path.insert", "sys.path.append")
+        path
+        for path in _find_text_matches("sys.path.insert", "sys.path.append")
         if path.startswith("aicomp_sdk/")
     }
     assert package_bootstraps == set()
@@ -205,9 +200,9 @@ def test_demo_library_modules_import_without_repo_root(tmp_path: Path) -> None:
         assert result.stdout.strip() == module_name
 
 
-def test_evaluation_redteam_help_completes_from_outside_repo_root(tmp_path: Path) -> None:
+def test_aicomp_evaluate_help_completes_from_outside_repo_root(tmp_path: Path) -> None:
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "evaluation_redteam.py"), "--help"],
+        [sys.executable, "-m", "aicomp_sdk.cli.main", "evaluate", "--help"],
         capture_output=True,
         cwd=tmp_path,
         env=_subprocess_env(),
@@ -217,3 +212,19 @@ def test_evaluation_redteam_help_completes_from_outside_repo_root(tmp_path: Path
 
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout.lower()
+
+
+def test_evaluation_namespace_exports_typed_execution_api() -> None:
+    from aicomp_sdk.evaluation import EvaluationExecution, execute_evaluation
+
+    assert EvaluationExecution.__name__ == "EvaluationExecution"
+    assert execute_evaluation.__name__ == "execute_evaluation"
+
+
+def test_cli_command_modules_are_subcommand_plugins_not_process_entrypoints() -> None:
+    from aicomp_sdk.cli.commands import evaluate
+    from aicomp_sdk.cli.commands import test as test_command
+
+    assert not hasattr(evaluate, "create_parser")
+    assert not hasattr(evaluate, "main")
+    assert not hasattr(test_command, "main")

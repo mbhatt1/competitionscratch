@@ -1,8 +1,8 @@
 from __future__ import annotations
+# mypy: disable-error-code="arg-type"
 
 import sys
 from types import SimpleNamespace
-from typing import Optional
 from unittest.mock import Mock, call
 
 import pytest
@@ -39,13 +39,13 @@ from aicomp_sdk.core.runtime_history import RuntimeHistory
 def _backend_config(
     *,
     model_id: str = "openai/gpt-oss-20b",
-    model_path: Optional[str] = None,
+    model_path: str | None = None,
     max_new_tokens: int = 256,
-    tokenizer_kwargs: Optional[dict[str, object]] = None,
-    model_kwargs: Optional[dict[str, object]] = None,
-    trust_remote_code: Optional[bool] = None,
-    attn_implementation: Optional[str] = None,
-    generation_kwargs: Optional[dict[str, object]] = None,
+    tokenizer_kwargs: dict[str, object] | None = None,
+    model_kwargs: dict[str, object] | None = None,
+    trust_remote_code: bool | None = None,
+    attn_implementation: str | None = None,
+    generation_kwargs: dict[str, object] | None = None,
 ) -> HFBackendConfig:
     return HFBackendConfig(
         model_id=model_id,
@@ -64,8 +64,8 @@ def _backend_config(
 
 def _profile(
     *,
-    chat_template: Optional[str] = None,
-    assistant_prefill: Optional[str] = None,
+    chat_template: str | None = None,
+    assistant_prefill: str | None = None,
     continue_final_message: bool = False,
 ) -> HFModelProfile:
     return HFModelProfile(
@@ -96,7 +96,7 @@ class _RecordingBackend:
         self,
         response: HFGenerationResponse,
         *,
-        config: Optional[HFBackendConfig] = None,
+        config: HFBackendConfig | None = None,
     ) -> None:
         self.response = response
         self.config = config or _backend_config()
@@ -112,7 +112,7 @@ class _SequentialBackend:
         self,
         responses: list[HFGenerationResponse],
         *,
-        config: Optional[HFBackendConfig] = None,
+        config: HFBackendConfig | None = None,
     ) -> None:
         self.responses = list(responses)
         self.config = config or _backend_config()

@@ -3,9 +3,11 @@ Unit tests for aicomp_sdk.guardrails.base module.
 Tests guardrail base classes and decision logic.
 """
 
+from typing import cast
+
 import pytest
 
-from aicomp_sdk.guardrails.base import Decision, GuardrailBase
+from aicomp_sdk.guardrails.base import Decision, DecisionAction, GuardrailBase
 
 
 class TestDecisionClass:
@@ -13,29 +15,43 @@ class TestDecisionClass:
 
     def test_decision_creation(self):
         """Test creating a Decision with all fields."""
-        decision = Decision(action="ALLOW", reason="safe operation", sanitized_args=None)
+        decision = Decision(
+            action=DecisionAction.ALLOW,
+            reason="safe operation",
+            sanitized_args=None,
+        )
 
+        assert decision.action is DecisionAction.ALLOW
         assert decision.action == "ALLOW"
         assert decision.reason == "safe operation"
         assert decision.sanitized_args is None
 
+    def test_decision_rejects_unknown_action(self):
+        """Test that invalid action values fail fast."""
+        with pytest.raises(ValueError, match="UNKNOWN"):
+            Decision(action=cast(DecisionAction, "UNKNOWN"))
+
     def test_decision_with_sanitized_args(self):
         """Test creating a Decision with sanitized arguments."""
         sanitized = {"path": "safe.txt"}
-        decision = Decision(action="SANITIZE", reason="path sanitized", sanitized_args=sanitized)
+        decision = Decision(
+            action=DecisionAction.SANITIZE,
+            reason="path sanitized",
+            sanitized_args=sanitized,
+        )
 
         assert decision.action == "SANITIZE"
         assert decision.sanitized_args == sanitized
 
     def test_decision_default_reason(self):
         """Test that reason defaults to empty string."""
-        decision = Decision(action="ALLOW")
+        decision = Decision(action=DecisionAction.ALLOW)
 
         assert decision.reason == ""
 
     def test_decision_default_sanitized_args(self):
         """Test that sanitized_args defaults to None."""
-        decision = Decision(action="DENY", reason="test")
+        decision = Decision(action=DecisionAction.DENY, reason="test")
 
         assert decision.sanitized_args is None
 

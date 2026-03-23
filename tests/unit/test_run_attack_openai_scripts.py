@@ -89,32 +89,45 @@ def test_root_main_runs_through_shared_sandbox_env(
 def test_script_main_runs_through_shared_sandbox_env(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    class _FakeAttackAlgorithm:
-        def __init__(self, config):  # noqa: ANN001
-            self.config = config
-            self.last_run_details = [
-                {
-                    "trace": {
-                        "user_messages": ["hello"],
-                        "tool_events": [],
-                    }
-                }
-            ]
+    captured: dict[str, Any] = {}
 
-        def run(self, env, config):  # noqa: ANN001, ANN201
-            assert env == "fake-env"
-            assert config.time_budget_s == 30
-            return [{"trace": {"user_messages": ["hello"], "tool_events": []}}]
+    def fake_build_agent_factory(selection: str) -> object:
+        captured["agent_selection"] = selection
+        return "fake-agent-factory"
 
-    monkeypatch.setattr(scripts_run_attack_openai, "_build_demo_env", lambda **_: "fake-env")
-    monkeypatch.setattr(scripts_run_attack_openai, "AttackAlgorithm", _FakeAttackAlgorithm)
-    monkeypatch.setattr(
-        scripts_run_attack_openai,
-        "eval_predicates",
-        lambda trace: [{"predicate": "EXFILTRATION", "severity": "high", "evidence": {}}],
-    )
+    def fake_eval_attack(attack_cls, budget_s, agent_factory, env_selection, **kwargs):  # noqa: ANN001, ANN202
+        captured["attack_cls"] = attack_cls
+        captured["budget_s"] = budget_s
+        captured["agent_factory"] = agent_factory
+        captured["env_selection"] = env_selection
+        captured["kwargs"] = kwargs
+        return [
+            {
+                "trace": {
+                    "user_messages": ["hello"],
+                    "tool_events": [],
+                },
+                "predicates": [{"predicate": "EXFILTRATION", "severity": "high", "evidence": {}}],
+            }
+        ]
+
+    monkeypatch.setattr(scripts_run_attack_openai, "build_agent_factory", fake_build_agent_factory)
+    monkeypatch.setattr(scripts_run_attack_openai, "eval_attack", fake_eval_attack)
 
     scripts_run_attack_openai.main()
+
+    options = captured["kwargs"]["options"]
+    assert captured["attack_cls"] is scripts_run_attack_openai.AttackAlgorithm
+    assert captured["budget_s"] == 30
+    assert captured["agent_factory"] == "fake-agent-factory"
+    assert captured["agent_selection"] == scripts_run_attack_openai._select_openai_demo_agent()
+    assert captured["env_selection"] == "sandbox"
+    assert captured["kwargs"]["fixtures_dir"] == scripts_run_attack_openai.repo_root / "fixtures"
+    assert options.run_config.time_budget_s == 30
+    assert options.run_config.max_steps == 100
+    assert options.attack_config == {"max_turns": 6, "branch_batch": 8}
+    assert options.seed == 42
+    assert options.guardrail_factory is scripts_run_attack_openai.BaselineGuardrail
 
     output = capsys.readouterr().out
     assert "GO-EXPLORE ATTACK DEMO" in output

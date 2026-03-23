@@ -5,7 +5,7 @@ This script runs a fast deterministic check that should pass before pushing:
 1. Validate root submission files (`attack.py`, `guardrail.py`).
 2. Run focused unit tests for attack-evaluation contract/scoring.
 3. Build a temporary submission zip from root files.
-4. Execute `evaluation.py` end-to-end and verify output artifacts.
+4. Execute `aicomp evaluate` end-to-end and verify output artifacts.
 
 Optional `--extended` runs longer report scripts as an extra sanity pass.
 """
@@ -124,12 +124,12 @@ def main() -> int:
     env["PYTHONPATH"] = str(repo_root)
 
     _run(
-        [*cli_cmd, "validate", "attack.py", "--type", "attack"],
+        [*cli_cmd, "validate", "redteam", "attack.py"],
         cwd=repo_root,
         env=env,
     )
     _run(
-        [*cli_cmd, "validate", "examples/guardrails/guardrail.py", "--type", "guardrail"],
+        [*cli_cmd, "validate", "defense", "examples/guardrails/guardrail.py"],
         cwd=repo_root,
         env=env,
     )
@@ -152,22 +152,21 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="aicomp_smoke_") as tmpdir:
         tmp_path = Path(tmpdir)
         submission_zip = tmp_path / "submission.zip"
-        score_txt = tmp_path / "scores.txt"
-        score_json = tmp_path / "scores.json"
+        artifacts_dir = tmp_path / "evaluation_artifacts"
+        score_txt = artifacts_dir / "score.txt"
+        score_json = artifacts_dir / "report.json"
 
         _build_submission_zip(repo_root, submission_zip)
         _run(
             [
-                python_bin,
-                "evaluation.py",
-                "--submission_zip",
+                *cli_cmd,
+                "evaluate",
+                "dual",
                 str(submission_zip),
                 "--budget-s",
                 str(float(args.budget_s)),
-                "--out",
-                str(score_txt),
-                "--out_json",
-                str(score_json),
+                "--artifacts-dir",
+                str(artifacts_dir),
             ],
             cwd=repo_root,
             env=env,

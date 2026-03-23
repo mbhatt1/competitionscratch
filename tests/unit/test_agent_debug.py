@@ -8,8 +8,9 @@ from aicomp_sdk.agents.debug import (
     JsonlAgentDebugSink,
     summarize_runtime_history,
 )
+from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity, RunDiagnostics
 from aicomp_sdk.agents.deterministic_agent import VulnerableDeterministicAgent
-from aicomp_sdk.agents.types import ToolCall, ToolResult
+from aicomp_sdk.agents.types import ToolCall, ToolCallDecision, ToolResult
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
 
@@ -91,6 +92,25 @@ def test_jsonl_agent_debug_sink_truncates_existing_log_on_init(tmp_path) -> None
     assert json.loads(lines[0])["phase"] == "request_built"
 
 
+def test_correlated_agent_debug_sink_adds_run_id(tmp_path) -> None:
+    path = tmp_path / "agent-debug.jsonl"
+    with RunDiagnostics(EvaluatorVerbosity.SUMMARY, run_id="run-123") as controller:
+        sink = controller.make_agent_debug_sink(path)
+        assert sink is not None
+        sink.record(
+            AgentDebugEvent(
+                backend="openai_responses",
+                model="gpt-4o-mini",
+                phase="request_built",
+                turn_index=1,
+                history_summary={"event_count": 1},
+            )
+        )
+
+    payload = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["run_id"] == "run-123"
+
+
 def test_summarize_runtime_history_is_compact_and_stable() -> None:
     history = (
         RuntimeHistory()
@@ -136,6 +156,7 @@ def test_deterministic_agent_emits_request_and_decision_debug_events() -> None:
 
     decision = agent.next_action(history=history, tools=[])
 
+    assert isinstance(decision, ToolCallDecision)
     assert decision.call.tool_name == "web.search"
     assert [event.phase for event in debug_sink.events] == [
         "request_built",

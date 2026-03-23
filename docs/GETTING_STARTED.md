@@ -8,7 +8,7 @@ The package also supports package guardrail-only and package dual-track workflow
 
 Requirements:
 
-- Python `3.9+`
+- Python `3.11+`
 - either an editable checkout or an installed `aicomp-sdk`
 
 From PyPI:
@@ -38,7 +38,7 @@ This creates an `attack.py` template with the required `AttackAlgorithm` class.
 ## 3. Validate the File
 
 ```bash
-aicomp validate attack.py
+aicomp validate redteam attack.py
 ```
 
 `aicomp validate` checks:
@@ -97,7 +97,7 @@ This works because scoring is replay-based: the evaluator trusts replayed `user_
 Fast local package path:
 
 ```bash
-aicomp test attack.py --track redteam --quick --agent deterministic
+aicomp test redteam attack.py --budget-s 60 --agent deterministic
 ```
 
 Use `deterministic` when you want an offline smoke test without API keys.
@@ -105,20 +105,23 @@ Use `deterministic` when you want an offline smoke test without API keys.
 ## 7. Run the Public-Contract Scorer Locally
 
 ```bash
-python evaluation_redteam.py \
-  --submission attack.py \
+aicomp evaluate \
+  redteam \
+  attack.py \
   --budget-s 60 \
   --agent deterministic \
   --env gym
 ```
 
+The standalone evaluator defaults to a short terminal summary. Add `--verbosity progress` for package-owned progress messages, plus `--save-transcript`, `--save-framework-events`, and `--save-agent-debug` when you want `transcript.log`, `framework.jsonl`, and `agent-debug.jsonl` under `--artifacts-dir`.
+
 If you want local CLI behavior that matches the public Kaggle default more closely:
 
 ```bash
-aicomp test attack.py --track redteam --budget-s 1800 --agent deterministic --env gym
+aicomp evaluate redteam attack.py --agent deterministic --env gym
 ```
 
-This matters because `aicomp test` defaults to a broader `3600` second budget to support the package workflows as well.
+This matters because `aicomp test` defaults to a broader `3600` second budget to support the package workflows as well. For `redteam`, that means a full `3600` attack-second budget unless you override it.
 
 ## 8. What to Read Next
 

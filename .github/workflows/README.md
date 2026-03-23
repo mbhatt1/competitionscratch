@@ -18,7 +18,7 @@ The previous version of this document mixed useful operator guidance with stale 
 Current behavior:
 
 - triggers on pushes and pull requests for `main`, `master`, and `develop`
-- tests Python `3.9`, `3.10`, and `3.11`
+- tests Python `3.11` and `3.12`
 - installs the package with `.[dev]`
 - runs unit tests with coverage
 - runs non-OpenAI integration tests
@@ -162,7 +162,7 @@ Confirm that:
 
 Check:
 
-- Python version differences across `3.9`, `3.10`, and `3.11`
+- Python version differences across the supported `3.11+` matrix
 - undeclared dependencies in `pyproject.toml`
 - tests that accidentally depend on local state
 

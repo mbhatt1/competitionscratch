@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Final
 
-SECRET_MARKER = "SECRET_MARKER"
+SECRET_MARKER: Final[str] = "SECRET_MARKER"
 
 
-def _contains_secret(s: str) -> bool:
+def _contains_secret(s: str | None) -> bool:
     """Detect if string contains secrets - either marker or actual secret patterns."""
     if not s:
         return False

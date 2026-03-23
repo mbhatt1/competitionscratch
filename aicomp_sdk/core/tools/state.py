@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 
 class WebPage(TypedDict):
@@ -26,11 +26,13 @@ class ToolRuntimeState:
     fs_backup: dict[str, str]
     egress_sink: list[dict[str, Any]]
     last_source: str
-    fs_workspace: Optional[TemporaryDirectory] = None
+    fs_workspace: TemporaryDirectory | None = None
 
 
 @dataclass(frozen=True)
 class ToolContext:
+    """Immutable facade over mutable tool runtime state shared by handlers."""
+
     _state: ToolRuntimeState
 
     def mark_source(self, source: str) -> None:
@@ -50,7 +52,7 @@ class ToolContext:
     def web_pages(self) -> list[WebPage]:
         return self._state.web["pages"]
 
-    def get_mail_folder(self, folder: str) -> Optional[Any]:
+    def get_mail_folder(self, folder: str) -> Any | None:
         return self._state.mail.get(folder)
 
     def iter_mail_folders(self) -> Iterable[Any]:

@@ -3,16 +3,23 @@ Validate command - fast validation of submission files.
 
 Checks:
 - File exists and is valid Python
-- Has required class/function (Attacker or Guardrail)
+- Has required class/function (`AttackAlgorithm` or `Guardrail`)
 - Imports are valid
-- Basic syntax check
 - Returns detailed error messages
 """
 
 import ast
 import importlib
 import importlib.util
+import zipfile
+from contextlib import ExitStack
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Literal
+
+from aicomp_sdk.evaluation.tracks import EvaluationTrack
+
+SubmissionType = Literal["attack", "guardrail"]
 
 
 def _parse_python_file(filepath: Path) -> ast.AST:
@@ -72,7 +79,6 @@ def validate_imports(filepath: Path) -> tuple[bool, list[str]]:
     try:
         tree = _parse_python_file(filepath)
 
-        # Extract all SDK imports and ensure referenced modules resolve.
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -105,7 +111,6 @@ def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
     try:
         tree = _parse_python_file(filepath)
 
-        # Check for AttackAlgorithm class
         has_attack_class = False
         has_run_method = False
 
@@ -118,14 +123,12 @@ def validate_attack_structure(filepath: Path) -> tuple[bool, list[str]]:
             if "AttackAlgorithmBase" not in base_names:
                 issues.append("AttackAlgorithm must inherit from AttackAlgorithmBase")
 
-            # Check for run method
             for item in node.body:
                 if not isinstance(item, ast.FunctionDef) or item.name != "run":
                     continue
 
                 has_run_method = True
 
-                # Check run method signature
                 arg_names = [arg.arg for arg in item.args.args]
                 if "self" not in arg_names:
                     issues.append("run() method should be an instance method (missing self)")
@@ -152,7 +155,6 @@ def validate_guardrail_structure(filepath: Path) -> tuple[bool, list[str]]:
     try:
         tree = _parse_python_file(filepath)
 
-        # Check for Guardrail class
         has_guardrail_class = False
         has_decide_method = False
 
@@ -162,14 +164,12 @@ def validate_guardrail_structure(filepath: Path) -> tuple[bool, list[str]]:
 
             has_guardrail_class = True
 
-            # Check for decide method
             for item in node.body:
                 if not isinstance(item, ast.FunctionDef) or item.name != "decide":
                     continue
 
                 has_decide_method = True
 
-                # Check decide method signature
                 arg_names = [arg.arg for arg in item.args.args]
                 if "self" not in arg_names:
                     issues.append("decide() method should be an instance method (missing self)")
@@ -191,60 +191,15 @@ def validate_guardrail_structure(filepath: Path) -> tuple[bool, list[str]]:
         return False, [f"Error analyzing structure: {e}"]
 
 
-def auto_detect_type(filepath: Path) -> str:
-    """Auto-detect submission type from filename or content."""
-    filename = filepath.name.lower()
-
-    if "attack" in filename:
-        return "attack"
-    elif "guardrail" in filename or "guard" in filename:
-        return "guardrail"
-
-    # Check content
-    try:
-        content = filepath.read_text(encoding="utf-8")
-
-        if "class AttackAlgorithm" in content:
-            return "attack"
-        elif "class Guardrail" in content:
-            return "guardrail"
-    except Exception:
-        pass
-
-    return "unknown"
-
-
-def run_validate(args) -> int:
-    """Execute validate command."""
+def _validate_single_file(filepath: Path, submission_type: SubmissionType) -> int:
     from aicomp_sdk.cli.main import (
         print_error,
         print_info,
         print_success,
-        print_warning,
     )
 
-    filepath = Path(args.file)
-
-    # Check file exists
-    if not filepath.exists():
-        print_error(f"File not found: {filepath}")
-        return 1
-
-    print_info(f"Validating: {filepath}")
-
-    # Detect type
-    submission_type = args.type
-    if submission_type == "auto":
-        submission_type = auto_detect_type(filepath)
-        if submission_type == "unknown":
-            print_warning("Could not auto-detect submission type. Specify with --type")
-            return 1
-        print_info(f"Detected type: {submission_type}")
-
-    # Run validations
     all_valid = True
 
-    # 1. Syntax check
     print_info("Checking Python syntax...")
     syntax_valid, syntax_msg = validate_python_syntax(filepath)
     if syntax_valid:
@@ -252,18 +207,16 @@ def run_validate(args) -> int:
     else:
         print_error(syntax_msg)
         all_valid = False
-        return 1  # Can't continue if syntax is invalid
-
-    # 2. Import check
+        return 1
     print_info("Checking imports...")
     imports_valid, import_issues = validate_imports(filepath)
     if imports_valid:
         print_success("All imports look valid")
     else:
         for issue in import_issues:
-            print_warning(issue)
+            print_error(issue)
+        all_valid = False
 
-    # 3. Structure check
     print_info(f"Checking {submission_type} structure...")
     if submission_type == "attack":
         struct_valid, struct_issues = validate_attack_structure(filepath)
@@ -277,7 +230,6 @@ def run_validate(args) -> int:
             print_error(issue)
         all_valid = False
 
-    # Summary
     print()
     if all_valid:
         print_success(f"✅ Validation passed! {filepath} is ready to test.")
@@ -287,3 +239,57 @@ def run_validate(args) -> int:
     else:
         print_error("❌ Validation failed. Please fix the issues above.")
         return 1
+
+
+def _extract_zip_member(
+    stack: ExitStack,
+    zip_path: Path,
+    member_name: str,
+) -> Path:
+    tmp_dir = stack.enter_context(TemporaryDirectory())
+    with zipfile.ZipFile(zip_path) as archive:
+        try:
+            archive.extract(member_name, path=tmp_dir)
+        except KeyError as err:
+            raise FileNotFoundError(f"Missing {member_name} in {zip_path.name}") from err
+    return Path(tmp_dir) / member_name
+
+
+def run_validate(args) -> int:
+    """Execute validate command."""
+    from aicomp_sdk.cli.main import print_error, print_info
+
+    track = EvaluationTrack(args.track)
+    filepath = Path(args.file)
+
+    if not filepath.exists():
+        print_error(f"File not found: {filepath}")
+        return 1
+
+    print_info(f"Validating: {filepath}")
+
+    if track is EvaluationTrack.DUAL:
+        if filepath.suffix != ".zip":
+            print_error("Dual-track validation requires a submission zip.")
+            return 1
+
+        with ExitStack() as stack:
+            try:
+                attack_path = _extract_zip_member(stack, filepath, "attack.py")
+                guardrail_path = _extract_zip_member(stack, filepath, "guardrail.py")
+            except (FileNotFoundError, zipfile.BadZipFile) as err:
+                print_error(str(err))
+                return 1
+
+            print_info("Validating redteam member: attack.py")
+            attack_status = _validate_single_file(attack_path, "attack")
+            print_info("Validating defense member: guardrail.py")
+            guardrail_status = _validate_single_file(guardrail_path, "guardrail")
+            return 0 if attack_status == 0 and guardrail_status == 0 else 1
+
+    if filepath.suffix != ".py":
+        print_error("Redteam and defense validation require a Python module.")
+        return 1
+
+    submission_type: SubmissionType = "attack" if track is EvaluationTrack.REDTEAM else "guardrail"
+    return _validate_single_file(filepath, submission_type)

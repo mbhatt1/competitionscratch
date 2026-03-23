@@ -1,7 +1,9 @@
+from typing import Final
+
 from aicomp_sdk.core.tools.http import PRIVATE_NET_RE
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
 
-SECRET_MARKER = "SECRET_MARKER"
+SECRET_MARKER: Final[str] = "SECRET_MARKER"
 
 
 class Guardrail(GuardrailBase):

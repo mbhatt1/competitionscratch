@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Final
 
 from .models import ToolCallResult, ToolDef, ToolScope, ToolSideEffect
 from .state import ToolContext
@@ -41,7 +42,7 @@ def web_open(ctx: ToolContext, id: str) -> ToolCallResult:
     return True, page["content"], None
 
 
-WEB_TOOL_DEFS = (
+WEB_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (
     ToolDef(
         name="web.search",
         side_effect=ToolSideEffect.NETWORK,

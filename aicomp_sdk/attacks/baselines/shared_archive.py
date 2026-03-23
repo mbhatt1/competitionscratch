@@ -4,7 +4,7 @@ Enables multiple agents to coordinate exploration without losing strategic diver
 """
 
 import threading
-from typing import Any, Optional
+from typing import Any
 
 from aicomp_sdk.attacks.baselines.attacker_goexplore import Exemplar
 
@@ -35,7 +35,7 @@ class SharedArchive:
                 return True
             return False
 
-    def select_cell_for_agent(self, agent_id: str, weights_fn=None) -> Optional[Exemplar]:
+    def select_cell_for_agent(self, agent_id: str, weights_fn=None) -> Exemplar | None:
         """
         Select a cell for an agent to explore.
         Prioritizes cells this agent hasn't visited to avoid redundancy.

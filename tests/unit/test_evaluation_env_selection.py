@@ -2,18 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
-from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig, evaluation_core
-from aicomp_sdk.agents import build_agent_factory
-from aicomp_sdk.core.env_api import (
+import aicomp_sdk.evaluation.ops as evaluation_core
+from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+from aicomp_sdk.agents import AgentProtocol, build_agent_factory
+from aicomp_sdk.core.env.sandbox import SandboxEnv
+from aicomp_sdk.core.env.api import (
     DEFAULT_MAX_TOOL_HOPS,
     AttackEnvProtocol,
+    coerce_env_selection,
     EnvInteractionResult,
     EnvSelection,
-    parse_env_selection,
 )
 
 
@@ -133,7 +135,7 @@ def test_build_attack_env_selects_sandbox_without_importing_gym(
         env_selection="sandbox",
     )
 
-    from aicomp_sdk.core.env import SandboxEnv
+    from aicomp_sdk.core.env.sandbox import SandboxEnv
 
     assert isinstance(env, SandboxEnv)
 
@@ -155,7 +157,7 @@ def test_build_attack_env_calls_agent_factory_each_time(tmp_path: Path) -> None:
         def restore_state(self, snapshot) -> None:  # noqa: ANN001
             return None
 
-    def agent_factory() -> object:
+    def agent_factory() -> AgentProtocol:
         agent = _FakeAgent()
         created_agents.append(agent)
         return agent
@@ -176,22 +178,24 @@ def test_build_attack_env_calls_agent_factory_each_time(tmp_path: Path) -> None:
     )
 
     assert len(created_agents) == 2
-    assert env1.agent is created_agents[0]
-    assert env2.agent is created_agents[1]
-    assert env1.agent is not env2.agent
+    sandbox_env1 = cast(SandboxEnv, env1)
+    sandbox_env2 = cast(SandboxEnv, env2)
+    assert sandbox_env1.agent is created_agents[0]
+    assert sandbox_env2.agent is created_agents[1]
+    assert sandbox_env1.agent is not sandbox_env2.agent
 
 
-def test_parse_env_selection_from_string() -> None:
-    assert parse_env_selection("gym") is EnvSelection.GYM
+def test_coerce_env_selection_from_string() -> None:
+    assert coerce_env_selection("gym") is EnvSelection.GYM
 
 
-def test_parse_env_selection_from_enum() -> None:
-    assert parse_env_selection(EnvSelection.SANDBOX) is EnvSelection.SANDBOX
+def test_coerce_env_selection_from_enum() -> None:
+    assert coerce_env_selection(EnvSelection.SANDBOX) is EnvSelection.SANDBOX
 
 
-def test_parse_env_selection_rejects_invalid_value() -> None:
+def test_coerce_env_selection_rejects_invalid_value() -> None:
     with pytest.raises(ValueError, match="Unsupported env selection: invalid"):
-        parse_env_selection("invalid")
+        coerce_env_selection("invalid")
 
 
 def test_build_attack_env_selects_gym_when_requested(tmp_path: Path, monkeypatch) -> None:
@@ -316,6 +320,89 @@ def test_eval_defense_builds_fresh_guardrail_instances(monkeypatch) -> None:
     assert _CountingGuardrail.init_calls == 4
     assert len(env_guardrails) == 4
     assert len({id(guardrail) for guardrail in env_guardrails}) == 4
+
+
+def test_eval_defense_applies_defense_run_options(monkeypatch) -> None:
+    build_calls: list[dict[str, Any]] = []
+    attacker_init_configs: list[dict[str, Any]] = []
+    attacker_run_configs: list[AttackRunConfig] = []
+
+    class _CapturingBaselineAttacker:
+        def __init__(self, config: dict[str, Any]) -> None:
+            attacker_init_configs.append(dict(config))
+
+        def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+            attacker_run_configs.append(config)
+            return [AttackCandidate.from_messages(["attack prompt"])]
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
+        build_calls.append(kwargs)
+        return _FakeEvalEnv(seed=kwargs["seed"])
+
+    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _CapturingBaselineAttacker)
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+    monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["default benign"])
+
+    options = evaluation_core.DefenseRunOptions(
+        baseline_attack_config={"max_turns": 6, "branch_batch": 8},
+        baseline_run_config=AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5),
+        attack_seed=42,
+        benign_seed=777,
+        benign_prompts=["safe one", "safe two"],
+    )
+
+    report = evaluation_core.eval_defense(
+        _Guardrail,
+        999.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+        options=options,
+    )
+
+    assert attacker_init_configs == [{"max_turns": 6, "branch_batch": 8}]
+    assert attacker_run_configs == [
+        AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5)
+    ]
+    assert [call["seed"] for call in build_calls] == [42, 42, 777, 777]
+    assert report["benign_trials"] == 2
+
+
+def test_eval_defense_defaults_to_legacy_baseline_tool_hops(monkeypatch) -> None:
+    attacker_run_configs: list[AttackRunConfig] = []
+
+    class _CapturingBaselineAttacker:
+        def __init__(self, config: dict[str, Any]) -> None:
+            del config
+
+        def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+            del env
+            attacker_run_configs.append(config)
+            return []
+
+    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _CapturingBaselineAttacker)
+    monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: [])
+    monkeypatch.setattr(
+        evaluation_core,
+        "build_attack_env",
+        lambda **kwargs: _FakeEvalEnv(seed=kwargs["seed"]),
+    )
+
+    report = evaluation_core.eval_defense(
+        _Guardrail,
+        30.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
+
+    assert report["breach_count"] == 0
+    assert report["benign_trials"] == 0
+    assert attacker_run_configs == [
+        AttackRunConfig(
+            time_budget_s=21.0,
+            max_tool_hops=evaluation_core.EVALUATION_DEFAULT_MAX_TOOL_HOPS,
+        )
+    ]
+    assert evaluation_core.EVALUATION_DEFAULT_MAX_TOOL_HOPS == 4
 
 
 def test_eval_attack_summary_matches_between_sandbox_and_gym() -> None:

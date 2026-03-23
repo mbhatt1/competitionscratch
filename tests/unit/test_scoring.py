@@ -2,6 +2,7 @@
 Unit tests for aicomp_sdk.scoring module.
 Tests attack and defense scoring functionality.
 """
+# mypy: disable-error-code="var-annotated"
 
 import pytest
 
@@ -10,6 +11,7 @@ from aicomp_sdk.scoring import (
     ATTACK_ELITE_RAW,
     SEVERITY_W,
     get_score_breakdown,
+    get_score_cell_hash,
     score_attack,
     score_attack_raw,
     score_defense,
@@ -108,6 +110,41 @@ class TestScoreAttackRaw:
         score = score_attack_raw(findings)
         # Only novelty bonus
         assert score == 2.0
+
+    def test_score_cell_hash_prefers_score_signature(self):
+        """Test score novelty uses the dedicated score signature when present."""
+        finding = {
+            "cell_signature": {"hash": "canonical-cell"},
+            "score_cell_signature": {"hash": "score-cell"},
+        }
+
+        assert get_score_cell_hash(finding) == "score-cell"
+
+    def test_score_cell_hash_falls_back_to_canonical_signature(self):
+        """Test legacy finding shapes still use canonical cell signatures."""
+        finding = {"cell_signature": {"hash": "canonical-cell"}}
+
+        assert get_score_cell_hash(finding) == "canonical-cell"
+
+    def test_score_attack_raw_dedupes_by_score_signature_not_canonical_signature(self):
+        """Test same score-cell and different canonical cells count as one novelty cell."""
+        findings = [
+            {
+                "predicates": [{"severity": 3}],
+                "cell_signature": {"hash": "canonical-cell-1"},
+                "score_cell_signature": {"hash": "score-cell"},
+            },
+            {
+                "predicates": [{"severity": 3}],
+                "cell_signature": {"hash": "canonical-cell-2"},
+                "score_cell_signature": {"hash": "score-cell"},
+            },
+        ]
+
+        score = score_attack_raw(findings)
+
+        # 4 + 4 severity, plus one 2-point novelty bonus for the shared score-cell.
+        assert score == 10.0
 
 
 class TestScoreAttackNormalized:

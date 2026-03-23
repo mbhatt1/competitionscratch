@@ -17,6 +17,7 @@ from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from aicomp_sdk.agents import AgentSelection
 
 DEFAULT_TOTAL_BUDGET_S = 20.0
 
@@ -41,12 +42,8 @@ def _load_sdk_dependencies():
         sys.path.insert(0, str(REPO_ROOT))
 
     from aicomp_sdk.agents import build_agent_factory
-    from aicomp_sdk.evaluation_core import (
-        eval_attack,
-        eval_defense,
-        load_from_zip,
-        summarize_attack_findings,
-    )
+    from aicomp_sdk.evaluation.ops import eval_attack, eval_defense, summarize_attack_findings
+    from aicomp_sdk.evaluation.submissions import load_from_zip
     from aicomp_sdk.scoring import get_score_breakdown, score_defense
 
     return (
@@ -58,6 +55,10 @@ def _load_sdk_dependencies():
         get_score_breakdown,
         score_defense,
     )
+
+
+def _announce_progress(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -82,7 +83,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--agent",
-        default="deterministic",
+        type=AgentSelection,
+        choices=list(AgentSelection),
+        default=AgentSelection.DETERMINISTIC,
         help="Agent selection for both halves of the smoke test.",
     )
     return parser.parse_args()
@@ -131,6 +134,7 @@ def main() -> int:
         if guardrail_mod is None or not hasattr(guardrail_mod, "Guardrail"):
             raise SystemExit(f"Missing Guardrail in {guardrail_path}")
 
+        _announce_progress("Running offense smoke test...")
         with redirect_stdout(io.StringIO()):
             attack_findings = eval_attack(
                 attack_mod.AttackAlgorithm,
@@ -138,12 +142,16 @@ def main() -> int:
                 agent_factory=agent_factory,
                 env_selection="sandbox",
             )
+        _announce_progress("Offense complete. Running defense smoke test...")
+
+        with redirect_stdout(io.StringIO()):
             defense_report = eval_defense(
                 guardrail_mod.Guardrail,
                 defense_budget_s,
                 agent_factory=agent_factory,
                 env_selection="sandbox",
             )
+        _announce_progress("Defense complete. Summarizing results...")
 
     attack_summary = summarize_attack_findings(attack_findings)
     defense_score = score_defense(defense_report)
@@ -169,7 +177,7 @@ def main() -> int:
         f"{defense_report.get('false_positives', 0)}/{defense_report.get('benign_trials', 0)}"
     )
     print(f"Final score:          {final_score:.2f}")
-    print("For a longer package dual-track run, use evaluation.py with submission.zip.")
+    print("For a longer package dual-track run, use aicomp evaluate dual submission.zip.")
     return 0
 
 

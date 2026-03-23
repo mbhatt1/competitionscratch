@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Final
+
 from .email import EMAIL_TOOL_DEFS
 from .fs import FS_TOOL_DEFS
 from .http import HTTP_TOOL_DEFS
@@ -23,4 +25,4 @@ def build_tool_registry() -> dict[str, ToolDef]:
     return registry
 
 
-TOOL_REGISTRY = build_tool_registry()
+TOOL_REGISTRY: Final[dict[str, ToolDef]] = build_tool_registry()
