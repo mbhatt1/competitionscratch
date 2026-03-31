@@ -125,6 +125,9 @@ Current red-team defaults:
 
 Pass `--env gym` explicitly when you want GymAttackEnv for Kaggle-style parity.
 
+For custom guardrail selection in attack evaluator runs, see
+[`API_REFERENCE.md`](API_REFERENCE.md#custom-attack-guardrails).
+
 If you use `GymAttackEnv` directly:
 
 - `reset()` returns `(obs, info)`
@@ -138,6 +141,9 @@ Useful trace fields from `env.export_trace_dict()`:
 - `assistant_messages`
 - `tool_events`
 - `egress`
+
+Evaluator attack phases redact guardrail block reasons to `denied` and `confirm_required`
+in attacker-visible traces. Direct SDK environments still expose raw guardrail reasons.
 
 ## Current Tool Surface
 

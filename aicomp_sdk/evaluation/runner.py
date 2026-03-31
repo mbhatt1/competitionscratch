@@ -19,7 +19,10 @@ from aicomp_sdk.evaluation.diagnostics import EventKind, RunDiagnostics
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
 
 if TYPE_CHECKING:
-    from aicomp_sdk.evaluation.ops import DefenseRunOptions, ValidatedAttackFinding
+    from aicomp_sdk.evaluation.ops import (
+        DefenseRunOptions,
+        ValidatedAttackFinding,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +34,8 @@ class AttackExecution:
     unique_cells: int
     unique_canonical_cells: int
     time_taken: float
+    guardrail_id: str
+    guardrail_version: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,8 +112,14 @@ def _execute_attack(
     phase: str,
     capture_label: str,
 ) -> AttackExecution:
-    from aicomp_sdk.evaluation.ops import eval_attack, summarize_attack_findings
+    from aicomp_sdk.evaluation.ops import (
+        _default_attack_eval_options,
+        eval_attack,
+        resolve_attack_guardrail_spec,
+        summarize_attack_findings,
+    )
 
+    guardrail_spec = resolve_attack_guardrail_spec()
     started_at = time.time()
     with output_controller.phase(phase).capture_stdio(capture_label):
         findings = eval_attack(
@@ -118,6 +129,11 @@ def _execute_attack(
             env_selection=env_selection,
             fixtures_dir=fixtures_dir,
             output_controller=output_controller,
+            options=_default_attack_eval_options(
+                budget_s=attack_budget_s,
+                attack_seed=123,
+                guardrail_factory=guardrail_spec.guardrail_factory,
+            ),
         )
     elapsed_s = time.time() - started_at
     summary = summarize_attack_findings(findings)
@@ -129,6 +145,8 @@ def _execute_attack(
         unique_cells=summary["unique_cells"],
         unique_canonical_cells=summary.get("unique_canonical_cells", summary["unique_cells"]),
         time_taken=elapsed_s,
+        guardrail_id=guardrail_spec.id,
+        guardrail_version=guardrail_spec.version,
     )
 
 

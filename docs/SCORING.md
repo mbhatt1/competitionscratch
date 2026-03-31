@@ -134,8 +134,11 @@ Useful JSON fields include:
 - `attack.score_raw`
 - `attack.findings_count`
 - `attack.unique_cells`
+- `attack_guardrail_id`
+- `attack_guardrail_version`
 - `budget_s`
 - `agent_selection`
+- `env_visibility`
 - `env_selection`
 - `scoring_mode`
 - `submission_type`
@@ -158,12 +161,15 @@ Useful dual-track JSON fields include:
 - `final_score`
 - `attack.score`
 - `attack.score_raw`
+- `attack_guardrail_id`
+- `attack_guardrail_version`
 - `defense.score`
 - `defense.breach_count`
 - `defense.false_positives`
 - `defense.benign_trials`
 - `defense.false_positive_rate`
 - `agent_selection`
+- `env_visibility`
 - `env_selection`
 - `scoring_mode`
 

@@ -8,6 +8,7 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Callable, Final, NotRequired, TypedDict, cast
 
@@ -19,8 +20,10 @@ from aicomp_sdk.core.env.api import (
     MAX_USER_MESSAGE_CHARS,
     AttackEnvProtocol,
     EnvSelection,
+    _HarnessAttackEnvProtocol,
     coerce_env_selection,
 )
+from aicomp_sdk.core.env.opaque import _OpaqueAttackEnv
 from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
 from aicomp_sdk.evaluation.diagnostics import RunDiagnostics
@@ -29,11 +32,14 @@ from aicomp_sdk.guardrails.optimal import Guardrail as OptimalGuardrail
 from aicomp_sdk.scoring import get_score_cell_hash, score_attack, score_attack_raw
 
 FIXTURES_ENV_VAR: Final[str] = "AICOMP_FIXTURES_DIR"
+ATTACK_GUARDRAIL_ENV_VAR: Final[str] = "AICOMP_ATTACK_GUARDRAIL_ID"
+ATTACK_GUARDRAIL_ENTRY_POINT_GROUP: Final[str] = "aicomp_sdk.attack_guardrails"
 PACKAGED_FIXTURES: Final[Path] = Path(__file__).resolve().parent.parent / "fixtures"
 LEGACY_REPO_FIXTURES: Final[Path] = Path(__file__).resolve().parent.parent.parent / "fixtures"
 MAX_REPLAY_FINDINGS: Final[int] = 2_000
 MAX_REPLAY_MESSAGES_PER_FINDING: Final[int] = 32
 EVALUATION_DEFAULT_MAX_TOOL_HOPS: Final[int] = 4
+DEFAULT_ATTACK_GUARDRAIL_ID: Final[str] = "optimal_public"
 
 
 class ValidatedAttackFinding(TypedDict):
@@ -56,13 +62,53 @@ class ValidatedAttackFinding(TypedDict):
 
 
 @dataclass(frozen=True, slots=True)
-class RedteamRunOptions:
-    """Run-level and constructor-level configuration for red-team evaluation."""
+class AttackGuardrailSpec:
+    """Allowlisted guardrail selection for attack evaluation."""
+
+    id: str
+    version: str
+    guardrail_factory: Callable[[], GuardrailBase]
+
+
+_BUILTIN_ATTACK_GUARDRAIL_SPECS: Final[dict[str, AttackGuardrailSpec]] = {
+    DEFAULT_ATTACK_GUARDRAIL_ID: AttackGuardrailSpec(
+        id=DEFAULT_ATTACK_GUARDRAIL_ID,
+        version="1",
+        guardrail_factory=OptimalGuardrail,
+    )
+}
+_REGISTERED_ATTACK_GUARDRAIL_SPECS: dict[str, AttackGuardrailSpec] = {}
+
+
+@dataclass(frozen=True, slots=True)
+class AttackEvalOptions:
+    """Run-level and constructor-level configuration for attack evaluation."""
 
     run_config: AttackRunConfig
     attack_config: Mapping[str, Any] = field(default_factory=dict)
     seed: int = 123
     guardrail_factory: Callable[[], GuardrailBase] = OptimalGuardrail
+
+
+# Backward-compatible alias for the pre-opaque-evaluator public name.
+RedteamRunOptions = AttackEvalOptions
+
+
+def _default_attack_eval_options(
+    *,
+    budget_s: float,
+    attack_seed: int,
+    guardrail_factory: Callable[[], GuardrailBase] | None = None,
+) -> AttackEvalOptions:
+    return AttackEvalOptions(
+        run_config=AttackRunConfig(
+            time_budget_s=float(budget_s),
+            max_steps=10**9,
+            max_tool_hops=EVALUATION_DEFAULT_MAX_TOOL_HOPS,
+        ),
+        seed=attack_seed,
+        guardrail_factory=guardrail_factory or resolve_attack_guardrail_spec().guardrail_factory,
+    )
 
 
 def _default_baseline_attack_config() -> dict[str, Any]:
@@ -152,6 +198,87 @@ def resolve_fixtures_dir(fixtures_dir: Path | None = None) -> Path:
     raise FileNotFoundError(
         "Could not resolve fixtures directory. Provide --fixtures-dir or set "
         f"{FIXTURES_ENV_VAR}. Checked:\n  - {checked_text}"
+    )
+
+
+def register_attack_guardrail_spec(spec: AttackGuardrailSpec) -> None:
+    """Register an allowlisted guardrail spec for attack evaluation."""
+    if not spec.id:
+        raise ValueError("Attack guardrail spec id cannot be empty")
+    _add_attack_guardrail_spec(
+        _REGISTERED_ATTACK_GUARDRAIL_SPECS,
+        spec,
+        duplicate_message="Attack guardrail spec already registered",
+    )
+
+
+def _add_attack_guardrail_spec(
+    registry: dict[str, AttackGuardrailSpec],
+    spec: AttackGuardrailSpec,
+    *,
+    duplicate_message: str,
+) -> None:
+    existing = registry.get(spec.id)
+    if existing is not None and existing != spec:
+        raise ValueError(f"{duplicate_message}: {spec.id}")
+    registry[spec.id] = spec
+
+
+def _load_entry_point_guardrail_spec(entry_point: Any) -> AttackGuardrailSpec:
+    guardrail_cls = entry_point.load()
+    if not inspect.isclass(guardrail_cls) or not issubclass(guardrail_cls, GuardrailBase):
+        raise TypeError(
+            "Attack guardrail entry points must load GuardrailBase subclasses: "
+            f"{entry_point.name}"
+        )
+    version = "unknown"
+    distribution = getattr(entry_point, "dist", None)
+    if distribution is not None:
+        version = str(getattr(distribution, "version", version))
+    return AttackGuardrailSpec(
+        id=entry_point.name,
+        version=version,
+        guardrail_factory=cast(Callable[[], GuardrailBase], guardrail_cls),
+    )
+
+
+def resolve_attack_guardrail_spec(
+    guardrail_id: str | None = None,
+) -> AttackGuardrailSpec:
+    """Resolve the attack-evaluation guardrail from an explicit id or env var."""
+    resolved_guardrail_id = guardrail_id
+    if resolved_guardrail_id is None:
+        resolved_guardrail_id = os.getenv(ATTACK_GUARDRAIL_ENV_VAR)
+    if not resolved_guardrail_id:
+        resolved_guardrail_id = DEFAULT_ATTACK_GUARDRAIL_ID
+
+    builtin_spec = _BUILTIN_ATTACK_GUARDRAIL_SPECS.get(resolved_guardrail_id)
+    registered_spec = _REGISTERED_ATTACK_GUARDRAIL_SPECS.get(resolved_guardrail_id)
+    matching_entry_points: list[Any] = []
+    known_ids = set(_BUILTIN_ATTACK_GUARDRAIL_SPECS)
+    known_ids.update(_REGISTERED_ATTACK_GUARDRAIL_SPECS)
+    for entry_point in entry_points(group=ATTACK_GUARDRAIL_ENTRY_POINT_GROUP):
+        known_ids.add(entry_point.name)
+        if entry_point.name == resolved_guardrail_id:
+            matching_entry_points.append(entry_point)
+
+    if builtin_spec is not None and registered_spec is not None and builtin_spec != registered_spec:
+        raise ValueError(f"Duplicate attack guardrail spec id: {resolved_guardrail_id}")
+    if matching_entry_points and (builtin_spec is not None or registered_spec is not None):
+        raise ValueError(f"Duplicate attack guardrail spec id: {resolved_guardrail_id}")
+    if len(matching_entry_points) > 1:
+        raise ValueError(f"Duplicate attack guardrail spec id: {resolved_guardrail_id}")
+    if registered_spec is not None:
+        return registered_spec
+    if builtin_spec is not None:
+        return builtin_spec
+    if matching_entry_points:
+        return _load_entry_point_guardrail_spec(matching_entry_points[0])
+
+    known_ids_text = ", ".join(sorted(known_ids))
+    raise ValueError(
+        f"Unsupported attack guardrail id: {resolved_guardrail_id}. "
+        f"Known guardrails: {known_ids_text}"
     )
 
 
@@ -272,7 +399,7 @@ def build_attack_env(
     env_selection: str | EnvSelection,
     max_tool_hops: int = AttackRunConfig.max_tool_hops,
     max_episode_messages: int = MAX_REPLAY_MESSAGES_PER_FINDING,
-) -> AttackEnvProtocol:
+) -> _HarnessAttackEnvProtocol:
     """Construct an evaluation environment for the requested env selection."""
     resolved_env_selection = coerce_env_selection(env_selection)
     agent = agent_factory()
@@ -293,7 +420,7 @@ def build_attack_env(
                 "Environment selection 'gym' requires GymAttackEnv and gymnasium to be available."
             ) from err
         return cast(
-            AttackEnvProtocol,
+            _HarnessAttackEnvProtocol,
             GymAttackEnv(
                 seed=seed,
                 fixtures_dir=fixtures_dir,
@@ -461,32 +588,30 @@ def eval_attack(
     fixtures_dir: Path | None = None,
     output_controller: RunDiagnostics | None = None,
     *,
-    options: RedteamRunOptions | None = None,
+    options: AttackEvalOptions | None = None,
 ) -> list[ValidatedAttackFinding]:
     """Evaluate an attack submission via replay and canonicalized scoring traces.
 
-    ``options`` exposes red-team specific tuning for Python callers. The legacy
+    ``options`` exposes attack-evaluation tuning for Python callers. The legacy
     arguments remain supported for existing CLI and test flows.
     """
     attack_cls = _require_attack_class(user_attack_cls)
     resolved_fixtures_dir = resolve_fixtures_dir(fixtures_dir)
-    resolved_options = options or RedteamRunOptions(
-        run_config=AttackRunConfig(
-            time_budget_s=float(budget_s),
-            max_steps=10**9,
-            max_tool_hops=EVALUATION_DEFAULT_MAX_TOOL_HOPS,
-        ),
-        seed=attack_seed,
+    resolved_options = options or _default_attack_eval_options(
+        budget_s=budget_s,
+        attack_seed=attack_seed,
     )
     run_config = resolved_options.run_config
 
-    run_env = build_attack_env(
-        seed=resolved_options.seed,
-        fixtures_dir=resolved_fixtures_dir,
-        agent_factory=agent_factory,
-        guardrail=resolved_options.guardrail_factory(),
-        env_selection=env_selection,
-        max_tool_hops=run_config.max_tool_hops,
+    run_env: AttackEnvProtocol = _OpaqueAttackEnv(
+        build_attack_env(
+            seed=resolved_options.seed,
+            fixtures_dir=resolved_fixtures_dir,
+            agent_factory=agent_factory,
+            guardrail=resolved_options.guardrail_factory(),
+            env_selection=env_selection,
+            max_tool_hops=run_config.max_tool_hops,
+        )
     )
     run_env.reset()
     attacker = attack_cls(config=dict(resolved_options.attack_config))

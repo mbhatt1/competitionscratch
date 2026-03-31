@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import gc
+import importlib
+import json
+import weakref
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -27,7 +32,7 @@ class _FakeSandboxEnv:
         self._messages: list[str] = []
         self.interaction_hops: list[int] = []
 
-    def reset(self) -> None:
+    def reset(self) -> Any:
         self._messages = []
 
     def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
@@ -63,12 +68,19 @@ class _FakeSandboxEnv:
         }
 
 
-@pytest.fixture
-def _patch_eval(monkeypatch: pytest.MonkeyPatch) -> None:
+def _fake_eval_predicates(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"predicate": "EXFILTRATION", "severity": 5}] if trace.get("user_messages") else []
+
+
+def _patch_fake_eval(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    env_factory: type[_FakeSandboxEnv] = _FakeSandboxEnv,
+) -> None:
     monkeypatch.setattr(
         evaluation_core,
         "build_attack_env",
-        lambda **kwargs: _FakeSandboxEnv(
+        lambda **kwargs: env_factory(
             seed=kwargs["seed"],
             fixtures_dir=kwargs["fixtures_dir"],
             guardrail=kwargs["guardrail"],
@@ -78,10 +90,13 @@ def _patch_eval(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         evaluation_core,
         "eval_predicates",
-        lambda trace: (
-            [{"predicate": "EXFILTRATION", "severity": 5}] if trace.get("user_messages") else []
-        ),
+        _fake_eval_predicates,
     )
+
+
+@pytest.fixture
+def _patch_eval(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_fake_eval(monkeypatch)
 
 
 def test_eval_attack_requires_attack_base_class(_patch_eval) -> None:
@@ -215,13 +230,7 @@ def test_eval_attack_builds_fresh_env_for_run_and_each_replay(monkeypatch) -> No
         return env
 
     monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
-    monkeypatch.setattr(
-        evaluation_core,
-        "eval_predicates",
-        lambda trace: (
-            [{"predicate": "EXFILTRATION", "severity": 5}] if trace.get("user_messages") else []
-        ),
-    )
+    monkeypatch.setattr(evaluation_core, "eval_predicates", _fake_eval_predicates)
 
     class TwoCandidatesAttack(AttackAlgorithmBase):
         def run(self, env, config):  # noqa: ANN001
@@ -272,7 +281,111 @@ def test_eval_attack_rejects_oversized_candidate_message(_patch_eval) -> None:
         )
 
 
-def test_eval_attack_applies_redteam_run_options(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_eval_attack_uses_opaque_env_for_attack_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inner_snapshot_refs: list[weakref.ReferenceType[object]] = []
+
+    class _SnapshotMarker:
+        __slots__ = ("messages", "trace", "__weakref__")
+
+        def __init__(self, *, messages: list[str], trace: str) -> None:
+            self.messages = messages
+            self.trace = trace
+
+    class _InspectableFakeEnv(_FakeSandboxEnv):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            self.trace = "raw-trace"
+            self.tools = "raw-tools"
+            self.guardrail = GuardrailBase()
+
+        def reset(self) -> tuple[dict[str, Any], dict[str, Any]]:
+            super().reset()
+            return (
+                {
+                    "trace_summary_json": json.dumps(
+                        {"recent_errors": ["denied:suspicious", "confirm_required:review"]}
+                    )
+                },
+                {
+                    "trace": {
+                        "seed": self.seed,
+                        "user_messages": [],
+                        "tool_events": [
+                            {
+                                "name": "fs.read",
+                                "args": {"path": "secret.txt"},
+                                "ok": False,
+                                "output": "",
+                                "side_effect": "READ",
+                                "scope": "secret",
+                                "source": "user",
+                                "error": "denied:suspicious",
+                            }
+                        ],
+                        "egress": [],
+                    }
+                },
+            )
+
+        def snapshot(self) -> _SnapshotMarker:
+            snapshot = _SnapshotMarker(messages=list(self._messages), trace=self.trace)
+            inner_snapshot_refs.append(weakref.ref(snapshot))
+            return snapshot
+
+        def restore(self, snapshot: _SnapshotMarker) -> None:
+            self._messages = list(snapshot.messages)
+
+    _patch_fake_eval(monkeypatch, env_factory=_InspectableFakeEnv)
+
+    class IntrospectiveAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del config
+            assert not hasattr(env, "guardrail")
+            assert not hasattr(env, "trace")
+            assert not hasattr(env, "tools")
+            assert not hasattr(env, "_inner")
+            assert not hasattr(env, "_snapshots")
+            opaque_module = importlib.import_module("aicomp_sdk.core.env.opaque")
+            assert not hasattr(opaque_module, "_get_opaque_attack_env_state")
+            assert "guardrail" not in dir(env)
+            assert "trace" not in dir(env)
+            assert "_inner" not in dir(env)
+            with pytest.raises(AttributeError):
+                object.__getattribute__(env, "_inner")
+            with pytest.raises(AttributeError):
+                object.__getattribute__(env, "_snapshots")
+            with pytest.raises(TypeError):
+                vars(env)
+
+            observation, info = env.reset()
+            summary = json.loads(observation["trace_summary_json"])
+            assert summary["recent_errors"] == ["denied", "confirm_required"]
+            assert info["trace"]["tool_events"][0]["error"] == "denied"
+
+            snapshot = env.snapshot()
+            with pytest.raises(TypeError):
+                env.restore({"messages": []})
+            with pytest.raises(ValueError, match="Unknown opaque snapshot token"):
+                env.restore(type(snapshot)())
+            env.restore(snapshot)
+            del snapshot
+            gc.collect()
+            assert [snapshot_ref() for snapshot_ref in inner_snapshot_refs] == [None]
+            return [AttackCandidate(user_messages=("attack prompt",))]
+
+    findings = evaluation_core.eval_attack(
+        IntrospectiveAttack,
+        10.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
+
+    assert [finding["user_messages"] for finding in findings] == [["attack prompt"]]
+
+
+def test_eval_attack_applies_attack_eval_options(monkeypatch: pytest.MonkeyPatch) -> None:
     build_calls: list[dict[str, Any]] = []
     guardrail_instances: list[object] = []
 
@@ -294,13 +407,7 @@ def test_eval_attack_applies_redteam_run_options(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
-    monkeypatch.setattr(
-        evaluation_core,
-        "eval_predicates",
-        lambda trace: (
-            [{"predicate": "EXFILTRATION", "severity": 5}] if trace.get("user_messages") else []
-        ),
-    )
+    monkeypatch.setattr(evaluation_core, "eval_predicates", _fake_eval_predicates)
 
     class ConfigurableAttack(AttackAlgorithmBase):
         def __init__(self, config=None):  # noqa: ANN001
@@ -314,7 +421,7 @@ def test_eval_attack_applies_redteam_run_options(monkeypatch: pytest.MonkeyPatch
             assert config == AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5)
             return [AttackCandidate(user_messages=("attack prompt",))]
 
-    options = evaluation_core.RedteamRunOptions(
+    options = evaluation_core.AttackEvalOptions(
         run_config=AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5),
         attack_config={"max_turns": 6, "branch_batch": 8},
         seed=42,
@@ -333,6 +440,160 @@ def test_eval_attack_applies_redteam_run_options(monkeypatch: pytest.MonkeyPatch
     assert [call["seed"] for call in build_calls] == [42, 42]
     assert [call["max_tool_hops"] for call in build_calls] == [5, 5]
     assert [call["guardrail"] for call in build_calls] == guardrail_instances
+
+
+def test_eval_attack_prefers_explicit_options_over_env_guardrail_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, "missing_guardrail")
+    _patch_fake_eval(monkeypatch)
+
+    class ConfiguredAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del env, config
+            return [AttackCandidate(user_messages=("attack prompt",))]
+
+    findings = evaluation_core.eval_attack(
+        ConfiguredAttack,
+        10.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+        options=evaluation_core.AttackEvalOptions(
+            run_config=AttackRunConfig(time_budget_s=30.0),
+            guardrail_factory=GuardrailBase,
+        ),
+    )
+
+    assert [finding["user_messages"] for finding in findings] == [["attack prompt"]]
+
+
+def test_eval_attack_keeps_redteam_run_options_alias() -> None:
+    options = evaluation_core.RedteamRunOptions(
+        run_config=AttackRunConfig(time_budget_s=30.0),
+    )
+
+    assert isinstance(options, evaluation_core.AttackEvalOptions)
+
+
+def test_resolve_attack_guardrail_spec_defaults_to_optimal_public(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, raising=False)
+
+    spec = evaluation_core.resolve_attack_guardrail_spec()
+
+    assert spec.id == evaluation_core.DEFAULT_ATTACK_GUARDRAIL_ID
+    assert spec.guardrail_factory is evaluation_core.OptimalGuardrail
+
+
+def test_resolve_attack_guardrail_spec_does_not_load_unselected_entry_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BrokenEntryPoint:
+        name = "broken_guardrail"
+
+        def load(self) -> None:
+            raise RuntimeError("should not load")
+
+    monkeypatch.setattr(
+        evaluation_core,
+        "entry_points",
+        lambda *, group: [_BrokenEntryPoint()],
+    )
+    monkeypatch.delenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, raising=False)
+
+    spec = evaluation_core.resolve_attack_guardrail_spec()
+
+    assert spec.id == evaluation_core.DEFAULT_ATTACK_GUARDRAIL_ID
+    assert spec.guardrail_factory is evaluation_core.OptimalGuardrail
+
+
+def test_resolve_attack_guardrail_spec_uses_registered_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _PrivateGuardrail(GuardrailBase):
+        pass
+
+    spec = evaluation_core.AttackGuardrailSpec(
+        id="private_test",
+        version="2026.03.30",
+        guardrail_factory=_PrivateGuardrail,
+    )
+    evaluation_core.register_attack_guardrail_spec(spec)
+    monkeypatch.setenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, "private_test")
+
+    resolved_spec = evaluation_core.resolve_attack_guardrail_spec()
+
+    assert resolved_spec == spec
+
+
+def test_resolve_attack_guardrail_spec_uses_entry_point_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _EntryPointGuardrail(GuardrailBase):
+        pass
+
+    class _FakeEntryPoint:
+        name = "entrypoint_test"
+        dist = SimpleNamespace(version="2.5.0")
+
+        def load(self) -> type[_EntryPointGuardrail]:
+            return _EntryPointGuardrail
+
+    monkeypatch.setattr(
+        evaluation_core,
+        "entry_points",
+        lambda *, group: [_FakeEntryPoint()],
+    )
+    monkeypatch.setenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, "entrypoint_test")
+
+    resolved_spec = evaluation_core.resolve_attack_guardrail_spec()
+
+    assert resolved_spec == evaluation_core.AttackGuardrailSpec(
+        id="entrypoint_test",
+        version="2.5.0",
+        guardrail_factory=_EntryPointGuardrail,
+    )
+
+
+def test_resolve_attack_guardrail_spec_rejects_unknown_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(evaluation_core.ATTACK_GUARDRAIL_ENV_VAR, "missing_guardrail")
+
+    with pytest.raises(ValueError, match="Unsupported attack guardrail id: missing_guardrail"):
+        evaluation_core.resolve_attack_guardrail_spec()
+
+
+def test_project_attack_trace_dict_preserves_score_cell_signature() -> None:
+    raw_tool_events = [
+        {
+            "name": "fs.read",
+            "args": {"path": "secret.txt"},
+            "ok": False,
+            "output": "",
+            "side_effect": "READ",
+            "scope": "secret",
+            "source": "user",
+            "error": "denied:suspicious reason",
+        },
+        {
+            "name": "email.send",
+            "args": {"to": "a@example.com"},
+            "ok": False,
+            "output": "",
+            "side_effect": "SHARE",
+            "scope": "external",
+            "source": "user",
+            "error": "confirm_required:needs review",
+        },
+    ]
+    redacted_tool_events = [
+        {**raw_tool_events[0], "error": "denied"},
+        {**raw_tool_events[1], "error": "confirm_required"},
+    ]
+
+    assert cell_signature(raw_tool_events) == cell_signature(redacted_tool_events)
 
 
 def test_eval_attack_defaults_to_legacy_hop_cap_for_generation_and_replay(

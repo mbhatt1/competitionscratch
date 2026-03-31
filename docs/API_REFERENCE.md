@@ -166,6 +166,10 @@ Current behavior:
 - `fixtures_dir` must point at a valid fixtures root
 - package evaluators can resolve packaged fixtures automatically
 
+Evaluator attack phases expose an opaque `AttackEnvProtocol` wrapper by default. Direct
+`SandboxEnv(...)` and `GymAttackEnv(...)` construction still expose harness internals for
+debugging and guardrail development.
+
 ### `GymAttackEnv`
 
 Stable constructor:
@@ -258,6 +262,50 @@ Current purpose:
 - supports `--save-transcript` for `transcript.log`
 - supports `--save-framework-events` for `framework.jsonl`
 - supports `--save-agent-debug` for `agent-debug.jsonl`
+
+Attack evaluator entrypoints resolve their target guardrail from `AICOMP_ATTACK_GUARDRAIL_ID`
+and fall back to `optimal_public`. `AttackEvalOptions` is the programmatic options type for
+attack evaluation; `RedteamRunOptions` remains as a compatibility alias.
+
+### Custom Attack Guardrails
+
+Attack evaluator entrypoints support custom guardrails for `evaluate redteam`, `test redteam`,
+and the offense phase of `dual`.
+
+For CLI and container runs, install a package that exposes an entry point in the
+`aicomp_sdk.attack_guardrails` group:
+
+```toml
+[project.entry-points."aicomp_sdk.attack_guardrails"]
+private_v1 = "your_private_pkg.guardrail:PrivateGuardrail"
+```
+
+Then select it at runtime with:
+
+```bash
+AICOMP_ATTACK_GUARDRAIL_ID=private_v1 aicomp evaluate redteam attack.py
+```
+
+For in-process tests and embedding, register a spec programmatically:
+
+```python
+from aicomp_sdk.evaluation import AttackGuardrailSpec, register_attack_guardrail_spec
+
+register_attack_guardrail_spec(
+    AttackGuardrailSpec(
+        id="private_v1",
+        version="1",
+        guardrail_factory=PrivateGuardrail,
+    )
+)
+```
+
+Resolution behavior:
+
+- explicit `AttackEvalOptions.guardrail_factory` wins for programmatic `eval_attack(...)`
+- otherwise `AICOMP_ATTACK_GUARDRAIL_ID` selects the guardrail id
+- otherwise the evaluator falls back to `optimal_public`
+- duplicate ids across built-ins, registered specs, and entry points fail closed
 
 ## CLI
 

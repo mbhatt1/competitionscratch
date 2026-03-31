@@ -61,7 +61,7 @@ RunDiagnostics = EnvRunDiagnostics
 
 @runtime_checkable
 class AttackEnvProtocol(Protocol):
-    """Runtime protocol for attack environments used by the evaluation stack."""
+    """Runtime protocol exposed to attack submissions during evaluator runs."""
 
     @property
     def seed(self) -> int:
@@ -71,23 +71,11 @@ class AttackEnvProtocol(Protocol):
     def seed(self, value: int) -> None:
         """Set the environment seed."""
 
-    @property
-    def trace(self) -> Any:
-        """Return the current trace object."""
-
-    @property
-    def tools(self) -> Any:
-        """Return the tool suite bound to this environment."""
-
-    @property
-    def guardrail(self) -> GuardrailBase:
-        """Return the active guardrail."""
-
     def reset(self, *args: Any, **kwargs: Any) -> Any:
         """Reset environment state."""
 
     def interact(
-        self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
+        self, user_message: str, max_tool_hops: int | None = None
     ) -> EnvInteractionResult:
         """Run one user interaction turn."""
 
@@ -101,10 +89,27 @@ class AttackEnvProtocol(Protocol):
         """Restore a snapshot captured by snapshot()."""
 
 
+@runtime_checkable
+class _HarnessAttackEnvProtocol(AttackEnvProtocol, Protocol):
+    """Internal protocol for evaluator harnesses and direct SDK environments."""
+
+    @property
+    def trace(self) -> Any:
+        """Return the current trace object."""
+
+    @property
+    def tools(self) -> Any:
+        """Return the tool suite bound to this environment."""
+
+    @property
+    def guardrail(self) -> GuardrailBase:
+        """Return the active guardrail."""
+
+
 class DiagnosticsEnv:
     """Proxy that forwards env calls while accumulating run diagnostics."""
 
-    def __init__(self, inner: AttackEnvProtocol) -> None:
+    def __init__(self, inner: _HarnessAttackEnvProtocol) -> None:
         self._inner = inner
         self.run_diagnostics = EnvRunDiagnostics()
 
@@ -132,7 +137,7 @@ class DiagnosticsEnv:
         return self._inner.reset(*args, **kwargs)
 
     def interact(
-        self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
+        self, user_message: str, max_tool_hops: int | None = None
     ) -> EnvInteractionResult:
         result = self._inner.interact(user_message, max_tool_hops=max_tool_hops)
         self.run_diagnostics.record(result)

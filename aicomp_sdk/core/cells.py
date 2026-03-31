@@ -128,6 +128,8 @@ def cell_signature(
             err = e.get("error", "")
             if err.startswith("denied:") or err.startswith("confirm_required:"):
                 blocks.append(err.split(":", 1)[0])
+            elif err in ("denied", "confirm_required"):
+                blocks.append(err)
 
     # Include user message intent (last 3) to differentiate when agent ignores/refuses
     # This ensures different intended actions create different cells even if agent does same thing
