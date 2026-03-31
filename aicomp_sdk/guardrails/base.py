@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -44,3 +46,11 @@ class GuardrailBase:
         self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]
     ) -> Decision:
         return Decision.allow("default allow")
+
+    def snapshot_state(self) -> Any:
+        """Capture guardrail state for env snapshot/restore flows."""
+        return None
+
+    def restore_state(self, snapshot: Any) -> None:
+        """Restore guardrail state from a previous snapshot."""
+        del snapshot

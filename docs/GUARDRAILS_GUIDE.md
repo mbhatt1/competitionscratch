@@ -103,6 +103,26 @@ def decide(self, tool_name, tool_args, context):
 
 Use the actual keys above. Historical names like `last_user_message` are not the current guardrail context contract.
 
+## Stateful Guardrails
+
+If your guardrail keeps mutable per-session state, implement the optional snapshot hooks so
+snapshot-based attackers can restore that state correctly:
+
+```python
+class Guardrail(GuardrailBase):
+    def __init__(self):
+        self.tainted = False
+
+    def snapshot_state(self):
+        return {"tainted": self.tainted}
+
+    def restore_state(self, snapshot):
+        self.tainted = bool(snapshot.get("tainted", False))
+```
+
+`SandboxEnv.reset()` restores the initial guardrail state, and `snapshot()` / `restore()`
+round-trip the current guardrail state.
+
 ## Current Tool Surface
 
 Guardrails see tool calls for:

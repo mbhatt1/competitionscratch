@@ -17,6 +17,7 @@ from aicomp_sdk.core.env.api import (
     EnvInteractionResult,
     EnvSelection,
 )
+from aicomp_sdk.guardrails.base import GuardrailBase
 
 
 class _FakeGymEnv:
@@ -53,14 +54,15 @@ class _FakeEvalEnv:
         self._messages = list(snapshot["messages"])
 
 
-class _Guardrail:
+class _Guardrail(GuardrailBase):
     pass
 
 
-class _CountingGuardrail:
+class _CountingGuardrail(GuardrailBase):
     init_calls = 0
 
     def __init__(self) -> None:
+        super().__init__()
         type(self).init_calls += 1
 
 

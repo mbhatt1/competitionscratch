@@ -59,6 +59,23 @@ class StubAgent:
         self._cursor = int(snapshot["data"].get("cursor", 0))
 
 
+class StatefulGuardrail(GuardrailBase):
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    def decide(self, tool_name, tool_args, context):  # noqa: ANN001, ANN201
+        del tool_name, tool_args, context
+        self.call_count += 1
+        return Decision.allow("state tracked")
+
+    def snapshot_state(self) -> dict[str, int]:
+        return {"call_count": self.call_count}
+
+    def restore_state(self, snapshot) -> None:  # noqa: ANN001
+        self.call_count = int(snapshot["call_count"])
+
+
 def _tool_decision(
     tool_name: str,
     args: dict[str, Any],
@@ -197,6 +214,45 @@ def test_env_snapshot_restore_round_trips_tool_state(temp_fixtures: Path) -> Non
     ]
     assert restored_tools_state["egress"] == [{"url": "https://example.com/api", "data": "payload"}]
     assert restored_tools_state["last_source"] == "tool"
+
+
+def test_env_snapshot_restore_round_trips_guardrail_state(temp_fixtures: Path) -> None:
+    agent = StubAgent(
+        decisions=[
+            _tool_decision("fs.read", {"path": "readme.txt"}, call_id="call_000001"),
+            _tool_decision("fs.read", {"path": "readme.txt"}, call_id="call_000002"),
+            _tool_decision("fs.read", {"path": "readme.txt"}, call_id="call_000003"),
+        ]
+    )
+    guardrail = StatefulGuardrail()
+    env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=agent, guardrail=guardrail)
+    env.interact("first", max_tool_hops=1)
+
+    snapshot = env.snapshot()
+
+    env.interact("second", max_tool_hops=1)
+    assert guardrail.call_count == 2
+
+    env.restore(snapshot)
+
+    assert guardrail.call_count == 1
+    env.interact("third", max_tool_hops=1)
+    assert guardrail.call_count == 2
+
+
+def test_env_reset_restores_initial_guardrail_state(temp_fixtures: Path) -> None:
+    agent = StubAgent(
+        decisions=[_tool_decision("fs.read", {"path": "readme.txt"}, call_id="call_000001")]
+    )
+    guardrail = StatefulGuardrail()
+    env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=agent, guardrail=guardrail)
+
+    env.interact("first", max_tool_hops=1)
+    assert guardrail.call_count == 1
+
+    env.reset()
+
+    assert guardrail.call_count == 0
 
 
 def test_env_restore_keeps_deleted_original_fixture_deleted(

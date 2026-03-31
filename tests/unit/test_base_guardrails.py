@@ -215,6 +215,18 @@ class TestGuardrailBase:
         decision = guardrail.decide("shell.run", {"cmd": "whoami"}, context)
         assert decision.action == "ALLOW"
 
+    def test_guardrail_base_snapshot_state_defaults_to_none(self):
+        """Test that base guardrail snapshot state is empty by default."""
+        guardrail = GuardrailBase()
+
+        assert guardrail.snapshot_state() is None
+
+    def test_guardrail_base_restore_state_defaults_to_noop(self):
+        """Test that base guardrail restore state accepts empty snapshots."""
+        guardrail = GuardrailBase()
+
+        guardrail.restore_state(None)
+
 
 class TestCustomGuardrail:
     """Test creating custom guardrails by subclassing GuardrailBase."""

@@ -93,6 +93,8 @@ class GuardrailBase:
         tool_args: Mapping[str, Any],
         context: Mapping[str, Any],
     ) -> Decision: ...
+    def snapshot_state(self) -> Any: ...
+    def restore_state(self, snapshot: Any) -> None: ...
 ```
 
 Current behavior:
@@ -100,6 +102,8 @@ Current behavior:
 - guardrail evaluation constructs fresh guardrail instances for replays and benign trials
 - cache heavyweight immutable resources outside the instance when possible
 - keep per-session mutable state on the instance itself
+- implement `snapshot_state(...)` / `restore_state(...)` for stateful guardrails that
+  need to work correctly with snapshot-based attackers
 
 Current context keys passed by `SandboxEnv`:
 

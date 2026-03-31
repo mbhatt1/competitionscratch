@@ -58,6 +58,7 @@ class EnvSnapshot:
     runtime_history: RuntimeHistory
     last_tool_output: str | None
     tools_state: dict[str, Any]
+    guardrail_state: Any
     agent_state: AgentStateSnapshot
     filesystem: FilesystemSnapshot
 
@@ -80,6 +81,7 @@ class SandboxEnv:
         self.fixtures_dir = Path(fixtures_dir)
         self.tools = ToolSuite(self.fixtures_dir, isolate_fs=True)
         self.guardrail = guardrail or GuardrailBase()
+        self._initial_guardrail_state = copy.deepcopy(self._snapshot_guardrail_state())
         self.trace = Trace(seed=self.seed)
         self._runtime_history = RuntimeHistory().with_instruction(_DEFAULT_RUNTIME_INSTRUCTIONS)
         self._last_tool_output: str | None = None
@@ -95,6 +97,7 @@ class SandboxEnv:
 
     def reset(self) -> None:
         self.tools.reset(self.seed)
+        self._restore_guardrail_state(copy.deepcopy(self._initial_guardrail_state))
         self.trace = Trace(seed=self.seed)
         self._runtime_history = RuntimeHistory().with_instruction(_DEFAULT_RUNTIME_INSTRUCTIONS)
         self._last_tool_output = None
@@ -107,6 +110,7 @@ class SandboxEnv:
             runtime_history=self._runtime_history,
             last_tool_output=self._last_tool_output,
             tools_state=self._snapshot_tools_state(),
+            guardrail_state=copy.deepcopy(self._snapshot_guardrail_state()),
             agent_state=copy.deepcopy(self.agent.snapshot_state()),
             filesystem=self._snapshot_filesystem(),
         )
@@ -116,6 +120,7 @@ class SandboxEnv:
         restored_snapshot = self._coerce_snapshot(snapshot)
         self._restore_filesystem(restored_snapshot.filesystem)
         self._restore_tools_state(restored_snapshot.tools_state)
+        self._restore_guardrail_state(copy.deepcopy(restored_snapshot.guardrail_state))
         self.trace = copy.deepcopy(restored_snapshot.trace)
         self._runtime_history = restored_snapshot.runtime_history
         self._last_tool_output = restored_snapshot.last_tool_output
@@ -129,9 +134,16 @@ class SandboxEnv:
             runtime_history=snapshot["runtime_history"],
             last_tool_output=snapshot["last_tool_output"],
             tools_state=copy.deepcopy(snapshot["tools_state"]),
+            guardrail_state=copy.deepcopy(snapshot.get("guardrail_state")),
             agent_state=copy.deepcopy(snapshot["agent_state"]),
             filesystem=snapshot["filesystem"],
         )
+
+    def _restore_guardrail_state(self, state: Any) -> None:
+        self.guardrail.restore_state(state)
+
+    def _snapshot_guardrail_state(self) -> Any:
+        return self.guardrail.snapshot_state()
 
     def _snapshot_tools_state(self) -> dict[str, Any]:
         return self.tools.snapshot_state()

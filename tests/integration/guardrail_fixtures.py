@@ -256,7 +256,8 @@ class PromptInjectionGuardrail(GuardrailBase):
 
 
 class _TextClassifier(Protocol):
-    def __call__(self, text: str) -> list[dict[str, Any]] | dict[str, Any]: ...
+    def __call__(self, text: str) -> list[dict[str, Any]] | dict[str, Any]:
+        ...
 
 
 @lru_cache(maxsize=1)
