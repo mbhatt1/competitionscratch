@@ -74,9 +74,7 @@ class AttackEnvProtocol(Protocol):
     def reset(self, *args: Any, **kwargs: Any) -> Any:
         """Reset environment state."""
 
-    def interact(
-        self, user_message: str, max_tool_hops: int | None = None
-    ) -> EnvInteractionResult:
+    def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
         """Run one user interaction turn."""
 
     def export_trace_dict(self) -> dict[str, Any]:
@@ -136,9 +134,7 @@ class DiagnosticsEnv:
     def reset(self, *args: Any, **kwargs: Any) -> Any:
         return self._inner.reset(*args, **kwargs)
 
-    def interact(
-        self, user_message: str, max_tool_hops: int | None = None
-    ) -> EnvInteractionResult:
+    def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
         result = self._inner.interact(user_message, max_tool_hops=max_tool_hops)
         self.run_diagnostics.record(result)
         return result

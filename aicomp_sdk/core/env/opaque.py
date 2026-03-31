@@ -104,9 +104,7 @@ class _OpaqueAttackEnvState:
     """Mutable backing state stored outside the attacker-visible wrapper."""
 
     inner: _HarnessAttackEnvProtocol
-    snapshots: WeakKeyDictionary[_OpaqueEnvSnapshot, Any] = field(
-        default_factory=WeakKeyDictionary
-    )
+    snapshots: WeakKeyDictionary[_OpaqueEnvSnapshot, Any] = field(default_factory=WeakKeyDictionary)
 
 
 def _build_opaque_attack_env_type() -> type:
