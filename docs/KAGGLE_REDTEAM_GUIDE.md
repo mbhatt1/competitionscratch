@@ -97,6 +97,13 @@ Compatibility helpers remain available:
 - `env.snapshot()`
 - `env.restore(...)`
 
+Hosted evaluator runs expose an opaque attack environment wrapper. Guardrail internals
+are not part of the submission contract, and attacker-visible traces redact block
+reasons to `denied` and `confirm_required`.
+
+For custom guardrail selection in hosted evaluator runs, see
+[`API_REFERENCE.md`](API_REFERENCE.md#custom-attack-guardrails).
+
 ## Replay and Scoring Rules
 
 The public leaderboard uses normalized attack score only.

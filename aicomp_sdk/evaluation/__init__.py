@@ -30,11 +30,14 @@ from .tracks import EvaluationTrack
 
 if TYPE_CHECKING:
     from .ops import (
+        ATTACK_GUARDRAIL_ENV_VAR,
         FIXTURES_ENV_VAR,
         LEGACY_REPO_FIXTURES,
         MAX_REPLAY_FINDINGS,
         MAX_REPLAY_MESSAGES_PER_FINDING,
         PACKAGED_FIXTURES,
+        AttackEvalOptions,
+        AttackGuardrailSpec,
         DefenseRunOptions,
     )
     from .ops import RedteamRunOptions as RedteamRunOptions
@@ -42,12 +45,17 @@ if TYPE_CHECKING:
         build_attack_env,
         eval_attack,
         eval_defense,
+        register_attack_guardrail_spec,
+        resolve_attack_guardrail_spec,
         resolve_fixtures_dir,
         summarize_attack_findings,
     )
     from .submissions import MAX_SUBMISSION_FILE_BYTES, load_from_zip, load_module_from_file
 
 _OPS_EXPORTS: Final[set[str]] = {
+    "ATTACK_GUARDRAIL_ENV_VAR",
+    "AttackEvalOptions",
+    "AttackGuardrailSpec",
     "DefenseRunOptions",
     "FIXTURES_ENV_VAR",
     "LEGACY_REPO_FIXTURES",
@@ -58,6 +66,8 @@ _OPS_EXPORTS: Final[set[str]] = {
     "build_attack_env",
     "eval_attack",
     "eval_defense",
+    "register_attack_guardrail_spec",
+    "resolve_attack_guardrail_spec",
     "resolve_fixtures_dir",
     "summarize_attack_findings",
 }
@@ -68,6 +78,7 @@ _SUBMISSION_EXPORTS: Final[set[str]] = {
 }
 
 __all__ = [
+    "ATTACK_GUARDRAIL_ENV_VAR",
     "DEFAULT_ATTACK_BUDGET_S",
     "DEFAULT_CLI_TOTAL_BUDGET_S",
     "DEFAULT_DEFENSE_BUDGET_S",
@@ -80,6 +91,8 @@ __all__ = [
     "MAX_SUBMISSION_FILE_BYTES",
     "PACKAGED_FIXTURES",
     "AttackExecution",
+    "AttackEvalOptions",
+    "AttackGuardrailSpec",
     "DefenseExecution",
     "EvaluationBudgetPlan",
     "EvaluationExecution",
@@ -87,6 +100,7 @@ __all__ = [
     "EvaluatorVerbosity",
     "FrameworkEvent",
     "ReportProfile",
+    "RedteamRunOptions",
     "RunDiagnostics",
     "build_attack_env",
     "eval_attack",
@@ -96,7 +110,9 @@ __all__ = [
     "coerce_evaluator_verbosity",
     "execute_evaluation",
     "build_evaluation_report",
+    "register_attack_guardrail_spec",
     "resolve_agent_factory",
+    "resolve_attack_guardrail_spec",
     "resolve_budget_plan",
     "resolve_fixtures_dir",
     "resolve_standalone_budget_plan",

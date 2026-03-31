@@ -22,7 +22,7 @@ from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.attacker_goexplore import AttackAlgorithm
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail as BaselineGuardrail
 from aicomp_sdk.core.env.sandbox import SandboxEnv
-from aicomp_sdk.evaluation import RedteamRunOptions, eval_attack
+from aicomp_sdk.evaluation import AttackEvalOptions, eval_attack
 
 
 def _select_openai_demo_agent() -> str:
@@ -40,8 +40,8 @@ def _build_demo_env(*, seed: int, fixtures_dir: Path) -> SandboxEnv:
     )
 
 
-def _build_demo_options() -> RedteamRunOptions:
-    return RedteamRunOptions(
+def _build_demo_options() -> AttackEvalOptions:
+    return AttackEvalOptions(
         run_config=AttackRunConfig(time_budget_s=30, max_steps=100),
         attack_config={"max_turns": 6, "branch_batch": 8},
         seed=42,

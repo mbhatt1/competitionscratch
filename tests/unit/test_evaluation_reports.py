@@ -42,6 +42,8 @@ def _attack_execution() -> AttackExecution:
         unique_cells=2,
         unique_canonical_cells=3,
         time_taken=0.1,
+        guardrail_id="optimal_public",
+        guardrail_version="1",
     )
 
 
@@ -95,6 +97,9 @@ def test_build_evaluation_report_evaluate_profile_omits_history_placeholders() -
     assert "time_taken" not in report["attack"]
     assert report["budget_s"] == 60.0
     assert report["attack_seed"] == 123
+    assert report["attack_guardrail_id"] == "optimal_public"
+    assert report["attack_guardrail_version"] == "1"
+    assert report["env_visibility"] == "opaque"
 
 
 def test_build_evaluation_report_test_profile_keeps_history_friendly_shape() -> None:

@@ -61,7 +61,7 @@ RunDiagnostics = EnvRunDiagnostics
 
 @runtime_checkable
 class AttackEnvProtocol(Protocol):
-    """Runtime protocol for attack environments used by the evaluation stack."""
+    """Runtime protocol exposed to attack submissions during evaluator runs."""
 
     @property
     def seed(self) -> int:
@@ -70,6 +70,26 @@ class AttackEnvProtocol(Protocol):
     @seed.setter
     def seed(self, value: int) -> None:
         """Set the environment seed."""
+
+    def reset(self, *args: Any, **kwargs: Any) -> Any:
+        """Reset environment state."""
+
+    def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
+        """Run one user interaction turn."""
+
+    def export_trace_dict(self) -> dict[str, Any]:
+        """Return the trace as a serializable dictionary."""
+
+    def snapshot(self) -> Any:
+        """Capture a restorable environment snapshot."""
+
+    def restore(self, snapshot: Any) -> None:
+        """Restore a snapshot captured by snapshot()."""
+
+
+@runtime_checkable
+class _HarnessAttackEnvProtocol(AttackEnvProtocol, Protocol):
+    """Internal protocol for evaluator harnesses and direct SDK environments."""
 
     @property
     def trace(self) -> Any:
@@ -83,28 +103,11 @@ class AttackEnvProtocol(Protocol):
     def guardrail(self) -> GuardrailBase:
         """Return the active guardrail."""
 
-    def reset(self, *args: Any, **kwargs: Any) -> Any:
-        """Reset environment state."""
-
-    def interact(
-        self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
-    ) -> EnvInteractionResult:
-        """Run one user interaction turn."""
-
-    def export_trace_dict(self) -> dict[str, Any]:
-        """Return the trace as a serializable dictionary."""
-
-    def snapshot(self) -> Any:
-        """Capture a restorable environment snapshot."""
-
-    def restore(self, snapshot: Any) -> None:
-        """Restore a snapshot captured by snapshot()."""
-
 
 class DiagnosticsEnv:
     """Proxy that forwards env calls while accumulating run diagnostics."""
 
-    def __init__(self, inner: AttackEnvProtocol) -> None:
+    def __init__(self, inner: _HarnessAttackEnvProtocol) -> None:
         self._inner = inner
         self.run_diagnostics = EnvRunDiagnostics()
 
@@ -131,9 +134,7 @@ class DiagnosticsEnv:
     def reset(self, *args: Any, **kwargs: Any) -> Any:
         return self._inner.reset(*args, **kwargs)
 
-    def interact(
-        self, user_message: str, max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS
-    ) -> EnvInteractionResult:
+    def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
         result = self._inner.interact(user_message, max_tool_hops=max_tool_hops)
         self.run_diagnostics.record(result)
         return result
