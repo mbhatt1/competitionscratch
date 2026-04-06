@@ -108,7 +108,7 @@ final_score = normalized_attack_score + defense_score
 
 Current dual-track evaluator behavior:
 
-- total budget defaults to `3600` seconds
+- dual-track total budget defaults to `3600` seconds
 - attack and defense each receive half of that budget
 - the final score is the sum of the two measured components
 
@@ -146,6 +146,8 @@ Useful JSON fields include:
 ### `aicomp evaluate defense` and `aicomp evaluate dual`
 
 `aicomp evaluate defense` writes a defense-only report shape. It does not include `attack.*` fields or `scoring_mode`.
+When a private hook fixture is selected for guardrail scoring, defense-only reports include
+`defense_hook_id` and `defense_hook_version`.
 
 The package dual-track evaluator writes:
 
@@ -165,6 +167,8 @@ Useful dual-track JSON fields include:
 - `attack_guardrail_version`
 - `defense.score`
 - `defense.breach_count`
+- `defense_hook_id`
+- `defense_hook_version`
 - `defense.false_positives`
 - `defense.benign_trials`
 - `defense.false_positive_rate`

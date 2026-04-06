@@ -1,5 +1,4 @@
 from __future__ import annotations
-# mypy: disable-error-code="unused-ignore,attr-defined"
 
 import json
 import sys
@@ -13,6 +12,8 @@ import aicomp_sdk.evaluation.ops as evaluation_core
 import aicomp_sdk.evaluation.submissions as evaluation_submissions
 import aicomp_sdk.scoring as scoring
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
+
+# mypy: disable-error-code="unused-ignore,attr-defined"
 
 
 class _StubGuardrail(GuardrailBase):
@@ -54,14 +55,21 @@ def test_defense_evaluator_writes_guardrail_only_outputs(tmp_path, monkeypatch) 
         budget_s,
         agent_factory=None,
         env_selection=None,
-        attack_seed=123,
+        guardrail_challenge_env_seed=123,
         benign_seed=999,
         fixtures_dir=None,
         output_controller=None,
         *,
         options=None,
     ):  # type: ignore[no-untyped-def]
-        del guardrail_cls, attack_seed, benign_seed, fixtures_dir, output_controller, options
+        del (
+            guardrail_cls,
+            guardrail_challenge_env_seed,
+            benign_seed,
+            fixtures_dir,
+            output_controller,
+            options,
+        )
         captured["budget_s"] = budget_s
         captured["env_selection"] = env_selection
         captured["agent_factory"] = agent_factory

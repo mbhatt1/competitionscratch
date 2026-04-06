@@ -51,10 +51,13 @@ class AttackAlgorithm(AttackAlgorithmBase):
 What this contract means in practice:
 
 - `AttackAlgorithm` is the required class name for the public Kaggle path, package attack-only evaluation, and package dual-track evaluation.
-- `config.time_budget_s` is the wall-clock budget for the run.
+- `config.time_budget_s` is the wall-clock budget contract your submission should honor.
 - `config.max_steps` is an outer-loop search cap you can honor if your algorithm uses one.
 - `config.max_tool_hops` is the per-message blue-agent/tool limit used during interaction and replay.
 - Returned `AttackCandidate` values should contain replayable user-message chains only.
+
+Local package evaluators pass that budget into `AttackAlgorithm.run(...)`. Hosted judging
+infrastructure may also enforce a separate outer process timeout.
 
 ## Replay Model and What Gets Scored
 
@@ -127,6 +130,11 @@ Pass `--env gym` explicitly when you want GymAttackEnv for Kaggle-style parity.
 
 For custom guardrail selection in attack evaluator runs, see
 [`API_REFERENCE.md`](API_REFERENCE.md#custom-attack-guardrails).
+
+Scorer-driven `attack.py` submissions should not register hooks. Private compromised-env
+hooks are configured by the harness, not by submission code. For local hook experiments,
+construct `SandboxEnv(..., hook_registry=registry)` in a repo script such as
+[`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py).
 
 If you use `GymAttackEnv` directly:
 
@@ -270,9 +278,11 @@ If you use `step(...)`, reset the environment when `truncated` becomes `True`.
 
 ## Examples
 
+- [`../examples/attacks/attack.py`](../examples/attacks/attack.py)
 - [`../examples/attacks/attack_gym_step.py`](../examples/attacks/attack_gym_step.py)
 - [`../examples/attacks/attack_simple.py`](../examples/attacks/attack_simple.py)
 - [`../examples/attacks/attack_goexplore_working.py`](../examples/attacks/attack_goexplore_working.py)
+- [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py)
 
 ## References
 

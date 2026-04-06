@@ -1,5 +1,4 @@
 from __future__ import annotations
-# mypy: disable-error-code="unused-ignore,attr-defined"
 
 import json
 import sys
@@ -10,15 +9,19 @@ from types import ModuleType
 import pytest
 
 import aicomp_sdk.evaluation.ops as evaluation_core
+import aicomp_sdk.evaluation.runner as evaluation_runner
 import aicomp_sdk.evaluation.submissions as evaluation_submissions
-from aicomp_sdk.cli.commands import evaluate as evaluation
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.agents.debug import AgentDebugEvent
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
+from aicomp_sdk.cli.commands import evaluate as evaluation
 from aicomp_sdk.core.env.api import EnvSelection
 from aicomp_sdk.evaluation.budget_policy import DEFAULT_ATTACK_BUDGET_S
 from aicomp_sdk.evaluation.ops import eval_attack, summarize_attack_findings
 from aicomp_sdk.evaluation.submissions import load_module_from_file
+
+# mypy: disable-error-code="unused-ignore,attr-defined"
+
 
 ATTACK_SOURCE = """\
 from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
@@ -347,13 +350,13 @@ def test_redteam_evaluator_passes_fixtures_override(
         budget_s,
         agent_factory,
         env_selection,
-        attack_seed=123,
+        attack_env_seed=123,
         fixtures_dir=None,
         output_controller=None,
         *,
         options=None,
     ):  # type: ignore[no-untyped-def]
-        del attack_cls, attack_seed, output_controller, options
+        del attack_cls, attack_env_seed, output_controller, options
         captured["fixtures_dir"] = fixtures_dir
         captured["agent_factory"] = agent_factory
         captured["budget_s"] = budget_s
@@ -412,13 +415,21 @@ def test_redteam_evaluator_passes_explicit_env_selection(
         budget_s,
         agent_factory,
         env_selection,
-        attack_seed=123,
+        attack_env_seed=123,
         fixtures_dir=None,
         output_controller=None,
         *,
         options=None,
     ):  # type: ignore[no-untyped-def]
-        del attack_cls, budget_s, agent_factory, attack_seed, fixtures_dir, output_controller, options
+        del (
+            attack_cls,
+            budget_s,
+            agent_factory,
+            attack_env_seed,
+            fixtures_dir,
+            output_controller,
+            options,
+        )
         captured["env_selection"] = env_selection
         return []
 
@@ -584,7 +595,11 @@ def test_redteam_evaluator_writes_optional_diagnostics_into_artifacts_dir(
         print("captured stderr", file=sys.stderr)
         return []
 
-    monkeypatch.setattr(evaluation, "build_agent_factory", fake_build_agent_factory)
+    monkeypatch.setattr(
+        evaluation_runner,
+        "build_agent_factory",
+        fake_build_agent_factory,
+    )
     monkeypatch.setattr(evaluation_core, "eval_attack", fake_eval_attack)
     monkeypatch.setattr(
         evaluation_core,
@@ -617,11 +632,10 @@ def test_redteam_evaluator_writes_optional_diagnostics_into_artifacts_dir(
     assert "captured stderr" in transcript_text
 
     framework_events = [
-        json.loads(line)
-        for line in framework_events_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in framework_events_path.read_text(encoding="utf-8").splitlines()
     ]
     assert [event["event"] for event in framework_events] == ["phase_start", "phase_end"]
-    assert framework_events[0]["message"] == "Running attack generation and replay..."
+    assert framework_events[0]["message"] == "Running red-team evaluation..."
     assert framework_events[0]["phase"] == "redteam_evaluation"
     assert framework_events[0]["fields"]["track"] == "redteam"
     assert framework_events[1]["fields"]["score"] == 0.0

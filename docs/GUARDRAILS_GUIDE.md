@@ -215,14 +215,11 @@ aicomp evaluate dual submission.zip --budget-s 60 --agent deterministic --env sa
 
 This guide is primarily about writing `guardrail.py`. If you are packaging `submission.zip`, use this guide for the guardrail contract and [`COMPETITION_DESIGN.md`](COMPETITION_DESIGN.md) for the broader package workflow.
 
-## Hook-Based Experiments
+## Hook-Based Threat Fixtures
 
-The repository also includes decorator-based hook helpers in:
-
-- [`../aicomp_sdk/guardrails/hooks_simple.py`](../aicomp_sdk/guardrails/hooks_simple.py)
-- [`../examples/guardrails/guardrail_simple.py`](../examples/guardrails/guardrail_simple.py)
-
-These are useful for experiments, but the stable minimum contract is still `Guardrail.decide(...)`.
+Scorer-driven `guardrail.py` submissions should not register hooks. If you want to test a
+guardrail against a compromised environment locally, construct `SandboxEnv(..., hook_registry=registry)`
+in a harness script and keep `guardrail.py` focused on `Guardrail.decide(...)`.
 
 ## Testing Advice
 

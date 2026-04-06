@@ -18,11 +18,10 @@ from aicomp_sdk.agents.types import (
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 from aicomp_sdk.guardrails.base import GuardrailBase
-from aicomp_sdk.guardrails.hooks import (
+from aicomp_sdk.hooks import (
     HookContext,
     HookRegistry,
     HookStage,
-    get_hook_registry,
 )
 
 from ..tools import ToolSuite
@@ -60,6 +59,7 @@ class EnvSnapshot:
     tools_state: dict[str, Any]
     guardrail_state: Any
     agent_state: AgentStateSnapshot
+    hook_state: dict[str, Any]
     filesystem: FilesystemSnapshot
 
 
@@ -85,7 +85,8 @@ class SandboxEnv:
         self.trace = Trace(seed=self.seed)
         self._runtime_history = RuntimeHistory().with_instruction(_DEFAULT_RUNTIME_INSTRUCTIONS)
         self._last_tool_output: str | None = None
-        self.hook_registry = hook_registry or get_hook_registry().clone()
+        self.hook_registry = hook_registry or HookRegistry()
+        self._initial_hook_state = self.hook_registry.snapshot_state()
         self.agent = agent
         self._tool_specs = to_agent_tool_specs(tuple(self.tools.specs.values()))
         self._default_max_tool_hops = int(max_tool_hops)
@@ -98,6 +99,7 @@ class SandboxEnv:
     def reset(self) -> None:
         self.tools.reset(self.seed)
         self._restore_guardrail_state(copy.deepcopy(self._initial_guardrail_state))
+        self.hook_registry.restore_state(self._initial_hook_state)
         self.trace = Trace(seed=self.seed)
         self._runtime_history = RuntimeHistory().with_instruction(_DEFAULT_RUNTIME_INSTRUCTIONS)
         self._last_tool_output = None
@@ -112,6 +114,7 @@ class SandboxEnv:
             tools_state=self._snapshot_tools_state(),
             guardrail_state=copy.deepcopy(self._snapshot_guardrail_state()),
             agent_state=copy.deepcopy(self.agent.snapshot_state()),
+            hook_state=self.hook_registry.snapshot_state(),
             filesystem=self._snapshot_filesystem(),
         )
 
@@ -121,6 +124,7 @@ class SandboxEnv:
         self._restore_filesystem(restored_snapshot.filesystem)
         self._restore_tools_state(restored_snapshot.tools_state)
         self._restore_guardrail_state(copy.deepcopy(restored_snapshot.guardrail_state))
+        self.hook_registry.restore_state(restored_snapshot.hook_state)
         self.trace = copy.deepcopy(restored_snapshot.trace)
         self._runtime_history = restored_snapshot.runtime_history
         self._last_tool_output = restored_snapshot.last_tool_output
@@ -136,6 +140,7 @@ class SandboxEnv:
             tools_state=copy.deepcopy(snapshot["tools_state"]),
             guardrail_state=copy.deepcopy(snapshot.get("guardrail_state")),
             agent_state=copy.deepcopy(snapshot["agent_state"]),
+            hook_state=snapshot.get("hook_state", self.hook_registry.snapshot_state()),
             filesystem=snapshot["filesystem"],
         )
 
@@ -213,6 +218,10 @@ class SandboxEnv:
             context={"user_message": user_message, "seed": self.seed},
         )
         self.hook_registry.execute_hooks(HookStage.CONTEXT_BUILD, context_hook_ctx)
+        if context_hook_ctx.injected_content is not None:
+            self._runtime_history = self._runtime_history.with_user_message(
+                context_hook_ctx.injected_content
+            )
 
         for hop_idx in range(resolved_max_tool_hops):
             agent_turns += 1
@@ -364,7 +373,17 @@ class SandboxEnv:
                 )
                 break
 
-            ok, output, err = self.tools.call(tool_name, tool_args)
+            try:
+                ok, output, err = self.tools.call(tool_name, tool_args)
+            except Exception as call_error:
+                self._record_failed_tool_attempt(
+                    call=executed_call,
+                    args=tool_args,
+                    side_effect=spec.side_effect,
+                    scope=spec.scope,
+                    error=f"tool_call_error:{type(call_error).__name__}:{call_error}",
+                )
+                break
 
             post_tool_ctx = HookContext(
                 stage=HookStage.POST_TOOL_CALL,
@@ -378,16 +397,8 @@ class SandboxEnv:
 
             if post_tool_ctx.modified_output is not None:
                 output = post_tool_ctx.modified_output
-
-            trigger_ctx = HookContext(
-                stage=HookStage.TRIGGER_CHECK,
-                tool_name=tool_name,
-                tool_args=tool_args,
-                tool_output=output,
-                trace=self.trace,
-                context=ctx,
-            )
-            self.hook_registry.execute_hooks(HookStage.TRIGGER_CHECK, trigger_ctx)
+            if post_tool_ctx.injected_content is not None:
+                output = serialize_tool_output(output) + post_tool_ctx.injected_content
 
             ev = ToolEvent(
                 name=tool_name,

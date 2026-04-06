@@ -19,6 +19,7 @@ from aicomp_sdk.core.env.api import (
 )
 from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.core.predicates import eval_predicates
+from aicomp_sdk.hooks import HookRegistry
 
 MAX_TRACE_SUMMARY_JSON_CHARS: Final[int] = 8_192
 RECENT_TOOL_WINDOW: Final[int] = 8
@@ -61,6 +62,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
         max_tool_hops: int = DEFAULT_MAX_TOOL_HOPS,
         max_episode_messages: int = 32,
         reward_mode: Literal["none"] = "none",
+        hook_registry: HookRegistry | None = None,
     ) -> None:
         super().__init__()
         if max_tool_hops <= 0:
@@ -75,6 +77,7 @@ class GymAttackEnv(gym.Env[dict[str, Any], str]):
             fixtures_dir=fixtures_dir,
             agent=agent,
             guardrail=guardrail,
+            hook_registry=hook_registry,
         )
         self.max_tool_hops = int(max_tool_hops)
         self.max_episode_messages = int(max_episode_messages)

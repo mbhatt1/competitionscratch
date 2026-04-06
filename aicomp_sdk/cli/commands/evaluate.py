@@ -9,18 +9,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, cast
 
-from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.cli.commands.options import add_shared_execution_arguments
 from aicomp_sdk.evaluation.budget_policy import (
     resolve_standalone_budget_plan as _resolve_budget_plan,
 )
 from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity, RunDiagnostics
+from aicomp_sdk.evaluation.ops import (
+    resolve_attack_guardrail_spec,
+    resolve_defense_hook_spec,
+)
 from aicomp_sdk.evaluation.reports import ReportProfile, build_evaluation_report
 from aicomp_sdk.evaluation.runner import (
     AttackExecution,
     DefenseExecution,
     EvaluationExecution,
-    execute_evaluation,
+    evaluate_defense,
+    evaluate_dual,
+    evaluate_redteam,
 )
 from aicomp_sdk.evaluation.submissions import load_track_modules
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
@@ -206,7 +211,7 @@ def _write_outputs(
     details: dict[str, Any],
     transcript_file: Path | None = None,
     framework_events_file: Path | None = None,
-    agent_debug_jsonl: Path | None = None,
+    agent_debug_file: Path | None = None,
 ) -> None:
     artifacts.dir_path.mkdir(parents=True, exist_ok=True)
     artifacts.score_path.write_text(f"{final_score}\n", encoding="utf-8")
@@ -218,8 +223,8 @@ def _write_outputs(
         print(f"Transcript written to: {transcript_file}", flush=True)
     if framework_events_file is not None:
         print(f"Framework events written to: {framework_events_file}", flush=True)
-    if agent_debug_jsonl is not None:
-        print(f"Agent debug JSONL written to: {agent_debug_jsonl}", flush=True)
+    if agent_debug_file is not None:
+        print(f"Agent debug JSONL written to: {agent_debug_file}", flush=True)
 
 
 def _render_summary(
@@ -299,13 +304,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
     artifacts = _resolve_artifacts(args.artifacts_dir)
     transcript_file = artifacts.transcript_path if args.save_transcript else None
     framework_events_file = artifacts.framework_events_path if args.save_framework_events else None
-    agent_debug_jsonl = artifacts.agent_debug_path if args.save_agent_debug else None
+    agent_debug_file = artifacts.agent_debug_path if args.save_agent_debug else None
 
     with RunDiagnostics(
         args.verbosity,
         transcript_file=transcript_file,
         event_log_file=framework_events_file,
+        agent_debug_file=agent_debug_file,
     ) as output_controller:
+        attack_guardrail_spec = None
+        defense_hook_spec = None
+        if track is EvaluationTrack.REDTEAM or track is EvaluationTrack.DUAL:
+            attack_guardrail_spec = resolve_attack_guardrail_spec()
+        if track is EvaluationTrack.DEFENSE or track is EvaluationTrack.DUAL:
+            defense_hook_spec = resolve_defense_hook_spec()
+
         if track is EvaluationTrack.REDTEAM:
             print("\n" + "=" * 70, flush=True)
             print("EVALUATING RED-TEAM SUBMISSION", flush=True)
@@ -332,31 +345,46 @@ def run_evaluate(args: argparse.Namespace) -> int:
                 track,
             )
 
-            if track is EvaluationTrack.REDTEAM and attack_cls is None:
-                raise SystemExit("Submission missing AttackAlgorithm")
-            if track is EvaluationTrack.DEFENSE and guardrail_cls is None:
-                raise SystemExit("Submission missing Guardrail")
-            if track is EvaluationTrack.DUAL and (attack_cls is None or guardrail_cls is None):
-                raise SystemExit(
-                    "Dual-track submissions must include both attack.py and guardrail.py"
+            if track is EvaluationTrack.REDTEAM:
+                if attack_cls is None:
+                    raise SystemExit("Submission missing AttackAlgorithm")
+                execution = evaluate_redteam(
+                    attack_cls,
+                    budget_s=budget_plan.total_budget_s,
+                    agent_selection=args.agent,
+                    env_selection=args.env,
+                    fixtures_dir=fixtures_dir,
+                    attack_guardrail_spec=attack_guardrail_spec,
+                    diagnostics=output_controller,
                 )
-
-            execution = execute_evaluation(
-                track=track,
-                budget_plan=budget_plan,
-                agent_selection=args.agent,
-                env_selection=args.env,
-                output_controller=output_controller,
-                attack_cls=attack_cls,
-                guardrail_cls=guardrail_cls,
-                fixtures_dir=fixtures_dir,
-                agent_debug_jsonl=agent_debug_jsonl,
-                agent_factory=build_agent_factory(
-                    args.agent,
-                    debug_sink=output_controller.make_agent_debug_sink(agent_debug_jsonl),
-                ),
-                event_style="evaluate",
-            )
+            elif track is EvaluationTrack.DEFENSE:
+                if guardrail_cls is None:
+                    raise SystemExit("Submission missing Guardrail")
+                execution = evaluate_defense(
+                    guardrail_cls,
+                    budget_s=budget_plan.total_budget_s,
+                    agent_selection=args.agent,
+                    env_selection=args.env,
+                    fixtures_dir=fixtures_dir,
+                    defense_hook_spec=defense_hook_spec,
+                    diagnostics=output_controller,
+                )
+            else:
+                if attack_cls is None or guardrail_cls is None:
+                    raise SystemExit(
+                        "Dual-track submissions must include both attack.py and guardrail.py"
+                    )
+                execution = evaluate_dual(
+                    attack_cls,
+                    guardrail_cls,
+                    budget_s=budget_plan.total_budget_s,
+                    agent_selection=args.agent,
+                    env_selection=args.env,
+                    fixtures_dir=fixtures_dir,
+                    attack_guardrail_spec=attack_guardrail_spec,
+                    defense_hook_spec=defense_hook_spec,
+                    diagnostics=output_controller,
+                )
 
         _render_summary(execution, verbosity=args.verbosity)
         details = build_evaluation_report(execution, profile=ReportProfile.EVALUATE)
@@ -367,6 +395,6 @@ def run_evaluate(args: argparse.Namespace) -> int:
         details=details,
         transcript_file=transcript_file,
         framework_events_file=framework_events_file,
-        agent_debug_jsonl=agent_debug_jsonl,
+        agent_debug_file=agent_debug_file,
     )
     return 0

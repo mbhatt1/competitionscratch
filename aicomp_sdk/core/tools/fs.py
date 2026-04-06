@@ -64,7 +64,7 @@ def _resolve_path(ctx: ToolContext, path: str) -> Path:
 
 
 def _is_path_escape(ctx: ToolContext, path: Path) -> bool:
-    return not str(path).startswith(str(ctx.filesystem_root.resolve()))
+    return not path.is_relative_to(ctx.filesystem_root.resolve())
 
 
 FS_TOOL_DEFS: Final[tuple[ToolDef, ...]] = (

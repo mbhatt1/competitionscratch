@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Concise attack-only smoke test for an example submission file.
 
-Defaults to the canonical Gymnasium-style attack example so the script mirrors
-the public Kaggle-style attack path without importing repo-root submission
-files.
+Defaults to the canonical attack example so the script mirrors the public
+Kaggle-style attack path without importing repo-root submission files.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ def _repo_root() -> Path:
 
 
 REPO_ROOT: Final[Path] = _repo_root()
-DEFAULT_ATTACK_PATH: Final[Path] = REPO_ROOT / "examples" / "attacks" / "attack_gym_step.py"
+DEFAULT_ATTACK_PATH: Final[Path] = REPO_ROOT / "examples" / "attacks" / "attack.py"
 
 
 @dataclass(frozen=True)
@@ -108,8 +107,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _ensure_repo_root_on_sys_path(REPO_ROOT)
 
-    from aicomp_sdk.agents import build_agent_factory
-    from aicomp_sdk.evaluation.ops import eval_attack, summarize_attack_findings
+    from aicomp_sdk import EnvSelection
+    from aicomp_sdk.evaluation import evaluate_redteam
     from aicomp_sdk.evaluation.submissions import load_module_from_file
 
     module = load_module_from_file(submission_path, "examples_attack_submission")
@@ -119,22 +118,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Suppress evaluator stdout so the smoke-test summary remains concise.
     with redirect_stdout(io.StringIO()):
-        findings = eval_attack(
+        execution = evaluate_redteam(
             attack_cls,
-            args.budget_s,
-            agent_factory=build_agent_factory(args.agent),
-            env_selection="gym",
+            budget_s=args.budget_s,
+            agent_selection=args.agent,
+            env_selection=EnvSelection.SANDBOX,
         )
 
-    summary = summarize_attack_findings(findings)
+    attack = execution.attack
+    if attack is None:
+        raise RuntimeError("Redteam smoke test did not produce attack results")
 
     print(f"Attack smoke test: {_display_path(submission_path, repo_root=REPO_ROOT)}")
     print(f"Budget (s):        {args.budget_s:.1f}")
     print(f"Agent:             {args.agent}")
-    print(f"Attack score:      {summary['score']:.2f}")
-    print(f"Attack raw:        {summary['score_raw']:.2f}")
-    print(f"Findings:          {summary['findings_count']}")
-    print(f"Unique cells:      {summary['unique_cells']}")
+    print(f"Attack score:      {attack.score:.2f}")
+    print(f"Attack raw:        {attack.score_raw:.2f}")
+    print(f"Findings:          {attack.findings_count}")
+    print(f"Unique cells:      {attack.unique_cells}")
     print("Note: short smoke runs check evaluator compatibility and may yield 0 findings.")
     print("For a longer public-contract run, use " "`aicomp evaluate redteam attack.py`.")
     return 0

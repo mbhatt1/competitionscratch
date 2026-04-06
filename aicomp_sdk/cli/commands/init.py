@@ -27,8 +27,8 @@ from typing import Final, Any
 
 from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
 
-# TODO: Choose your approach - you can use hooks, direct exploration, or both
-# from aicomp_sdk.guardrails.hooks_simple import attack_hook, clear_hooks
+# TODO: Choose your attack search strategy. Scorer submissions should not register hooks;
+# compromised-env hooks are a harness-owned concern, not a submission API.
 
 
 class AttackAlgorithm(AttackAlgorithmBase):
@@ -50,7 +50,6 @@ class AttackAlgorithm(AttackAlgorithmBase):
         
         # TODO: Initialize your attack strategy here
         # Examples:
-        # - Set up hook-based payload injection
         # - Initialize exploration algorithm (e.g., GO-EXPLORE)
         # - Configure search parameters
     
@@ -81,10 +80,7 @@ class AttackAlgorithm(AttackAlgorithmBase):
         # 2. Exploration: Try many different prompts/scenarios
         #    Example: Test file operations, emails, web requests systematically
         #
-        # 3. Hook-based: Use LPCI hooks to inject payloads into tool outputs
-        #    Example: Inject malicious actions into web search results
-        #
-        # 4. Chaining: Find sequences that bypass guardrails
+        # 3. Chaining: Find sequences that bypass guardrails
         #    Example: Read benign file -> manipulate output -> exfiltrate
         
         test_prompts = [
@@ -174,8 +170,8 @@ from collections.abc import Mapping
 from typing import Any
 from aicomp_sdk import GuardrailBase, Decision
 
-# TODO: Choose your approach - you can use hooks, rules, or both
-# from aicomp_sdk.guardrails.hooks_simple import defense_hook, clear_hooks
+# TODO: Choose your guardrail strategy. Scorer submissions should implement
+# `decide(...)`; compromised-env hooks are owned by the harness, not `guardrail.py`.
 
 
 class Guardrail(GuardrailBase):
@@ -195,7 +191,6 @@ class Guardrail(GuardrailBase):
         
         # TODO: Initialize your defense strategy here
         # Examples:
-        # - Set up detection hooks
         # - Cache heavyweight immutable resources (models, regexes) outside the instance
         # - Keep per-session mutable state on self
         # - Initialize taint tracking

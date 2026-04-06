@@ -119,7 +119,9 @@ Important distinction:
 - `aicomp evaluate redteam` defaults to `1800`
 - `aicomp evaluate defense` defaults to `1800`
 - `aicomp evaluate dual` defaults to `3600` total, split to `1800` attack and `1800` defense
-- `aicomp test` defaults to `3600` total; that becomes `3600` for redteam, `3600` for defense, and `1800`/`1800` for dual
+- `aicomp test redteam` defaults to `1800`
+- `aicomp test defense` defaults to `1800`
+- `aicomp test dual` defaults to `3600` total, split to `1800` attack and `1800` defense
 
 ### How do I test locally without an API key?
 

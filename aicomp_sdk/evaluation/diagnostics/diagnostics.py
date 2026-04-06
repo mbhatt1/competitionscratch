@@ -190,6 +190,7 @@ class RunDiagnostics:
         stderr: TextIO | None = None,
         transcript_file: Path | None = None,
         event_log_file: Path | None = None,
+        agent_debug_file: Path | None = None,
         run_id: str | None = None,
     ) -> None:
         self.verbosity = verbosity
@@ -197,12 +198,14 @@ class RunDiagnostics:
         self.console = ConsoleRenderer(verbosity, stderr=stderr)
         self.transcript_file = Path(transcript_file) if transcript_file is not None else None
         self.event_log_file = Path(event_log_file) if event_log_file is not None else None
+        self.agent_debug_file = Path(agent_debug_file) if agent_debug_file is not None else None
         self._transcript_writer = (
             TranscriptWriter(self.transcript_file) if self.transcript_file is not None else None
         )
         self._event_log_sink = (
             open_event_log_sink(self.event_log_file) if self.event_log_file is not None else None
         )
+        self._agent_debug_sink: AgentDebugSink | None = None
 
     def __enter__(self) -> RunDiagnostics:
         return self
@@ -322,10 +325,15 @@ class RunDiagnostics:
     def progress_reporter(self, *, phase: str) -> ProgressReporter:
         return self.phase(phase)
 
-    def make_agent_debug_sink(self, path: Path | None) -> AgentDebugSink | None:
-        if path is None:
+    def make_agent_debug_sink(self) -> AgentDebugSink | None:
+        if self.agent_debug_file is None:
             return None
-        return CorrelatedAgentDebugSink(JsonlAgentDebugSink(path), run_id=self.run_id)
+        if self._agent_debug_sink is None:
+            self._agent_debug_sink = CorrelatedAgentDebugSink(
+                JsonlAgentDebugSink(self.agent_debug_file),
+                run_id=self.run_id,
+            )
+        return self._agent_debug_sink
 
     @contextmanager
     def capture_stdio(self, label: str, *, phase: str | None = None):

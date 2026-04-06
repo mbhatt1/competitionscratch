@@ -660,6 +660,23 @@ class TestFileSystemTools:
         assert ok is False
         assert err == "path_escape"
 
+    def test_fs_write_rejects_sibling_prefix_escape(self, tools):
+        """Test that sibling directories with a matching prefix are still outside the sandbox root."""
+        sibling_root = tools.filesystem_root.parent / f"{tools.filesystem_root.name}_escape"
+
+        ok, output, err = tools.call(
+            "fs.write",
+            {
+                "path": f"../{sibling_root.name}/poc.txt",
+                "content": "escaped",
+            },
+        )
+
+        assert ok is False
+        assert output == ""
+        assert err == "path_escape"
+        assert not sibling_root.exists()
+
     def test_fs_write_sets_source(self, tools):
         """Test that fs.write sets source to 'file'."""
         tools.call("fs.write", {"path": "test.txt", "content": "test"})

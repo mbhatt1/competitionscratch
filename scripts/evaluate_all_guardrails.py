@@ -175,7 +175,7 @@ def merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
 
 
 def effective_attack_budget(eval_budget_s: float) -> float:
-    return max(10.0, eval_budget_s * 0.7)
+    return max(1.0, eval_budget_s * 0.7)
 
 
 def test_guardrail(
@@ -186,7 +186,7 @@ def test_guardrail(
     agent_selection: AgentSelection,
     env_selection: EnvSelection,
 ) -> dict[str, Any]:
-    """Test a guardrail against baseline attacker across one or more seeds."""
+    """Test a guardrail against the guardrail challenge generator across one or more seeds."""
     md_print(f"\n### Testing: **{name}**")
     md_print()
     md_print(f"[INFO] Agent selection: {format_agent_selection(agent_selection)}")
@@ -197,8 +197,8 @@ def test_guardrail(
 
     md_print(f"- **Evaluation budget per run:** {eval_budget_s:.1f}s")
     md_print(
-        f"- **Effective attacker budget per run:** {effective_budget_s:.1f}s "
-        "(max(10, budget_s*0.7))"
+        f"- **Effective guardrail challenge budget per run:** {effective_budget_s:.1f}s "
+        "(max(1, budget_s*0.7))"
     )
     md_print(f"- **Seeds:** {', '.join(str(seed) for seed in seeds)}")
     agent_factory = build_agent_factory(agent_selection)
@@ -219,7 +219,7 @@ def test_guardrail(
                 eval_budget_s,
                 agent_factory=agent_factory,
                 env_selection=env_selection,
-                attack_seed=seed,
+                guardrail_challenge_env_seed=seed,
                 benign_seed=seed + BENIGN_SEED_OFFSET,
             )
 
@@ -317,7 +317,7 @@ def main() -> None:
     md_print()
     md_print("## Test Configuration")
     md_print()
-    md_print("- **Evaluation Type:** Defense (baseline attack vs. user guardrails)")
+    md_print("- **Evaluation Type:** Defense (guardrail challenge vs. user guardrails)")
     md_print("- **Attacker:** Go-Explore baseline")
     md_print(f"- **Agent:** {format_agent_selection(agent_selection)}")
     md_print(f"- **Env:** {env_selection.value}")

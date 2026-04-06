@@ -62,6 +62,13 @@ def _format_attack_metadata(attack: AttackExecution) -> dict[str, Any]:
     }
 
 
+def _format_defense_metadata(defense: DefenseExecution) -> dict[str, Any]:
+    return {
+        "defense_hook_id": defense.hook_id,
+        "defense_hook_version": defense.hook_version,
+    }
+
+
 def _format_defense_payload(
     defense: DefenseExecution,
     *,
@@ -139,10 +146,10 @@ def _build_evaluate_report(execution: EvaluationExecution) -> dict[str, Any]:
                 include_time_taken=False,
             ),
             "final_score": execution.final_score,
-            "attack_seed": 123,
+            "attack_env_seed": attack.env_seed,
             **_format_attack_metadata(attack),
             "budget_s": execution.budget_plan.attack_budget_s,
-            "agent_selection": execution.agent_selection.value,
+            "agent_selection": execution.agent.label,
             "env_selection": execution.env_selection.value,
             "run_id": execution.run_id,
             "scoring_mode": "normalized",
@@ -159,8 +166,9 @@ def _build_evaluate_report(execution: EvaluationExecution) -> dict[str, Any]:
                 include_time_taken=False,
             ),
             "final_score": execution.final_score,
+            **_format_defense_metadata(defense),
             "budget_s": execution.budget_plan.defense_budget_s,
-            "agent_selection": execution.agent_selection.value,
+            "agent_selection": execution.agent.label,
             "env_selection": execution.env_selection.value,
             "run_id": execution.run_id,
             "submission_type": "guardrail_only",
@@ -182,8 +190,9 @@ def _build_evaluate_report(execution: EvaluationExecution) -> dict[str, Any]:
             include_time_taken=False,
         ),
         **_format_attack_metadata(attack),
+        **_format_defense_metadata(defense),
         "budget_s": execution.budget_plan.total_budget_s,
-        "agent_selection": execution.agent_selection.value,
+        "agent_selection": execution.agent.label,
         "env_selection": execution.env_selection.value,
         "run_id": execution.run_id,
         "scoring_mode": execution.scoring_mode,
@@ -206,7 +215,7 @@ def _build_test_report(execution: EvaluationExecution) -> dict[str, Any]:
             **_format_attack_metadata(attack),
             "submission_type": "attack_only",
             "scoring_mode": "normalized",
-            "agent_selection": execution.agent_selection.value,
+            "agent_selection": execution.agent.label,
             "env_selection": execution.env_selection.value,
             "run_id": execution.run_id,
         }
@@ -222,8 +231,9 @@ def _build_test_report(execution: EvaluationExecution) -> dict[str, Any]:
                 include_time_taken=True,
             ),
             "final_score": execution.final_score,
+            **_format_defense_metadata(defense),
             "submission_type": "guardrail_only",
-            "agent_selection": execution.agent_selection.value,
+            "agent_selection": execution.agent.label,
             "env_selection": execution.env_selection.value,
             "run_id": execution.run_id,
         }
@@ -244,9 +254,10 @@ def _build_test_report(execution: EvaluationExecution) -> dict[str, Any]:
         ),
         "final_score": execution.final_score,
         **_format_attack_metadata(attack),
+        **_format_defense_metadata(defense),
         "scoring_mode": execution.scoring_mode,
         "submission_type": "dual_track",
-        "agent_selection": execution.agent_selection.value,
+        "agent_selection": execution.agent.label,
         "env_selection": execution.env_selection.value,
         "run_id": execution.run_id,
     }

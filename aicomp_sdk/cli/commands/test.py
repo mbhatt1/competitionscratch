@@ -12,7 +12,6 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, cast
 
-import aicomp_sdk.evaluation.runner as evaluation_runner
 import aicomp_sdk.evaluation.submissions as evaluation_submissions
 from aicomp_sdk.agents import (
     AgentFactory,
@@ -22,20 +21,32 @@ from aicomp_sdk.agents import (
 from aicomp_sdk.cli.commands.options import add_shared_execution_arguments
 from aicomp_sdk.core.env.api import EnvSelection, coerce_env_selection
 from aicomp_sdk.evaluation.budget_policy import (
-    DEFAULT_CLI_TOTAL_BUDGET_S,
+    DEFAULT_ATTACK_BUDGET_S,
+    DEFAULT_DEFENSE_BUDGET_S,
+    DEFAULT_DUAL_TOTAL_BUDGET_S,
 )
-from aicomp_sdk.evaluation.budget_policy import resolve_budget_plan as _resolve_budget_plan
+from aicomp_sdk.evaluation.budget_policy import (
+    resolve_standalone_budget_plan as _resolve_budget_plan,
+)
 from aicomp_sdk.evaluation.diagnostics import (
     EvaluatorVerbosity,
     RunDiagnostics,
     coerce_evaluator_verbosity,
+)
+from aicomp_sdk.evaluation.ops import (
+    AttackGuardrailSpec,
+    DefenseHookSpec,
+    resolve_attack_guardrail_spec,
+    resolve_defense_hook_spec,
 )
 from aicomp_sdk.evaluation.reports import ReportProfile, build_evaluation_report
 from aicomp_sdk.evaluation.runner import (
     AttackExecution,
     DefenseExecution,
     EvaluationExecution,
-    execute_evaluation,
+    evaluate_defense,
+    evaluate_dual,
+    evaluate_redteam,
 )
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
 
@@ -67,8 +78,13 @@ def save_results(run_name: str, results: dict[str, Any]) -> Path:
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     add_shared_execution_arguments(
         parser,
-        budget_default=DEFAULT_CLI_TOTAL_BUDGET_S,
-        budget_help=f"Total evaluation budget in seconds (default: {DEFAULT_CLI_TOTAL_BUDGET_S:.0f})",
+        budget_default=None,
+        budget_help=(
+            "Total evaluation budget in seconds. Defaults to "
+            f"{DEFAULT_ATTACK_BUDGET_S:.0f} for redteam, "
+            f"{DEFAULT_DEFENSE_BUDGET_S:.0f} for defense, and "
+            f"{DEFAULT_DUAL_TOTAL_BUDGET_S:.0f} for dual."
+        ),
         agent_help="Blue-agent selection policy for evaluation runs (default: auto)",
         env_help="Attack environment selection. Defaults to sandbox; pass --env gym explicitly.",
         fixtures_help=(
@@ -221,49 +237,74 @@ def _run_evaluation_with_progress(
     track: EvaluationTrack,
     attack_cls,
     guardrail_cls,
-    attack_budget_s: float,
-    defense_budget_s: float,
+    budget_s: float | None,
     agent_selection: AgentSelection,
     env_selection: EnvSelection,
     fixtures_dir: Path | None = None,
     verbosity: EvaluatorVerbosity = EvaluatorVerbosity.SUMMARY,
     transcript_file: Path | None = None,
     event_log_file: Path | None = None,
-    agent_debug_jsonl: Path | None = None,
+    agent_debug_file: Path | None = None,
     agent_factory: AgentFactory | None = None,
+    attack_guardrail_spec: AttackGuardrailSpec | None = None,
+    defense_hook_spec: DefenseHookSpec | None = None,
 ) -> dict[str, Any]:
+    budget_plan = _resolve_budget_plan(
+        track,
+        total_budget_s=budget_s,
+    )
     with RunDiagnostics(
         verbosity,
         transcript_file=transcript_file,
         event_log_file=event_log_file,
+        agent_debug_file=agent_debug_file,
     ) as output_controller:
-        resolved_agent_factory = evaluation_runner.resolve_agent_factory(
-            agent_selection,
-            agent_debug_jsonl=agent_debug_jsonl,
-            output_controller=output_controller,
-            agent_factory=agent_factory,
-        )
         _print_progress_start(
             track,
-            attack_budget_s=attack_budget_s,
-            defense_budget_s=defense_budget_s,
+            attack_budget_s=budget_plan.attack_budget_s,
+            defense_budget_s=budget_plan.defense_budget_s,
         )
-        execution = execute_evaluation(
-            track=track,
-            budget_plan=_resolve_budget_plan(
-                track,
-                total_budget_s=attack_budget_s + defense_budget_s,
-            ),
-            agent_selection=agent_selection,
-            env_selection=env_selection,
-            output_controller=output_controller,
-            attack_cls=attack_cls,
-            guardrail_cls=guardrail_cls,
-            fixtures_dir=fixtures_dir,
-            agent_debug_jsonl=agent_debug_jsonl,
-            agent_factory=resolved_agent_factory,
-            event_style="test",
-        )
+        if track is EvaluationTrack.REDTEAM:
+            if attack_cls is None:
+                raise RuntimeError("Red-team evaluation requires AttackAlgorithm")
+            execution = evaluate_redteam(
+                attack_cls,
+                budget_s=budget_plan.total_budget_s,
+                agent_selection=agent_selection,
+                agent_factory=agent_factory,
+                env_selection=env_selection,
+                fixtures_dir=fixtures_dir,
+                attack_guardrail_spec=attack_guardrail_spec,
+                diagnostics=output_controller,
+            )
+        elif track is EvaluationTrack.DEFENSE:
+            if guardrail_cls is None:
+                raise RuntimeError("Defense evaluation requires Guardrail")
+            execution = evaluate_defense(
+                guardrail_cls,
+                budget_s=budget_plan.total_budget_s,
+                agent_selection=agent_selection,
+                agent_factory=agent_factory,
+                env_selection=env_selection,
+                fixtures_dir=fixtures_dir,
+                defense_hook_spec=defense_hook_spec,
+                diagnostics=output_controller,
+            )
+        else:
+            if attack_cls is None or guardrail_cls is None:
+                raise RuntimeError("Dual-track evaluation requires AttackAlgorithm and Guardrail")
+            execution = evaluate_dual(
+                attack_cls,
+                guardrail_cls,
+                budget_s=budget_plan.total_budget_s,
+                agent_selection=agent_selection,
+                agent_factory=agent_factory,
+                env_selection=env_selection,
+                fixtures_dir=fixtures_dir,
+                attack_guardrail_spec=attack_guardrail_spec,
+                defense_hook_spec=defense_hook_spec,
+                diagnostics=output_controller,
+            )
 
     _print_progress_complete(execution)
     return build_evaluation_report(execution, profile=ReportProfile.TEST)
@@ -271,7 +312,7 @@ def _run_evaluation_with_progress(
 
 def run_redteam_evaluation_with_progress(
     attack_cls,
-    attack_budget_s: float,
+    budget_s: float,
     agent_selection: AgentSelection,
     env_selection: EnvSelection,
     fixtures_dir: Path | None = None,
@@ -279,7 +320,7 @@ def run_redteam_evaluation_with_progress(
     verbosity: EvaluatorVerbosity = EvaluatorVerbosity.SUMMARY,
     transcript_file: Path | None = None,
     event_log_file: Path | None = None,
-    agent_debug_jsonl: Path | None = None,
+    agent_debug_file: Path | None = None,
     agent_factory: AgentFactory | None = None,
 ) -> dict[str, Any]:
     """Run the attack-only Kaggle-style evaluation."""
@@ -287,22 +328,21 @@ def run_redteam_evaluation_with_progress(
         track=EvaluationTrack.REDTEAM,
         attack_cls=attack_cls,
         guardrail_cls=None,
-        attack_budget_s=attack_budget_s,
-        defense_budget_s=0.0,
+        budget_s=budget_s,
         agent_selection=agent_selection,
         env_selection=env_selection,
         fixtures_dir=fixtures_dir,
         verbosity=verbosity,
         transcript_file=transcript_file,
         event_log_file=event_log_file,
-        agent_debug_jsonl=agent_debug_jsonl,
+        agent_debug_file=agent_debug_file,
         agent_factory=agent_factory,
     )
 
 
 def run_defense_evaluation_with_progress(
     guardrail_cls,
-    defense_budget_s: float,
+    budget_s: float,
     agent_selection: AgentSelection,
     env_selection: EnvSelection,
     fixtures_dir: Path | None = None,
@@ -310,7 +350,7 @@ def run_defense_evaluation_with_progress(
     verbosity: EvaluatorVerbosity = EvaluatorVerbosity.SUMMARY,
     transcript_file: Path | None = None,
     event_log_file: Path | None = None,
-    agent_debug_jsonl: Path | None = None,
+    agent_debug_file: Path | None = None,
     agent_factory: AgentFactory | None = None,
 ) -> dict[str, Any]:
     """Run the local-only defense helper track."""
@@ -318,15 +358,14 @@ def run_defense_evaluation_with_progress(
         track=EvaluationTrack.DEFENSE,
         attack_cls=None,
         guardrail_cls=guardrail_cls,
-        attack_budget_s=0.0,
-        defense_budget_s=defense_budget_s,
+        budget_s=budget_s,
         agent_selection=agent_selection,
         env_selection=env_selection,
         fixtures_dir=fixtures_dir,
         verbosity=verbosity,
         transcript_file=transcript_file,
         event_log_file=event_log_file,
-        agent_debug_jsonl=agent_debug_jsonl,
+        agent_debug_file=agent_debug_file,
         agent_factory=agent_factory,
     )
 
@@ -334,8 +373,7 @@ def run_defense_evaluation_with_progress(
 def run_dual_evaluation_with_progress(
     attack_cls,
     guardrail_cls,
-    attack_budget_s: float,
-    defense_budget_s: float,
+    budget_s: float,
     agent_selection: AgentSelection,
     env_selection: EnvSelection,
     fixtures_dir: Path | None = None,
@@ -343,23 +381,22 @@ def run_dual_evaluation_with_progress(
     verbosity: EvaluatorVerbosity = EvaluatorVerbosity.SUMMARY,
     transcript_file: Path | None = None,
     event_log_file: Path | None = None,
-    agent_debug_jsonl: Path | None = None,
+    agent_debug_file: Path | None = None,
     agent_factory: AgentFactory | None = None,
 ) -> dict[str, Any]:
-    """Run the legacy local dual-track evaluation."""
+    """Run the local dual-track evaluation."""
     return _run_evaluation_with_progress(
         track=EvaluationTrack.DUAL,
         attack_cls=attack_cls,
         guardrail_cls=guardrail_cls,
-        attack_budget_s=attack_budget_s,
-        defense_budget_s=defense_budget_s,
+        budget_s=budget_s,
         agent_selection=agent_selection,
         env_selection=env_selection,
         fixtures_dir=fixtures_dir,
         verbosity=verbosity,
         transcript_file=transcript_file,
         event_log_file=event_log_file,
-        agent_debug_jsonl=agent_debug_jsonl,
+        agent_debug_file=agent_debug_file,
         agent_factory=agent_factory,
     )
 
@@ -398,7 +435,7 @@ def _render_summary(results: dict[str, Any]) -> None:
     defense = results["defense"]
     final = results["final_score"]
 
-    print("Track:          Dual (Legacy Local)")
+    print("Track:          Dual")
     print(f"Attack Score:   {attack['score']:.2f}")
     print(f"  - Findings: {attack['findings_count']}")
     print(f"  - Unique cells: {attack['unique_cells']}")
@@ -428,8 +465,6 @@ def run_test(args) -> int:
         print_error(f"Submission not found: {submission_path}")
         return 1
 
-    total_budget_s = args.budget_s
-
     track = EvaluationTrack(args.track)
     agent_selection = coerce_agent_selection(args.agent)
     raw_verbosity = args.verbosity
@@ -446,10 +481,10 @@ def run_test(args) -> int:
     event_log_file = (
         Path(args.event_log_file).expanduser().resolve() if args.event_log_file else None
     )
-    agent_debug_jsonl = (
+    agent_debug_file = (
         Path(args.agent_debug_jsonl).expanduser().resolve() if args.agent_debug_jsonl else None
     )
-    budget_plan = _resolve_budget_plan(track, total_budget_s=total_budget_s)
+    budget_plan = _resolve_budget_plan(track, total_budget_s=args.budget_s)
     attack_budget_s = budget_plan.attack_budget_s
     defense_budget_s = budget_plan.defense_budget_s
 
@@ -459,8 +494,8 @@ def run_test(args) -> int:
     print_info(f"Env selection: {env_selection}")
     if fixtures_dir is not None:
         print_info(f"Using fixtures override: {fixtures_dir}")
-    if agent_debug_jsonl is not None:
-        print_info(f"Agent debug JSONL: {agent_debug_jsonl}")
+    if agent_debug_file is not None:
+        print_info(f"Agent debug JSONL: {agent_debug_file}")
     if transcript_file is not None:
         print_info(f"Evaluator transcript: {transcript_file}")
     if event_log_file is not None:
@@ -475,6 +510,13 @@ def run_test(args) -> int:
     print()
 
     try:
+        attack_guardrail_spec = None
+        defense_hook_spec = None
+        if track is EvaluationTrack.REDTEAM or track is EvaluationTrack.DUAL:
+            attack_guardrail_spec = resolve_attack_guardrail_spec()
+        if track is EvaluationTrack.DEFENSE or track is EvaluationTrack.DUAL:
+            defense_hook_spec = resolve_defense_hook_spec()
+
         with ExitStack() as stack:
             attack_cls, guardrail_cls = evaluation_submissions.load_track_modules(
                 stack, submission_path, track
@@ -494,15 +536,16 @@ def run_test(args) -> int:
                 track=track,
                 attack_cls=attack_cls,
                 guardrail_cls=guardrail_cls,
-                attack_budget_s=attack_budget_s,
-                defense_budget_s=defense_budget_s,
+                budget_s=budget_plan.total_budget_s,
                 agent_selection=agent_selection,
                 env_selection=env_selection,
                 fixtures_dir=fixtures_dir,
                 verbosity=verbosity,
                 transcript_file=transcript_file,
                 event_log_file=event_log_file,
-                agent_debug_jsonl=agent_debug_jsonl,
+                agent_debug_file=agent_debug_file,
+                attack_guardrail_spec=attack_guardrail_spec,
+                defense_hook_spec=defense_hook_spec,
             )
     except Exception as e:
         print_error(f"Evaluation failed: {e}")

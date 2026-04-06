@@ -1,4 +1,10 @@
-"""Agent implementations for AI competition."""
+"""Extension-facing agent backend namespace.
+
+Import ``AgentSelection`` and ``build_agent_factory`` for SDK-managed backends.
+Import ``AgentProtocol`` and the debug sink types when adding a custom backend.
+Backend-specific classes and parser helpers are exported here for extension
+authors, not as the high-level evaluation API.
+"""
 
 from .debug import (
     AgentDebugEvent,
