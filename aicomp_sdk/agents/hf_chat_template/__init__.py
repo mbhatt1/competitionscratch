@@ -1,5 +1,6 @@
 from .hf_agent import HFChatTemplateAgent
 from .hf_backend import HFChatTemplateBackend
+from .hf_processor_backend import HFProcessorChatTemplateBackend
 from .hf_response_parsing import (
     JsonEnvelopeToolCallParser,
     TokenizerNativeResponseParser,
@@ -21,6 +22,7 @@ __all__ = [
     "HFBackendConfig",
     "HFChatTemplateAgent",
     "HFChatTemplateBackend",
+    "HFProcessorChatTemplateBackend",
     "HFGenerationBackendProtocol",
     "HFGenerationRequest",
     "HFGenerationResponse",

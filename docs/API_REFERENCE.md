@@ -255,13 +255,22 @@ Current agent selections:
 | `deterministic` | local vulnerable baseline agent |
 | `openai` | OpenAI Responses-backed agent |
 | `gpt_oss` | local GPT-OSS backend |
-| `gemma` | local Gemma backend |
+| `gemma` | local prompt-driven Gemma 3 HF chat-template backend |
+| `gemma_4` | local Gemma 4 native tool-call backend for `google/gemma-4-26B-A4B-it` |
 
 `aicomp_sdk.agents` is an extension-facing namespace. Use `AgentSelection` and
 `build_agent_factory(...)` for SDK-managed backends. Use `AgentProtocol` and the
 debug sink types when adding a custom backend. Backend-specific classes and parser
 helpers are exported there for backend authors rather than as the high-level
 evaluation API.
+
+Gemma 4 support is explicit rather than part of `auto`: use `--agent gemma_4`
+or `AgentSelection.GEMMA_4` after installing a recent Transformers release and
+making the model available locally. Configure the model source with
+`GEMMA4_MODEL_PATH` or `GEMMA4_MODEL_ID`, or pass explicit values to
+`build_gemma4_backend_config(...)`. It uses Gemma 4's native chat-template tool
+declarations, but the SDK sandbox still owns tool allowlisting, guardrail checks,
+hook fixtures, and tool execution.
 
 Current canonical tools:
 

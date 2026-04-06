@@ -7,6 +7,7 @@ from typing import Final
 
 from .debug import AgentDebugSink
 from .deterministic_agent import VulnerableDeterministicAgent
+from .gemma4_agent import Gemma4Agent, build_gemma4_backend
 from .gemma_agent import GemmaAgent, build_gemma_backend
 from .gpt_oss_agent import GPTOSSAgent, build_gpt_oss_backend
 from .openai_agent import OpenAIResponsesAgent
@@ -19,6 +20,7 @@ class AgentSelection(StrEnum):
     OPENAI = "openai"
     GPT_OSS = "gpt_oss"
     GEMMA = "gemma"
+    GEMMA_4 = "gemma_4"
 
 
 AgentFactory = Callable[[], AgentProtocol]
@@ -95,6 +97,8 @@ def format_agent_selection(selection: AgentSelection) -> str:
         return "Local GPT-OSS agent (forced)"
     if selection is AgentSelection.GEMMA:
         return "Local Gemma HF chat-template agent (forced)"
+    if selection is AgentSelection.GEMMA_4:
+        return "Local Gemma 4 native tool-call agent (forced)"
     return "Auto selection (gpt-oss -> OpenAI if key -> deterministic)"
 
 
@@ -107,6 +111,9 @@ def require_agent_selection_configuration(selection: AgentSelection) -> None:
         return
     if selection is AgentSelection.GEMMA:
         build_gemma_backend()
+        return
+    if selection is AgentSelection.GEMMA_4:
+        build_gemma4_backend()
 
 
 def build_agent_factory(
@@ -126,12 +133,16 @@ def build_agent_factory(
         return lambda: _create_openai_agent(api_key, resolved_verbose, debug_sink)
 
     if resolved_selection is AgentSelection.GPT_OSS:
-        backend = build_gpt_oss_backend()
-        return lambda: GPTOSSAgent(backend, debug_sink=debug_sink)
+        gpt_oss_backend = build_gpt_oss_backend()
+        return lambda: GPTOSSAgent(gpt_oss_backend, debug_sink=debug_sink)
 
     if resolved_selection is AgentSelection.GEMMA:
-        backend = build_gemma_backend()
-        return lambda: GemmaAgent(backend, debug_sink=debug_sink)
+        gemma_backend = build_gemma_backend()
+        return lambda: GemmaAgent(gemma_backend, debug_sink=debug_sink)
+
+    if resolved_selection is AgentSelection.GEMMA_4:
+        gemma4_backend = build_gemma4_backend()
+        return lambda: Gemma4Agent(gemma4_backend, debug_sink=debug_sink)
 
     return _resolve_auto_factory(resolved_verbose, debug_sink)
 

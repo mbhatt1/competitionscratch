@@ -39,7 +39,7 @@ features:
 
   - icon: 🤖
     title: Pluggable Blue Agents
-    details: Run against `deterministic`, `gpt_oss`, `openai`, or `gemma` backends. Auto mode prefers GPT-OSS, then OpenAI if configured, then deterministic.
+    details: Run against `deterministic`, `gpt_oss`, `openai`, `gemma`, or explicit `gemma_4` backends. Auto mode prefers GPT-OSS, then OpenAI if configured, then deterministic.
 ---
 
 ## Choose Your Workflow
