@@ -15,6 +15,12 @@ from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunCo
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env.api import MAX_USER_MESSAGE_CHARS, EnvInteractionResult
 from aicomp_sdk.guardrails.base import GuardrailBase
+from aicomp_sdk.hooks import (
+    HookContext,
+    HookRegistry,
+    HookResult,
+    HookStage,
+)
 
 
 class _FakeSandboxEnv:
@@ -36,7 +42,9 @@ class _FakeSandboxEnv:
         self._messages = []
 
     def interact(self, user_message: str, max_tool_hops: int | None = None) -> EnvInteractionResult:
-        resolved_max_tool_hops = self.default_max_tool_hops if max_tool_hops is None else max_tool_hops
+        resolved_max_tool_hops = (
+            self.default_max_tool_hops if max_tool_hops is None else max_tool_hops
+        )
         self.interaction_hops.append(resolved_max_tool_hops)
         self._messages.append(user_message)
         return EnvInteractionResult(
@@ -251,6 +259,51 @@ def test_eval_attack_builds_fresh_env_for_run_and_each_replay(monkeypatch) -> No
     assert len({id(env) for env in build_calls}) == 3
 
 
+@pytest.mark.parametrize("env_selection", ["sandbox", "gym"])
+def test_eval_attack_builds_fresh_default_hook_registries_for_generation_and_replay(
+    monkeypatch: pytest.MonkeyPatch,
+    env_selection: str,
+) -> None:
+    built_registries: list[HookRegistry] = []
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeSandboxEnv:
+        built_registries.append(kwargs["hook_registry"])
+        return _FakeSandboxEnv(
+            seed=kwargs["seed"],
+            fixtures_dir=kwargs["fixtures_dir"],
+            guardrail=kwargs["guardrail"],
+            max_tool_hops=kwargs.get("max_tool_hops", 8),
+        )
+
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+    monkeypatch.setattr(
+        evaluation_core,
+        "eval_predicates",
+        lambda trace: [{"predicate": "EXFILTRATION", "severity": 5}],
+    )
+
+    class ReadReadmeAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del config
+            env.reset()
+            env.interact("read file readme.txt")
+            trace = env.export_trace_dict()
+            return [AttackCandidate(user_messages=tuple(trace.get("user_messages", [])))]
+
+    findings = evaluation_core.eval_attack(
+        ReadReadmeAttack,
+        10.0,
+        build_agent_factory("deterministic"),
+        env_selection=env_selection,
+    )
+
+    assert len(findings) == 1
+    assert findings[0]["user_messages"] == ["read file readme.txt"]
+    assert len(built_registries) == 2
+    assert all(isinstance(registry, HookRegistry) for registry in built_registries)
+    assert len({id(registry) for registry in built_registries}) == 2
+
+
 def test_eval_attack_enforces_replay_candidate_limit(_patch_eval) -> None:
     class ManyCandidatesAttack(AttackAlgorithmBase):
         def run(self, env, config):  # noqa: ANN001
@@ -424,7 +477,7 @@ def test_eval_attack_applies_attack_eval_options(monkeypatch: pytest.MonkeyPatch
     options = evaluation_core.AttackEvalOptions(
         run_config=AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5),
         attack_config={"max_turns": 6, "branch_batch": 8},
-        seed=42,
+        env_seed=42,
         guardrail_factory=fake_guardrail_factory,
     )
 
@@ -440,6 +493,8 @@ def test_eval_attack_applies_attack_eval_options(monkeypatch: pytest.MonkeyPatch
     assert [call["seed"] for call in build_calls] == [42, 42]
     assert [call["max_tool_hops"] for call in build_calls] == [5, 5]
     assert [call["guardrail"] for call in build_calls] == guardrail_instances
+    assert all(isinstance(call["hook_registry"], HookRegistry) for call in build_calls)
+    assert len({id(call["hook_registry"]) for call in build_calls}) == 2
 
 
 def test_eval_attack_prefers_explicit_options_over_env_guardrail_override(

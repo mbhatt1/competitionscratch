@@ -1,5 +1,4 @@
 from __future__ import annotations
-# mypy: disable-error-code="unused-ignore,attr-defined"
 
 import json
 import sys
@@ -20,6 +19,8 @@ from aicomp_sdk.evaluation.budget_policy import (
     DEFAULT_DEFENSE_BUDGET_S,
 )
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
+
+# mypy: disable-error-code="unused-ignore,attr-defined"
 
 
 class _StubAttackAlgorithm(AttackAlgorithmBase):
@@ -92,7 +93,7 @@ def test_dual_evaluator_passes_fixtures_override(tmp_path, monkeypatch) -> None:
         budget_s,
         agent_factory,
         env_selection,
-        attack_seed=123,
+        attack_env_seed=123,
         fixtures_dir=None,
         output_controller=None,
         *,
@@ -110,7 +111,7 @@ def test_dual_evaluator_passes_fixtures_override(tmp_path, monkeypatch) -> None:
         budget_s,
         agent_factory=None,
         env_selection=None,
-        attack_seed=123,
+        guardrail_challenge_env_seed=123,
         benign_seed=999,
         fixtures_dir=None,
         output_controller=None,
@@ -178,13 +179,21 @@ def test_dual_evaluator_passes_explicit_env_selection(tmp_path, monkeypatch) -> 
         budget_s,
         agent_factory,
         env_selection,
-        attack_seed=123,
+        attack_env_seed=123,
         fixtures_dir=None,
         output_controller=None,
         *,
         options=None,
     ):  # type: ignore[no-untyped-def]
-        del attack_cls, budget_s, agent_factory, attack_seed, fixtures_dir, output_controller, options
+        del (
+            attack_cls,
+            budget_s,
+            agent_factory,
+            attack_env_seed,
+            fixtures_dir,
+            output_controller,
+            options,
+        )
         captured["attack_env_selection"] = env_selection
         return []
 
@@ -193,7 +202,7 @@ def test_dual_evaluator_passes_explicit_env_selection(tmp_path, monkeypatch) -> 
         budget_s,
         agent_factory=None,
         env_selection=None,
-        attack_seed=123,
+        guardrail_challenge_env_seed=123,
         benign_seed=999,
         fixtures_dir=None,
         output_controller=None,
@@ -204,7 +213,7 @@ def test_dual_evaluator_passes_explicit_env_selection(tmp_path, monkeypatch) -> 
             guardrail_cls,
             budget_s,
             agent_factory,
-            attack_seed,
+            guardrail_challenge_env_seed,
             benign_seed,
             fixtures_dir,
             output_controller,
@@ -346,8 +355,7 @@ def test_dual_evaluator_writes_balanced_framework_phase_events(
     _run_evaluate_cli()
 
     framework_events = [
-        json.loads(line)
-        for line in framework_events_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in framework_events_path.read_text(encoding="utf-8").splitlines()
     ]
     assert [event["event"] for event in framework_events] == [
         "phase_start",

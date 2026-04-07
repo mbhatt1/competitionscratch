@@ -55,10 +55,6 @@ class EnvRunDiagnostics:
         self.agent_refusals += int(result.agent_refused)
 
 
-# Backward-compatible alias for the pre-stabilization public name.
-RunDiagnostics = EnvRunDiagnostics
-
-
 @runtime_checkable
 class AttackEnvProtocol(Protocol):
     """Runtime protocol exposed to attack submissions during evaluator runs."""

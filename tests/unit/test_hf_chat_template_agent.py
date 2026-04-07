@@ -1,5 +1,4 @@
 from __future__ import annotations
-# mypy: disable-error-code="arg-type"
 
 import sys
 from types import SimpleNamespace
@@ -10,6 +9,9 @@ import pytest
 from aicomp_sdk.agents.debug import InMemoryAgentDebugSink
 from aicomp_sdk.agents.hf_chat_template.hf_agent import HFChatTemplateAgent
 from aicomp_sdk.agents.hf_chat_template.hf_backend import HFChatTemplateBackend
+from aicomp_sdk.agents.hf_chat_template.hf_processor_backend import (
+    HFProcessorChatTemplateBackend,
+)
 from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
     JsonEnvelopeToolCallParser,
     TokenizerNativeResponseParser,
@@ -34,6 +36,8 @@ from aicomp_sdk.agents.types import (
     ToolResult,
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
+
+# mypy: disable-error-code="arg-type"
 
 
 def _backend_config(
@@ -222,6 +226,47 @@ def test_hf_backend_from_pretrained_uses_config_kwargs(
     )
 
 
+def test_hf_processor_backend_from_pretrained_uses_config_kwargs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_processor = Mock()
+    mock_model = Mock()
+    processor_factory = Mock(return_value=mock_processor)
+    model_factory = Mock(return_value=mock_model)
+    fake_module = SimpleNamespace(
+        AutoProcessor=SimpleNamespace(from_pretrained=processor_factory),
+        AutoModelForMultimodalLM=SimpleNamespace(from_pretrained=model_factory),
+    )
+    monkeypatch.setitem(sys.modules, "transformers", fake_module)
+    config = _backend_config(
+        model_path="/models/gemma4",
+        tokenizer_kwargs={"padding_side": "left"},
+        model_kwargs={"revision": "main"},
+        trust_remote_code=True,
+        attn_implementation="flash_attention_2",
+    )
+
+    backend = HFProcessorChatTemplateBackend.from_pretrained(config)
+
+    assert backend.config == config
+    assert backend.processor is mock_processor
+    processor_factory.assert_called_once_with(
+        "/models/gemma4",
+        local_files_only=True,
+        padding_side="left",
+        trust_remote_code=True,
+    )
+    model_factory.assert_called_once_with(
+        "/models/gemma4",
+        dtype="auto",
+        device_map="auto",
+        local_files_only=True,
+        revision="main",
+        trust_remote_code=True,
+        attn_implementation="flash_attention_2",
+    )
+
+
 def test_hf_backend_generate_forwards_request_and_decodes_suffix() -> None:
     mock_tokenizer = Mock()
     mock_model = Mock()
@@ -273,6 +318,66 @@ def test_hf_backend_generate_forwards_request_and_decodes_suffix() -> None:
         max_new_tokens=64,
     )
     assert mock_tokenizer.decode.call_args_list == [
+        call(
+            [4],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        ),
+        call(
+            [4],
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        ),
+    ]
+
+
+def test_hf_processor_backend_generate_forwards_request_and_decodes_suffix() -> None:
+    mock_processor = Mock()
+    mock_model = Mock()
+    mock_input_ids = Mock()
+    mock_input_ids.shape = [1, 3]
+    mock_inputs = Mock()
+    mock_inputs.to.return_value = {"input_ids": mock_input_ids}
+    mock_processor.apply_chat_template.return_value = "prompt"
+    mock_processor.return_value = mock_inputs
+    mock_model.device = "cpu"
+    mock_model.generate.return_value = [[1, 2, 3, 4]]
+    mock_processor.decode.side_effect = [
+        '<|tool_call>call:fs.read{path:<|"|>a.txt<|"|>}<tool_call|>',
+        "",
+    ]
+    backend = HFProcessorChatTemplateBackend(
+        processor=mock_processor,
+        model=mock_model,
+        config=_backend_config(model_id="google/gemma-4-26B-A4B-it"),
+    )
+    request = HFGenerationRequest(
+        messages=[{"role": "user", "content": "Read secret"}],
+        tools=[{"type": "function", "function": {"name": "fs.read"}}],
+        chat_template=None,
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=64,
+        generation_kwargs={"do_sample": False},
+    )
+
+    response = backend.generate(request)
+
+    assert response.raw_text == '<|tool_call>call:fs.read{path:<|"|>a.txt<|"|>}<tool_call|>'
+    assert response.text == ""
+    mock_processor.apply_chat_template.assert_called_once_with(
+        [{"role": "user", "content": "Read secret"}],
+        tools=[{"type": "function", "function": {"name": "fs.read"}}],
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    mock_processor.assert_called_once_with(text="prompt", return_tensors="pt")
+    mock_model.generate.assert_called_once_with(
+        input_ids=mock_input_ids,
+        do_sample=False,
+        max_new_tokens=64,
+    )
+    assert mock_processor.decode.call_args_list == [
         call(
             [4],
             skip_special_tokens=False,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -7,17 +8,19 @@ from typing import Any, cast
 import pytest
 
 import aicomp_sdk.evaluation.ops as evaluation_core
+import aicomp_sdk.evaluation.runner as evaluation_runner
 from aicomp_sdk import AttackAlgorithmBase, AttackCandidate, AttackRunConfig
-from aicomp_sdk.agents import AgentProtocol, build_agent_factory
-from aicomp_sdk.core.env.sandbox import SandboxEnv
+from aicomp_sdk.agents import AgentProtocol, AgentSelection, build_agent_factory
 from aicomp_sdk.core.env.api import (
     DEFAULT_MAX_TOOL_HOPS,
     AttackEnvProtocol,
-    coerce_env_selection,
     EnvInteractionResult,
     EnvSelection,
+    coerce_env_selection,
 )
+from aicomp_sdk.core.env.sandbox import SandboxEnv
 from aicomp_sdk.guardrails.base import GuardrailBase
+from aicomp_sdk.hooks import HookRegistry
 
 
 class _FakeGymEnv:
@@ -66,7 +69,7 @@ class _CountingGuardrail(GuardrailBase):
         type(self).init_calls += 1
 
 
-class _BaselineAttacker:
+class _GuardrailChallengeGenerator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
@@ -74,7 +77,7 @@ class _BaselineAttacker:
         return []
 
 
-class _SingleCandidateBaselineAttacker:
+class _SingleCandidateGuardrailChallengeGenerator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
@@ -96,13 +99,28 @@ class _HopSensitiveAttack(AttackAlgorithmBase):
         return [AttackCandidate.from_messages(user_messages)]
 
 
+class _FakeRunDiagnostics:
+    run_id = "test-run-id"
+
+    def phase(self, name: str) -> _FakeRunDiagnostics:
+        del name
+        return self
+
+    def capture_stdio(self, label: str) -> Any:
+        del label
+        return nullcontext()
+
+    def record_event(self, **kwargs: object) -> None:
+        del kwargs
+
+
 def _summarize_attack_for_env(env_selection: str) -> dict[str, Any]:
     findings = evaluation_core.eval_attack(
         _HopSensitiveAttack,
         1.0,
         agent_factory=build_agent_factory("deterministic"),
         env_selection=env_selection,
-        attack_seed=123,
+        attack_env_seed=123,
         fixtures_dir=evaluation_core.resolve_fixtures_dir(),
     )
     return evaluation_core.summarize_attack_findings(findings)
@@ -241,7 +259,9 @@ def test_build_attack_env_gym_failure_raises_without_fallback(tmp_path: Path, mo
 def test_eval_defense_uses_requested_env_selection_for_all_envs(monkeypatch) -> None:
     selections: list[str] = []
 
-    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _BaselineAttacker)
+    monkeypatch.setattr(
+        evaluation_core, "GuardrailChallengeGenerator", _GuardrailChallengeGenerator
+    )
     monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["safe one", "safe two"])
 
     def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
@@ -265,7 +285,11 @@ def test_eval_defense_uses_requested_env_selection_for_all_envs(monkeypatch) -> 
 def test_eval_defense_builds_fresh_env_for_replays_and_benign_trials(monkeypatch) -> None:
     env_instances: list[_FakeEvalEnv] = []
 
-    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _SingleCandidateBaselineAttacker)
+    monkeypatch.setattr(
+        evaluation_core,
+        "GuardrailChallengeGenerator",
+        _SingleCandidateGuardrailChallengeGenerator,
+    )
     monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["safe one", "safe two"])
     monkeypatch.setattr(
         evaluation_core,
@@ -301,7 +325,11 @@ def test_eval_defense_builds_fresh_guardrail_instances(monkeypatch) -> None:
     env_guardrails: list[object] = []
     _CountingGuardrail.init_calls = 0
 
-    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _SingleCandidateBaselineAttacker)
+    monkeypatch.setattr(
+        evaluation_core,
+        "GuardrailChallengeGenerator",
+        _SingleCandidateGuardrailChallengeGenerator,
+    )
     monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["safe one", "safe two"])
 
     def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
@@ -328,8 +356,9 @@ def test_eval_defense_applies_defense_run_options(monkeypatch) -> None:
     build_calls: list[dict[str, Any]] = []
     attacker_init_configs: list[dict[str, Any]] = []
     attacker_run_configs: list[AttackRunConfig] = []
+    hook_registry_instances: list[HookRegistry] = []
 
-    class _CapturingBaselineAttacker:
+    class _CapturingGuardrailChallengeGenerator:
         def __init__(self, config: dict[str, Any]) -> None:
             attacker_init_configs.append(dict(config))
 
@@ -341,16 +370,29 @@ def test_eval_defense_applies_defense_run_options(monkeypatch) -> None:
         build_calls.append(kwargs)
         return _FakeEvalEnv(seed=kwargs["seed"])
 
-    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _CapturingBaselineAttacker)
+    def fake_hook_registry_factory() -> HookRegistry:
+        registry = HookRegistry()
+        registry.set_persistent_state("factory_call", len(hook_registry_instances))
+        hook_registry_instances.append(registry)
+        return registry
+
+    monkeypatch.setattr(
+        evaluation_core,
+        "GuardrailChallengeGenerator",
+        _CapturingGuardrailChallengeGenerator,
+    )
     monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
     monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: ["default benign"])
 
     options = evaluation_core.DefenseRunOptions(
-        baseline_attack_config={"max_turns": 6, "branch_batch": 8},
-        baseline_run_config=AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5),
-        attack_seed=42,
+        guardrail_challenge_config={"max_turns": 6, "branch_batch": 8},
+        guardrail_challenge_run_config=AttackRunConfig(
+            time_budget_s=30.0, max_steps=100, max_tool_hops=5
+        ),
+        guardrail_challenge_env_seed=42,
         benign_seed=777,
         benign_prompts=["safe one", "safe two"],
+        hook_registry_factory=fake_hook_registry_factory,
     )
 
     report = evaluation_core.eval_defense(
@@ -366,13 +408,17 @@ def test_eval_defense_applies_defense_run_options(monkeypatch) -> None:
         AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5)
     ]
     assert [call["seed"] for call in build_calls] == [42, 42, 777, 777]
+    assert [call["hook_registry"] for call in build_calls] == hook_registry_instances
+    assert [
+        registry.get_persistent_state("factory_call") for registry in hook_registry_instances
+    ] == [0, 1, 2, 3]
     assert report["benign_trials"] == 2
 
 
 def test_eval_defense_defaults_to_legacy_baseline_tool_hops(monkeypatch) -> None:
     attacker_run_configs: list[AttackRunConfig] = []
 
-    class _CapturingBaselineAttacker:
+    class _CapturingGuardrailChallengeGenerator:
         def __init__(self, config: dict[str, Any]) -> None:
             del config
 
@@ -381,7 +427,11 @@ def test_eval_defense_defaults_to_legacy_baseline_tool_hops(monkeypatch) -> None
             attacker_run_configs.append(config)
             return []
 
-    monkeypatch.setattr(evaluation_core, "BaselineAttacker", _CapturingBaselineAttacker)
+    monkeypatch.setattr(
+        evaluation_core,
+        "GuardrailChallengeGenerator",
+        _CapturingGuardrailChallengeGenerator,
+    )
     monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: [])
     monkeypatch.setattr(
         evaluation_core,
@@ -407,6 +457,164 @@ def test_eval_defense_defaults_to_legacy_baseline_tool_hops(monkeypatch) -> None
     assert evaluation_core.EVALUATION_DEFAULT_MAX_TOOL_HOPS == 4
 
 
+def test_eval_defense_uses_harness_owned_hook_registries(monkeypatch) -> None:
+    hook_registries: list[HookRegistry | None] = []
+
+    class _ReadReadmeAttacker:
+        def __init__(self, config: dict[str, Any]) -> None:
+            self.config = dict(config)
+
+        def run(self, env: AttackEnvProtocol, config: AttackRunConfig) -> list[AttackCandidate]:
+            del config
+            env.reset()
+            env.interact("read file readme.txt")
+            trace = env.export_trace_dict()
+            return [AttackCandidate.from_messages(trace["user_messages"])]
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeEvalEnv:
+        hook_registries.append(kwargs.get("hook_registry"))
+        return _FakeEvalEnv(seed=kwargs["seed"])
+
+    monkeypatch.setattr(evaluation_core, "GuardrailChallengeGenerator", _ReadReadmeAttacker)
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+    monkeypatch.setattr(
+        evaluation_core,
+        "eval_predicates",
+        lambda trace: [{"predicate": "EXFILTRATION", "severity": 5}],
+    )
+    monkeypatch.setattr(evaluation_core, "_is_breach", lambda trace, predicates: True)
+    monkeypatch.setattr(evaluation_core, "_benign_suite", lambda: [])
+
+    report = evaluation_core.eval_defense(
+        GuardrailBase,
+        30.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+    )
+
+    assert report["breach_count"] == 1
+    assert len(hook_registries) == 2
+    assert all(isinstance(registry, HookRegistry) for registry in hook_registries)
+    assert len({id(registry) for registry in hook_registries}) == 2
+
+
+def test_resolve_defense_hook_spec_defaults_to_none_public(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, raising=False)
+
+    spec = evaluation_core.resolve_defense_hook_spec()
+
+    assert spec.id == evaluation_core.DEFAULT_DEFENSE_HOOK_ID
+    assert spec.hook_registry_factory is HookRegistry
+
+
+def test_resolve_defense_hook_spec_does_not_load_unselected_entry_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BrokenEntryPoint:
+        name = "broken_hooks"
+
+        def load(self) -> None:
+            raise RuntimeError("should not load")
+
+    monkeypatch.setattr(
+        evaluation_core,
+        "entry_points",
+        lambda *, group: (
+            [_BrokenEntryPoint()] if group == evaluation_core.DEFENSE_HOOK_ENTRY_POINT_GROUP else []
+        ),
+    )
+    monkeypatch.delenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, raising=False)
+
+    spec = evaluation_core.resolve_defense_hook_spec()
+
+    assert spec.id == evaluation_core.DEFAULT_DEFENSE_HOOK_ID
+    assert spec.hook_registry_factory is HookRegistry
+
+
+def test_resolve_defense_hook_spec_uses_registered_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def private_hook_registry_factory() -> HookRegistry:
+        return HookRegistry()
+
+    spec = evaluation_core.DefenseHookSpec(
+        id="private_hooks_test",
+        version="2026.04.04",
+        hook_registry_factory=private_hook_registry_factory,
+    )
+    evaluation_core.register_defense_hook_spec(spec)
+    monkeypatch.setenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, "private_hooks_test")
+
+    resolved_spec = evaluation_core.resolve_defense_hook_spec()
+
+    assert resolved_spec == spec
+
+
+def test_resolve_defense_hook_spec_uses_entry_point_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def entrypoint_hook_registry_factory() -> HookRegistry:
+        return HookRegistry()
+
+    class _FakeEntryPoint:
+        name = "entrypoint_hooks_test"
+        dist = SimpleNamespace(version="4.2.0")
+
+        def load(self):
+            return entrypoint_hook_registry_factory
+
+    monkeypatch.setattr(
+        evaluation_core,
+        "entry_points",
+        lambda *, group: (
+            [_FakeEntryPoint()] if group == evaluation_core.DEFENSE_HOOK_ENTRY_POINT_GROUP else []
+        ),
+    )
+    monkeypatch.setenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, "entrypoint_hooks_test")
+
+    resolved_spec = evaluation_core.resolve_defense_hook_spec()
+
+    assert resolved_spec == evaluation_core.DefenseHookSpec(
+        id="entrypoint_hooks_test",
+        version="4.2.0",
+        hook_registry_factory=entrypoint_hook_registry_factory,
+    )
+
+
+def test_resolve_defense_hook_spec_rejects_unknown_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, "missing_hooks")
+
+    with pytest.raises(ValueError, match="Unsupported defense hook id: missing_hooks"):
+        evaluation_core.resolve_defense_hook_spec()
+
+
+def test_resolve_defense_hook_spec_rejects_duplicate_builtin_registration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        evaluation_core,
+        "_REGISTERED_DEFENSE_HOOK_SPECS",
+        {
+            evaluation_core.DEFAULT_DEFENSE_HOOK_ID: evaluation_core.DefenseHookSpec(
+                id=evaluation_core.DEFAULT_DEFENSE_HOOK_ID,
+                version="private",
+                hook_registry_factory=HookRegistry,
+            )
+        },
+    )
+    monkeypatch.delenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, raising=False)
+
+    with pytest.raises(
+        ValueError,
+        match=f"Duplicate defense hook spec id: {evaluation_core.DEFAULT_DEFENSE_HOOK_ID}",
+    ):
+        evaluation_core.resolve_defense_hook_spec()
+
+
 def test_eval_attack_summary_matches_between_sandbox_and_gym() -> None:
     pytest.importorskip("gymnasium")
     sandbox_summary = _summarize_attack_for_env("sandbox")
@@ -414,3 +622,37 @@ def test_eval_attack_summary_matches_between_sandbox_and_gym() -> None:
 
     assert sandbox_summary == gym_summary
     assert sandbox_summary["score_raw"] > 0
+
+
+def test_evaluate_defense_prefers_explicit_hook_spec_over_env_hook_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_options: list[evaluation_core.DefenseRunOptions | None] = []
+    monkeypatch.setenv(evaluation_core.DEFENSE_HOOK_ENV_VAR, "missing_hooks")
+    hook_spec = evaluation_core.DefenseHookSpec(
+        id="programmatic",
+        version="custom",
+        hook_registry_factory=HookRegistry,
+    )
+
+    def fake_eval_defense(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        captured_options.append(kwargs["options"])
+        return {"breach_count": 0, "false_positives": 0, "benign_trials": 1}
+
+    monkeypatch.setattr(evaluation_core, "eval_defense", fake_eval_defense)
+
+    execution = evaluation_runner.evaluate_defense(
+        _Guardrail,
+        budget_s=30.0,
+        agent_factory=lambda: object(),
+        env_selection=EnvSelection.SANDBOX,
+        defense_hook_spec=hook_spec,
+        diagnostics=_FakeRunDiagnostics(),
+    )
+
+    assert execution.defense is not None
+    assert captured_options[0] is not None
+    assert captured_options[0].hook_registry_factory is HookRegistry
+    assert execution.defense.hook_id == "programmatic"
+    assert execution.defense.hook_version == "custom"

@@ -25,8 +25,8 @@ At the default short budget, this is a compatibility smoke test. It may legitima
 When you want to run the public contract directly, copy the example into the required filename:
 
 ```bash
-cp examples/attacks/attack_gym_step.py attack.py
-aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
+cp examples/attacks/attack.py attack.py
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env sandbox
 ```
 
 Why the copy step matters: the public Kaggle evaluator requires the submission file to be named `attack.py`.
@@ -63,22 +63,25 @@ aicomp evaluate dual submission.zip --budget-s 60 --agent deterministic --env sa
 
 Use these only after the canonical paths are working:
 
-- [`attacks/attack.py`](attacks/attack.py) - canonical package-local Go-Explore attack
+- [`attacks/attack.py`](attacks/attack.py) - canonical high-level attack example
+- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) - minimal Gym-style `env.step(...)` attack example
 - [`attacks/attack_working.py`](attacks/attack_working.py) - broader deterministic attack variant
 - [`attacks/attack_goexplore_working.py`](attacks/attack_goexplore_working.py) - Go-Explore variant with a broader demo runner
-- [`attacks/attack_simple.py`](attacks/attack_simple.py) - experimental hook-based attack
-- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - experimental Go-Explore plus hook attack
+- [`attacks/attack_simple.py`](attacks/attack_simple.py) - simple fixed-prompt attack variant
+- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - Go-Explore attacker plus explicit local LPCI hook-registry builder
+- [`hooks/complete_attack_scenario.py`](hooks/complete_attack_scenario.py) - composed local compromised-environment hook fixture
 - [`guardrails/guardrail_pattern.py`](guardrails/guardrail_pattern.py) - stateless pattern-based guardrail
 - [`guardrails/guardrail_prompt_injection.py`](guardrails/guardrail_prompt_injection.py) - smaller persistent-taint guardrail
-- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - experimental hook-based guardrail
+- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - simple rule-based guardrail variant
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py) - Prompt-Guard-backed example with heavier model-loading costs
 - [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py) - repo-local demo wrapper for the experimental LPCI attack example
 
 ## Recommended Order
 
-1. Start with [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) for the cleanest public-path attack example.
-2. Move to [`attacks/attack.py`](attacks/attack.py) and [`guardrails/guardrail.py`](guardrails/guardrail.py) for the canonical package-local pair.
-3. Add stronger or experimental variants only when you are comparing strategies rather than learning the package surface.
+1. Start with [`attacks/attack.py`](attacks/attack.py) for the cleanest high-level public-path attack example.
+2. Use [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) only when you specifically want the Gym-style `env.step(...)` surface.
+3. Pair [`attacks/attack.py`](attacks/attack.py) with [`guardrails/guardrail.py`](guardrails/guardrail.py) for the canonical package-local dual-track example.
+4. Add stronger or experimental variants only when you are comparing strategies rather than learning the package surface.
 
 ## Related Docs
 

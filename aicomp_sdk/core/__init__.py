@@ -9,7 +9,6 @@ from .env.api import (
     EnvInteractionResult,
     EnvRunDiagnostics,
     EnvSelection,
-    RunDiagnostics,
     coerce_env_selection,
 )
 from .env.sandbox import SandboxEnv
@@ -39,7 +38,6 @@ __all__ = [
     "EnvRunDiagnostics",
     "EnvSelection",
     "GymAttackEnv",
-    "RunDiagnostics",
     "SandboxEnv",
     "RuntimeToolSpec",
     "ToolContext",

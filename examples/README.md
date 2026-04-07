@@ -14,15 +14,15 @@ The standalone evaluator defaults to a short terminal summary. Add `--verbosity 
 
 Start with:
 
-- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py)
+- [`attacks/attack.py`](attacks/attack.py)
 - [`test_attack_submission.py`](test_attack_submission.py)
 - [`../docs/GETTING_STARTED.md`](../docs/GETTING_STARTED.md)
 - [`../docs/KAGGLE_REDTEAM_GUIDE.md`](../docs/KAGGLE_REDTEAM_GUIDE.md)
 
 Use this path if:
 
-- you want the shortest current `AttackAlgorithm` example
-- you want a Gym-style `env.step(...)` attack
+- you want the canonical current `AttackAlgorithm` example
+- you want the high-level `evaluate_redteam(...)` smoke path
 - you are building toward the public Kaggle `attack.py` contract
 
 ### I want a canonical package-local attack + guardrail pair
@@ -61,13 +61,14 @@ Use this path if:
 Start with:
 
 - [`attacks/attack_simple.py`](attacks/attack_simple.py)
-- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py)
+- [`hooks/complete_attack_scenario.py`](hooks/complete_attack_scenario.py)
 - [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py)
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py)
+- [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py)
 
 Use this path if:
 
-- you want to experiment with hook-based attacks or defenses
+- you want to run a local harness-owned LPCI hook demo
 - you want to study Prompt-Guard-backed filtering
 - you do not need the simplest starting point
 
@@ -75,8 +76,8 @@ Use this path if:
 
 ## Canonical Examples
 
-- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) - shortest current attack example for Gym-style red-team evaluation
-- [`attacks/attack.py`](attacks/attack.py) - canonical package-local Go-Explore-style attack example
+- [`attacks/attack.py`](attacks/attack.py) - canonical high-level attack example
+- [`attacks/attack_gym_step.py`](attacks/attack_gym_step.py) - minimal Gym-style `env.step(...)` attack example
 - [`guardrails/guardrail.py`](guardrails/guardrail.py) - canonical context-aware guardrail using the current `decide(...)` context
 
 ## Advanced Package-Local Examples
@@ -91,9 +92,16 @@ Use this path if:
 
 ## Experimental Examples
 
-- [`attacks/attack_simple.py`](attacks/attack_simple.py) - hook-based attack experiment
-- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - Go-Explore plus LPCI-style hook experiment
-- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - hook-based guardrail experiment
+- [`attacks/attack_simple.py`](attacks/attack_simple.py) - simple fixed-prompt attack experiment
+- [`attacks/attack_goexplore_lpci.py`](attacks/attack_goexplore_lpci.py) - Go-Explore attacker plus explicit local LPCI hook-registry builder
+- [`hooks/vector_store_poisoning.py`](hooks/vector_store_poisoning.py) - local CONTEXT_BUILD vector-store poisoning fixture
+- [`hooks/tool_arg_rewrite.py`](hooks/tool_arg_rewrite.py) - local PRE_TOOL_CALL tool-argument rewrite fixture
+- [`hooks/payload_injection.py`](hooks/payload_injection.py) - local POST_TOOL_CALL payload injection fixture
+- [`hooks/triggered_guardrail_context.py`](hooks/triggered_guardrail_context.py) - local PRE_GUARDRAIL trigger/context mutation fixture
+- [`hooks/memory_state.py`](hooks/memory_state.py) - local MEMORY_STORE state-tracking fixture
+- [`hooks/detection.py`](hooks/detection.py) - local outbound-exfil detection fixture
+- [`hooks/complete_attack_scenario.py`](hooks/complete_attack_scenario.py) - composed local compromised-environment fixture
+- [`guardrails/guardrail_simple.py`](guardrails/guardrail_simple.py) - simple rule-based guardrail experiment
 - [`guardrails/guardrail_promptguard.py`](guardrails/guardrail_promptguard.py) - transformer-backed Prompt-Guard example with heavier runtime costs
 - [`../scripts/goexplore_lpci_demo.py`](../scripts/goexplore_lpci_demo.py) - repo-local demo wrapper for the experimental LPCI attack example
 
@@ -118,8 +126,8 @@ At the default short budget, this smoke test verifies current evaluator compatib
 Then copy the example into the public submission shape:
 
 ```bash
-cp examples/attacks/attack_gym_step.py attack.py
-aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env gym
+cp examples/attacks/attack.py attack.py
+aicomp evaluate redteam attack.py --budget-s 60 --agent deterministic --env sandbox
 ```
 
 ### Package guardrail-only example

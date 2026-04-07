@@ -1,4 +1,10 @@
-"""Agent implementations for AI competition."""
+"""Extension-facing agent backend namespace.
+
+Import ``AgentSelection`` and ``build_agent_factory`` for SDK-managed backends.
+Import ``AgentProtocol`` and the debug sink types when adding a custom backend.
+Backend-specific classes and parser helpers are exported here for extension
+authors, not as the high-level evaluation API.
+"""
 
 from .debug import (
     AgentDebugEvent,
@@ -16,6 +22,13 @@ from .factory import (
     coerce_agent_selection,
     format_agent_selection,
     require_agent_selection_configuration,
+)
+from .gemma4_agent import (
+    DEFAULT_GEMMA4_MODEL_ID,
+    Gemma4Agent,
+    build_gemma4_backend,
+    build_gemma4_backend_config,
+    build_gemma4_parser,
 )
 from .gemma_agent import (
     DEFAULT_GEMMA_MODEL_ID,
@@ -38,6 +51,7 @@ from .hf_chat_template import (
     HFGenerationRequest,
     HFGenerationResponse,
     HFModelProfile,
+    HFProcessorChatTemplateBackend,
     HFRequestBuilder,
     HFResponseParser,
     JsonEnvelopeToolCallParser,
@@ -57,6 +71,7 @@ __all__ = [
     "AgentSelection",
     "DEFAULT_GPT_OSS_MODEL_ID",
     "DEFAULT_GEMMA_MODEL_ID",
+    "DEFAULT_GEMMA4_MODEL_ID",
     "DebugPhase",
     "HFBackendConfig",
     "HFChatTemplateAgent",
@@ -65,11 +80,13 @@ __all__ = [
     "HFGenerationRequest",
     "HFGenerationResponse",
     "HFModelProfile",
+    "HFProcessorChatTemplateBackend",
     "HFRequestBuilder",
     "HFResponseParser",
     "InMemoryAgentDebugSink",
     "GPTOSSAgent",
     "GemmaAgent",
+    "Gemma4Agent",
     "JsonEnvelopeToolCallParser",
     "JsonlAgentDebugSink",
     "normalize_parsed_response",
@@ -84,6 +101,9 @@ __all__ = [
     "build_gpt_oss_parser",
     "build_gemma_backend",
     "build_gemma_backend_config",
+    "build_gemma4_backend",
+    "build_gemma4_backend_config",
+    "build_gemma4_parser",
     "build_hf_response_parser",
     "coerce_agent_selection",
     "format_agent_selection",

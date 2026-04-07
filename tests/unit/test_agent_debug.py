@@ -8,10 +8,10 @@ from aicomp_sdk.agents.debug import (
     JsonlAgentDebugSink,
     summarize_runtime_history,
 )
-from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity, RunDiagnostics
 from aicomp_sdk.agents.deterministic_agent import VulnerableDeterministicAgent
 from aicomp_sdk.agents.types import ToolCall, ToolCallDecision, ToolResult
 from aicomp_sdk.core.runtime_history import RuntimeHistory
+from aicomp_sdk.evaluation.diagnostics import EvaluatorVerbosity, RunDiagnostics
 
 
 def test_in_memory_agent_debug_sink_preserves_event_order() -> None:
@@ -94,8 +94,12 @@ def test_jsonl_agent_debug_sink_truncates_existing_log_on_init(tmp_path) -> None
 
 def test_correlated_agent_debug_sink_adds_run_id(tmp_path) -> None:
     path = tmp_path / "agent-debug.jsonl"
-    with RunDiagnostics(EvaluatorVerbosity.SUMMARY, run_id="run-123") as controller:
-        sink = controller.make_agent_debug_sink(path)
+    with RunDiagnostics(
+        EvaluatorVerbosity.SUMMARY,
+        run_id="run-123",
+        agent_debug_file=path,
+    ) as controller:
+        sink = controller.make_agent_debug_sink()
         assert sink is not None
         sink.record(
             AgentDebugEvent(
@@ -109,6 +113,49 @@ def test_correlated_agent_debug_sink_adds_run_id(tmp_path) -> None:
 
     payload = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
     assert payload["run_id"] == "run-123"
+
+
+def test_run_diagnostics_reuses_agent_debug_sink(tmp_path) -> None:
+    path = tmp_path / "agent-debug.jsonl"
+    with RunDiagnostics(
+        EvaluatorVerbosity.SUMMARY,
+        run_id="run-123",
+        agent_debug_file=path,
+    ) as controller:
+        first = controller.make_agent_debug_sink()
+        second = controller.make_agent_debug_sink()
+        assert first is second
+        assert first is not None
+        first.record(
+            AgentDebugEvent(
+                backend="openai_responses",
+                model="gpt-4o-mini",
+                phase="request_built",
+                turn_index=1,
+                history_summary={"event_count": 1},
+            )
+        )
+        second.record(
+            AgentDebugEvent(
+                backend="openai_responses",
+                model="gpt-4o-mini",
+                phase="decision_emitted",
+                turn_index=1,
+                history_summary={"event_count": 1},
+            )
+        )
+
+    payloads = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [payload["phase"] for payload in payloads] == [
+        "request_built",
+        "decision_emitted",
+    ]
+    assert {payload["run_id"] for payload in payloads} == {"run-123"}
+
+
+def test_run_diagnostics_returns_no_agent_debug_sink_without_file() -> None:
+    with RunDiagnostics(EvaluatorVerbosity.SUMMARY) as controller:
+        assert controller.make_agent_debug_sink() is None
 
 
 def test_summarize_runtime_history_is_compact_and_stable() -> None:

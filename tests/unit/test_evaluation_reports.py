@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from aicomp_sdk.agents import AgentSelection
 from aicomp_sdk.core.env.api import EnvSelection
 from aicomp_sdk.evaluation.budget_policy import EvaluationBudgetPlan
 from aicomp_sdk.evaluation.reports import ReportProfile, build_evaluation_report
-from aicomp_sdk.evaluation.runner import AttackExecution, DefenseExecution, EvaluationExecution
+from aicomp_sdk.evaluation.runner import (
+    AttackExecution,
+    DefenseExecution,
+    EvaluationExecution,
+    ResolvedAgentConfig,
+)
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
 
 
@@ -23,7 +27,10 @@ def _execution(
             attack_budget_s=30.0 if track is EvaluationTrack.DUAL else 60.0,
             defense_budget_s=30.0 if track is EvaluationTrack.DUAL else 60.0,
         ),
-        agent_selection=AgentSelection.DETERMINISTIC,
+        agent=ResolvedAgentConfig(
+            selection=None,
+            label="deterministic",
+        ),
         env_selection=EnvSelection.SANDBOX,
         run_id="run-123",
         attack=attack,
@@ -44,6 +51,7 @@ def _attack_execution() -> AttackExecution:
         time_taken=0.1,
         guardrail_id="optimal_public",
         guardrail_version="1",
+        env_seed=42,
     )
 
 
@@ -56,6 +64,8 @@ def _defense_execution() -> DefenseExecution:
         benign_trials=7,
         false_positive_rate=0.0,
         time_taken=0.2,
+        hook_id="private_lpci",
+        hook_version="2026.04.04",
     )
 
 
@@ -96,9 +106,13 @@ def test_build_evaluation_report_evaluate_profile_omits_history_placeholders() -
     assert "evaluated" not in report["attack"]
     assert "time_taken" not in report["attack"]
     assert report["budget_s"] == 60.0
-    assert report["attack_seed"] == 123
+    assert report["attack_env_seed"] == 42
     assert report["attack_guardrail_id"] == "optimal_public"
     assert report["attack_guardrail_version"] == "1"
+    assert "attack_hook_id" not in report
+    assert "attack_hook_version" not in report
+    assert "defense_hook_id" not in report
+    assert "defense_hook_version" not in report
     assert report["env_visibility"] == "opaque"
 
 
@@ -117,3 +131,5 @@ def test_build_evaluation_report_test_profile_keeps_history_friendly_shape() -> 
     assert report["defense"]["evaluated"] is True
     assert report["defense"]["time_taken"] == 0.2
     assert report["final_score"] == 875.0
+    assert report["defense_hook_id"] == "private_lpci"
+    assert report["defense_hook_version"] == "2026.04.04"

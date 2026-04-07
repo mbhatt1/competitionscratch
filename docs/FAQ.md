@@ -119,7 +119,9 @@ Important distinction:
 - `aicomp evaluate redteam` defaults to `1800`
 - `aicomp evaluate defense` defaults to `1800`
 - `aicomp evaluate dual` defaults to `3600` total, split to `1800` attack and `1800` defense
-- `aicomp test` defaults to `3600` total; that becomes `3600` for redteam, `3600` for defense, and `1800`/`1800` for dual
+- `aicomp test redteam` defaults to `1800`
+- `aicomp test defense` defaults to `1800`
+- `aicomp test dual` defaults to `3600` total, split to `1800` attack and `1800` defense
 
 ### How do I test locally without an API key?
 
@@ -144,3 +146,10 @@ Current selections are:
 - `openai`
 - `gpt_oss`
 - `gemma`
+- `gemma_4`
+
+`gemma` is the existing prompt-driven Gemma 3 HF backend. `gemma_4` is the
+opt-in native tool-call backend for `google/gemma-4-26B-A4B-it`; it requires a
+recent Transformers install and local model availability. Use `GEMMA4_MODEL_PATH`
+or `GEMMA4_MODEL_ID` to override the default model source. `auto` does not load
+Gemma 4.

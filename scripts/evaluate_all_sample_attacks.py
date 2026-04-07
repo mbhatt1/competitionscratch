@@ -199,7 +199,7 @@ def test_attack(
                 attack_budget_s,
                 agent_factory=agent_factory,
                 env_selection=env_selection,
-                attack_seed=seed,
+                attack_env_seed=seed,
             )
 
         breach_count = len(findings)

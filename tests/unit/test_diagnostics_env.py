@@ -4,7 +4,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
-from aicomp_sdk.core.env.api import DiagnosticsEnv, EnvInteractionResult, EnvRunDiagnostics, RunDiagnostics
+from aicomp_sdk.core.env.api import DiagnosticsEnv, EnvInteractionResult, EnvRunDiagnostics
 from aicomp_sdk.guardrails.base import GuardrailBase
 
 
@@ -71,7 +71,6 @@ def test_diagnostics_env_uses_role_specific_env_run_diagnostics_type() -> None:
     env = DiagnosticsEnv(_FakeEnv())
 
     assert isinstance(env.run_diagnostics, EnvRunDiagnostics)
-    assert RunDiagnostics is EnvRunDiagnostics
 
 
 def test_diagnostics_env_delegates_snapshot_restore_and_export() -> None:

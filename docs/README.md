@@ -29,7 +29,7 @@ Use this path if:
 Start here:
 - [`ATTACKS_GUIDE.md`](ATTACKS_GUIDE.md) for attack strategy, replay behavior, and environment usage
 - [`API_REFERENCE.md`](API_REFERENCE.md) for SDK and CLI details
-- [`../examples/attacks/attack_gym_step.py`](../examples/attacks/attack_gym_step.py) for a minimal runnable example
+- [`../examples/attacks/attack.py`](../examples/attacks/attack.py) for the canonical high-level attack example
 
 Use this path if:
 - you are iterating on `AttackAlgorithm`
@@ -84,7 +84,7 @@ If you are new to the project:
 
 Examples:
 - [`../examples/README.md`](../examples/README.md)
-- [`../examples/attacks/attack_gym_step.py`](../examples/attacks/attack_gym_step.py)
+- [`../examples/attacks/attack.py`](../examples/attacks/attack.py)
 - [`../examples/guardrails/guardrail_optimal.py`](../examples/guardrails/guardrail_optimal.py)
 
 Useful validation paths:
@@ -99,4 +99,4 @@ Useful validation paths:
 - Public Kaggle mode: `aicomp evaluate redteam`
 - Package dual-track entrypoints: `aicomp evaluate dual` and `aicomp test dual`
 - Default public attack budget: `1800` seconds
-- Default `aicomp test` budget: `3600` seconds total, which becomes `3600` for single-track runs or `1800`/`1800` for dual-track runs
+- Default `aicomp test` budget: `1800` seconds for `redteam`, `1800` seconds for `defense`, or `3600` seconds total for dual-track runs (`1800`/`1800` split)

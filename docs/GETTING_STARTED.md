@@ -121,7 +121,7 @@ If you want local CLI behavior that matches the public Kaggle default more close
 aicomp evaluate redteam attack.py --agent deterministic --env gym
 ```
 
-This matters because `aicomp test` defaults to a broader `3600` second budget to support the package workflows as well. For `redteam`, that means a full `3600` attack-second budget unless you override it.
+`aicomp test redteam` and `aicomp evaluate redteam` both default to `1800` seconds. Dual-track runs default to `3600` seconds total, split into `1800` attack seconds and `1800` defense seconds.
 
 ## 8. What to Read Next
 

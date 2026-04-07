@@ -16,7 +16,7 @@ from aicomp_sdk.agents import build_agent
 from aicomp_sdk.attacks import AttackRunConfig
 from aicomp_sdk.attacks.baselines.guardrail_allow import Guardrail
 from aicomp_sdk.core.env.sandbox import SandboxEnv
-from examples.attacks.attack_goexplore_lpci import AttackAlgorithm
+from examples.attacks.attack_goexplore_lpci import AttackAlgorithm, build_lpci_hook_registry
 
 
 def _build_demo_env(*, seed: int, fixtures_dir: Path) -> SandboxEnv:
@@ -31,6 +31,7 @@ def _build_demo_env(*, seed: int, fixtures_dir: Path) -> SandboxEnv:
         fixtures_dir=fixtures_dir,
         agent=build_agent(selection),
         guardrail=Guardrail(),
+        hook_registry=build_lpci_hook_registry(),
     )
 
 
@@ -48,6 +49,7 @@ def main() -> None:
             fixtures_dir=fixtures,
             agent=build_agent("deterministic"),
             guardrail=Guardrail(),
+            hook_registry=build_lpci_hook_registry(),
         )
 
     print("\nRunning Go-Explore + LPCI hybrid attack...")

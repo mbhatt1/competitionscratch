@@ -13,9 +13,7 @@ import scripts.run_attack_openai as scripts_run_attack_openai
 def test_root_openai_demo_selection_prefers_openai_when_key_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        scripts_run_attack_openai, "_select_openai_demo_agent", lambda: "openai"
-    )
+    monkeypatch.setattr(scripts_run_attack_openai, "_select_openai_demo_agent", lambda: "openai")
 
     assert run_attack_openai._select_openai_demo_agent() == "openai"
 
@@ -95,7 +93,9 @@ def test_script_main_runs_through_shared_sandbox_env(
         captured["agent_selection"] = selection
         return "fake-agent-factory"
 
-    def fake_eval_attack(attack_cls, budget_s, agent_factory, env_selection, **kwargs):  # noqa: ANN001, ANN202
+    def fake_eval_attack(
+        attack_cls, budget_s, agent_factory, env_selection, **kwargs
+    ):  # noqa: ANN001, ANN202
         captured["attack_cls"] = attack_cls
         captured["budget_s"] = budget_s
         captured["agent_factory"] = agent_factory
@@ -126,7 +126,7 @@ def test_script_main_runs_through_shared_sandbox_env(
     assert options.run_config.time_budget_s == 30
     assert options.run_config.max_steps == 100
     assert options.attack_config == {"max_turns": 6, "branch_batch": 8}
-    assert options.seed == 42
+    assert options.env_seed == 42
     assert options.guardrail_factory is scripts_run_attack_openai.BaselineGuardrail
 
     output = capsys.readouterr().out
@@ -140,11 +140,20 @@ def test_goexplore_lpci_demo_openai_branch_uses_shared_sandbox_env(
     captured: dict[str, Any] = {}
 
     class _FakeEnv:
-        def __init__(self, *, seed: int, fixtures_dir: Path, agent: object, guardrail: object):
+        def __init__(
+            self,
+            *,
+            seed: int,
+            fixtures_dir: Path,
+            agent: object,
+            guardrail: object,
+            hook_registry: object,
+        ):
             captured["seed"] = seed
             captured["fixtures_dir"] = fixtures_dir
             captured["agent"] = agent
             captured["guardrail"] = guardrail
+            captured["hook_registry"] = hook_registry
 
     build_agent_calls: list[str] = []
 
@@ -171,8 +180,18 @@ def test_goexplore_lpci_demo_local_model_branch_still_uses_auto(
     captured: dict[str, Any] = {}
 
     class _FakeEnv:
-        def __init__(self, *, seed: int, fixtures_dir: Path, agent: object, guardrail: object):
+        def __init__(
+            self,
+            *,
+            seed: int,
+            fixtures_dir: Path,
+            agent: object,
+            guardrail: object,
+            hook_registry: object,
+        ):
+            del seed, fixtures_dir, guardrail
             captured["agent"] = agent
+            captured["hook_registry"] = hook_registry
 
     build_agent_calls: list[str] = []
 

@@ -12,11 +12,12 @@ import aicomp_sdk.evaluation.ops as evaluation_ops
 import aicomp_sdk.evaluation.runner as evaluation_runner
 import aicomp_sdk.evaluation.submissions as evaluation_submissions
 from aicomp_sdk.agents import AgentSelection
+from aicomp_sdk.agents.debug import AgentDebugEvent
 from aicomp_sdk.cli.commands import test as test_command
 from aicomp_sdk.cli.main import create_parser
 from aicomp_sdk.core.env.api import EnvSelection
-from aicomp_sdk.evaluation.budget_policy import DEFAULT_CLI_TOTAL_BUDGET_S
 from aicomp_sdk.evaluation.tracks import EvaluationTrack
+from aicomp_sdk.hooks import HookRegistry
 
 
 def _redteam_result(
@@ -152,23 +153,23 @@ def test_run_test_supports_redteam_track_for_attack_py(tmp_path: Path, monkeypat
         track,
         attack_cls,
         guardrail_cls,
-        attack_budget_s,
-        defense_budget_s,
+        budget_s,
         agent_selection,
         env_selection,
         fixtures_dir=None,
         verbosity=None,
         transcript_file=None,
         event_log_file=None,
-        agent_debug_jsonl=None,
+        agent_debug_file=None,
         agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
     ):
         del (
             track,
             attack_cls,
             guardrail_cls,
-            defense_budget_s,
-            agent_debug_jsonl,
+            agent_debug_file,
             agent_factory,
             verbosity,
             transcript_file,
@@ -177,7 +178,7 @@ def test_run_test_supports_redteam_track_for_attack_py(tmp_path: Path, monkeypat
         captured["fixtures_dir"] = fixtures_dir
         captured["agent_selection"] = agent_selection
         captured["env_selection"] = env_selection
-        captured["attack_budget_s"] = attack_budget_s
+        captured["budget_s"] = budget_s
         return _redteam_result(
             score=12.5,
             score_raw=4.0,
@@ -221,7 +222,7 @@ def test_run_test_supports_redteam_track_for_attack_py(tmp_path: Path, monkeypat
     assert captured["fixtures_dir"] == fixtures_dir.resolve()
     assert captured["agent_selection"] == "deterministic"
     assert captured["env_selection"] == "sandbox"
-    assert captured["attack_budget_s"] == 10.0
+    assert captured["budget_s"] == 10.0
 
 
 def test_run_test_supports_explicit_dual_track_for_zip(tmp_path: Path, monkeypatch) -> None:
@@ -244,22 +245,23 @@ def test_run_test_supports_explicit_dual_track_for_zip(tmp_path: Path, monkeypat
         track,
         attack_cls,
         guardrail_cls,
-        attack_budget_s,
-        defense_budget_s,
+        budget_s,
         agent_selection,
         env_selection,
         fixtures_dir=None,
         verbosity=None,
         transcript_file=None,
         event_log_file=None,
-        agent_debug_jsonl=None,
+        agent_debug_file=None,
         agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
     ):
         del (
             track,
             attack_cls,
             guardrail_cls,
-            agent_debug_jsonl,
+            agent_debug_file,
             agent_factory,
             verbosity,
             transcript_file,
@@ -268,8 +270,7 @@ def test_run_test_supports_explicit_dual_track_for_zip(tmp_path: Path, monkeypat
         captured["fixtures_dir"] = fixtures_dir
         captured["agent_selection"] = agent_selection
         captured["env_selection"] = env_selection
-        captured["attack_budget_s"] = attack_budget_s
-        captured["defense_budget_s"] = defense_budget_s
+        captured["budget_s"] = budget_s
         return _dual_result(
             agent_selection=agent_selection,
             env_selection=env_selection,
@@ -307,8 +308,7 @@ def test_run_test_supports_explicit_dual_track_for_zip(tmp_path: Path, monkeypat
     assert captured["fixtures_dir"] == fixtures_dir.resolve()
     assert captured["agent_selection"] == "deterministic"
     assert captured["env_selection"] == "sandbox"
-    assert captured["attack_budget_s"] == 5.0
-    assert captured["defense_budget_s"] == 5.0
+    assert captured["budget_s"] == 10.0
 
 
 def test_run_test_supports_defense_track_for_guardrail_py(tmp_path: Path, monkeypatch) -> None:
@@ -334,23 +334,23 @@ def test_run_test_supports_defense_track_for_guardrail_py(tmp_path: Path, monkey
         track,
         attack_cls,
         guardrail_cls,
-        attack_budget_s,
-        defense_budget_s,
+        budget_s,
         agent_selection,
         env_selection,
         fixtures_dir=None,
         verbosity=None,
         transcript_file=None,
         event_log_file=None,
-        agent_debug_jsonl=None,
+        agent_debug_file=None,
         agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
     ):
         del (
             track,
             attack_cls,
             guardrail_cls,
-            attack_budget_s,
-            agent_debug_jsonl,
+            agent_debug_file,
             agent_factory,
             verbosity,
             transcript_file,
@@ -359,7 +359,7 @@ def test_run_test_supports_defense_track_for_guardrail_py(tmp_path: Path, monkey
         captured["fixtures_dir"] = fixtures_dir
         captured["agent_selection"] = agent_selection
         captured["env_selection"] = env_selection
-        captured["defense_budget_s"] = defense_budget_s
+        captured["budget_s"] = budget_s
         return _defense_result(
             agent_selection=agent_selection,
             env_selection=env_selection,
@@ -399,7 +399,7 @@ def test_run_test_supports_defense_track_for_guardrail_py(tmp_path: Path, monkey
     assert captured["fixtures_dir"] == fixtures_dir.resolve()
     assert captured["agent_selection"] == "deterministic"
     assert captured["env_selection"] == "sandbox"
-    assert captured["defense_budget_s"] == 10.0
+    assert captured["budget_s"] == 10.0
 
 
 def test_run_test_allows_explicit_env_override(tmp_path: Path, monkeypatch) -> None:
@@ -420,24 +420,24 @@ def test_run_test_allows_explicit_env_override(tmp_path: Path, monkeypatch) -> N
         track,
         attack_cls,
         guardrail_cls,
-        attack_budget_s,
-        defense_budget_s,
+        budget_s,
         agent_selection,
         env_selection,
         fixtures_dir=None,
         verbosity=None,
         transcript_file=None,
         event_log_file=None,
-        agent_debug_jsonl=None,
+        agent_debug_file=None,
         agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
     ):
         del (
             track,
             attack_cls,
             guardrail_cls,
-            attack_budget_s,
-            defense_budget_s,
-            agent_debug_jsonl,
+            budget_s,
+            agent_debug_file,
             agent_factory,
             verbosity,
             transcript_file,
@@ -558,8 +558,7 @@ def test_run_dual_evaluation_reuses_single_agent_factory(monkeypatch) -> None:
     results = test_command.run_dual_evaluation_with_progress(
         object,
         object,
-        5.0,
-        5.0,
+        10.0,
         AgentSelection.GPT_OSS,
         EnvSelection.SANDBOX,
         verbosity=test_command.EvaluatorVerbosity.SUMMARY,
@@ -625,7 +624,7 @@ def test_create_parser_uses_named_cli_budget_default() -> None:
 
     args = parser.parse_args(["test", "redteam", "attack.py"])
 
-    assert args.budget_s == DEFAULT_CLI_TOTAL_BUDGET_S
+    assert args.budget_s is None
     assert args.verbosity is test_command.EvaluatorVerbosity.SUMMARY
 
 
@@ -668,16 +667,34 @@ def test_resolve_agent_factory_threads_jsonl_debug_sink(monkeypatch, tmp_path: P
     monkeypatch.setattr(evaluation_runner, "build_agent_factory", fake_build_agent_factory)
     debug_path = tmp_path / "agent-debug.jsonl"
 
-    factory = evaluation_runner.resolve_agent_factory(
-        AgentSelection.OPENAI,
-        agent_debug_jsonl=debug_path,
-    )
+    with test_command.RunDiagnostics(
+        test_command.EvaluatorVerbosity.SUMMARY,
+        agent_debug_file=debug_path,
+    ) as diagnostics:
+        factory, resolved_agent = evaluation_runner.resolve_agent_factory(
+            agent_selection=AgentSelection.OPENAI,
+            diagnostics=diagnostics,
+        )
 
     assert factory is not None
+    assert resolved_agent == evaluation_runner.ResolvedAgentConfig(
+        selection=AgentSelection.OPENAI,
+        label="openai",
+    )
     assert captured["selection"] is AgentSelection.OPENAI
     debug_sink = captured["debug_sink"]
-    assert isinstance(debug_sink, evaluation_runner.JsonlAgentDebugSink)
-    assert debug_sink.path == debug_path
+    assert debug_sink is not None
+    debug_sink.record(
+        AgentDebugEvent(
+            backend="openai_responses",
+            model="gpt-4o-mini",
+            phase="request_built",
+            turn_index=1,
+            history_summary={"event_count": 1},
+        )
+    )
+    payload = json.loads(debug_path.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["phase"] == "request_built"
 
 
 def test_run_test_threads_agent_debug_jsonl_to_redteam_eval(
@@ -701,29 +718,29 @@ def test_run_test_threads_agent_debug_jsonl_to_redteam_eval(
         track,
         attack_cls,
         guardrail_cls,
-        attack_budget_s,
-        defense_budget_s,
+        budget_s,
         agent_selection,
         env_selection,
         fixtures_dir=None,
         verbosity=None,
         transcript_file=None,
         event_log_file=None,
-        agent_debug_jsonl=None,
+        agent_debug_file=None,
         agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
     ):
         del (
             track,
             attack_cls,
             guardrail_cls,
-            attack_budget_s,
-            defense_budget_s,
+            budget_s,
             agent_selection,
             env_selection,
             fixtures_dir,
             agent_factory,
         )
-        captured["agent_debug_jsonl"] = agent_debug_jsonl
+        captured["agent_debug_file"] = agent_debug_file
         captured["verbosity"] = verbosity
         captured["transcript_file"] = transcript_file
         captured["event_log_file"] = event_log_file
@@ -757,12 +774,157 @@ def test_run_test_threads_agent_debug_jsonl_to_redteam_eval(
     )
 
     assert test_command.run_test(args) == 0
-    assert captured["agent_debug_jsonl"] == debug_path.resolve()
+    assert captured["agent_debug_file"] == debug_path.resolve()
     assert captured["verbosity"] is test_command.EvaluatorVerbosity.DEBUG
-    assert captured["transcript_file"] == (
-        tmp_path / "logs" / "evaluator-transcript.log"
-    ).resolve()
+    assert captured["transcript_file"] == (tmp_path / "logs" / "evaluator-transcript.log").resolve()
     assert captured["event_log_file"] == (tmp_path / "logs" / "evaluator-events.log").resolve()
+
+
+def test_run_redteam_evaluation_allows_diagnostics_debug_file_with_custom_agent_factory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    debug_path = tmp_path / "logs" / "agent-debug.jsonl"
+
+    monkeypatch.setattr(evaluation_ops, "eval_attack", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        evaluation_ops,
+        "summarize_attack_findings",
+        lambda findings: _attack_summary(),
+    )
+
+    results = test_command.run_redteam_evaluation_with_progress(
+        object,
+        5.0,
+        AgentSelection.AUTO,
+        EnvSelection.SANDBOX,
+        agent_debug_file=debug_path,
+        agent_factory=lambda: object(),
+    )
+
+    assert results["track"] == "redteam"
+
+
+def test_run_test_resolves_dual_specs_before_submission_import(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    submission_zip = tmp_path / "submission.zip"
+    submission_zip.write_bytes(b"fake-zip")
+    events: list[str] = []
+    captured: dict[str, object] = {}
+
+    def fake_resolve_attack_guardrail_spec() -> evaluation_ops.AttackGuardrailSpec:
+        events.append("resolve_guardrail")
+        return evaluation_ops.AttackGuardrailSpec(
+            id="pre_resolved_guardrail",
+            version="1",
+            guardrail_factory=object,
+        )
+
+    def fake_resolve_defense_hook_spec() -> evaluation_ops.DefenseHookSpec:
+        events.append("resolve_hooks")
+        return evaluation_ops.DefenseHookSpec(
+            id="pre_resolved_hooks",
+            version="1",
+            hook_registry_factory=HookRegistry,
+        )
+
+    def fake_load_track_modules(stack, submission_path, track):  # noqa: ANN001
+        del stack, submission_path, track
+        events.append("load_submission")
+        return object, object
+
+    def fake_run_evaluation_with_progress(  # noqa: ANN202
+        *,
+        track,
+        attack_cls,
+        guardrail_cls,
+        budget_s,
+        agent_selection,
+        env_selection,
+        fixtures_dir=None,
+        verbosity=None,
+        transcript_file=None,
+        event_log_file=None,
+        agent_debug_file=None,
+        agent_factory=None,
+        attack_guardrail_spec=None,
+        defense_hook_spec=None,
+    ):
+        del (
+            track,
+            attack_cls,
+            guardrail_cls,
+            budget_s,
+            agent_selection,
+            env_selection,
+            fixtures_dir,
+            verbosity,
+            transcript_file,
+            event_log_file,
+            agent_debug_file,
+            agent_factory,
+        )
+        captured["attack_guardrail_spec"] = attack_guardrail_spec
+        captured["defense_hook_spec"] = defense_hook_spec
+        return _redteam_result(
+            score=1.0,
+            score_raw=1.0,
+            findings_count=1,
+            unique_cells=1,
+            agent_selection="deterministic",
+            env_selection="sandbox",
+        )
+
+    monkeypatch.setattr(
+        test_command,
+        "resolve_attack_guardrail_spec",
+        fake_resolve_attack_guardrail_spec,
+    )
+    monkeypatch.setattr(
+        test_command,
+        "resolve_defense_hook_spec",
+        fake_resolve_defense_hook_spec,
+    )
+    monkeypatch.setattr(
+        evaluation_submissions,
+        "load_track_modules",
+        fake_load_track_modules,
+    )
+    monkeypatch.setattr(
+        test_command,
+        "_run_evaluation_with_progress",
+        fake_run_evaluation_with_progress,
+    )
+
+    args = SimpleNamespace(
+        submission=str(submission_zip),
+        budget_s=10.0,
+        name="pre_resolved_specs",
+        verbosity=None,
+        track="dual",
+        fixtures_dir=None,
+        agent="deterministic",
+        env=None,
+        transcript_file=None,
+        event_log_file=None,
+        agent_debug_jsonl=None,
+    )
+
+    assert test_command.run_test(args) == 0
+    assert events == ["resolve_guardrail", "resolve_hooks", "load_submission"]
+    assert captured["attack_guardrail_spec"] == evaluation_ops.AttackGuardrailSpec(
+        id="pre_resolved_guardrail",
+        version="1",
+        guardrail_factory=object,
+    )
+    assert captured["defense_hook_spec"] == evaluation_ops.DefenseHookSpec(
+        id="pre_resolved_hooks",
+        version="1",
+        hook_registry_factory=HookRegistry,
+    )
 
 
 def test_run_redteam_evaluation_threads_output_controller(monkeypatch, tmp_path: Path) -> None:
@@ -775,12 +937,14 @@ def test_run_redteam_evaluation_threads_output_controller(monkeypatch, tmp_path:
             *,
             transcript_file=None,
             event_log_file=None,
+            agent_debug_file=None,
             stderr=None,
         ):  # noqa: ANN001
             del stderr
             captured["verbosity"] = verbosity
             captured["transcript_file"] = transcript_file
             captured["event_log_file"] = event_log_file
+            captured["agent_debug_file"] = agent_debug_file
             self.run_id = "test-run-id"
 
         def __enter__(self):  # noqa: ANN204
@@ -796,6 +960,9 @@ def test_run_redteam_evaluation_threads_output_controller(monkeypatch, tmp_path:
         def phase(self, name: str):  # noqa: ANN201
             captured["phase_scope"] = name
             return self
+
+        def make_agent_debug_sink(self):  # noqa: ANN201
+            return None
 
         def record_event(  # noqa: ANN201, ANN001
             self,
@@ -873,7 +1040,10 @@ def test_run_redteam_evaluation_writes_framework_events_for_quiet_runs(
     monkeypatch.setattr(
         evaluation_runner,
         "resolve_agent_factory",
-        lambda *args, **kwargs: object(),
+        lambda *args, **kwargs: (
+            object(),
+            evaluation_runner.ResolvedAgentConfig(selection=None, label="custom"),
+        ),
     )
     monkeypatch.setattr(evaluation_ops, "eval_attack", lambda *args, **kwargs: [])
     monkeypatch.setattr(

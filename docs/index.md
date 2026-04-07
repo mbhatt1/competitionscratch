@@ -39,7 +39,7 @@ features:
 
   - icon: 🤖
     title: Pluggable Blue Agents
-    details: Run against `deterministic`, `gpt_oss`, `openai`, or `gemma` backends. Auto mode prefers GPT-OSS, then OpenAI if configured, then deterministic.
+    details: Run against `deterministic`, `gpt_oss`, `openai`, `gemma`, or explicit `gemma_4` backends. Auto mode prefers GPT-OSS, then OpenAI if configured, then deterministic.
 ---
 
 ## Choose Your Workflow
@@ -53,8 +53,9 @@ features:
 
 Important current defaults:
 
-- `aicomp evaluate redteam` defaults to the official Kaggle attack budget of `1800` seconds.
-- `aicomp test` defaults to `3600` seconds total because it supports package attack-only, guardrail-only, and dual-track evaluation. That becomes `3600` attack seconds for `redteam`, `3600` defense seconds for `defense`, and `1800`/`1800` for `dual`.
+- `aicomp evaluate redteam` and `aicomp test redteam` default to the official Kaggle attack budget of `1800` seconds.
+- `aicomp evaluate defense` and `aicomp test defense` default to `1800` seconds.
+- Dual-track `evaluate` and `test` runs default to `3600` seconds total, split into `1800` attack seconds and `1800` defense seconds.
 - If you want CLI behavior that matches the public Kaggle default, run `aicomp evaluate redteam attack.py --env gym`.
 
 ## Install and Run a First Attack
@@ -110,8 +111,10 @@ Why the return value is small: the evaluator does not trust attacker-supplied tr
 
 - `SandboxEnv` is the direct SDK environment for package-level experimentation, guardrail-only workflows, and dual-track workflows.
 - `GymAttackEnv` wraps the same sandbox with a Gymnasium-style `reset(...)` and `step(...)` interface and is available when you explicitly pass `--env gym`.
-- Direct `SandboxEnv(...)` construction changed in `2.0.0`: you must now provide an explicit `agent=` instance.
-- The guardrail contract is `GuardrailBase.decide(...) -> Decision`; guardrail and hook-based APIs are part of the supported package workflow even though the public Kaggle submission shape is attack-only.
+- Direct `SandboxEnv(...)` construction requires an explicit `agent=` instance.
+- The guardrail contract is `GuardrailBase.decide(...) -> Decision`; hook-based APIs are advanced harness-owned threat fixtures under `aicomp_sdk.hooks`, not submission APIs.
+- `RuntimeHistory` is the agent-provider-facing conversation/tool history; `Trace` is the scorer/export-facing event record used for replay validation, predicates, cells, and reports.
+- `aicomp_sdk.agents` is extension-facing: use it when selecting SDK backends or adding custom backend agents.
 - Current canonical tools are `web.search`, `web.open`, `fs.read`, `fs.write`, `fs.delete`, `shell.run`, `email.list`, `email.read`, `email.send`, and `http.post`.
 - If you construct environments directly, the evaluators resolve packaged fixtures automatically; direct SDK usage should point at a valid fixtures directory or call `resolve_fixtures_dir(...)`.
 

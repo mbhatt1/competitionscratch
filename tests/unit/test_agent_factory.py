@@ -8,17 +8,16 @@ import pytest
 
 from aicomp_sdk.agents import (
     AgentSelection,
+    Gemma4Agent,
     GemmaAgent,
     GPTOSSAgent,
     InMemoryAgentDebugSink,
     VulnerableDeterministicAgent,
     build_agent,
     build_agent_factory,
-)
-from aicomp_sdk.agents import factory as agent_factory
-from aicomp_sdk.agents import (
     coerce_agent_selection,
 )
+from aicomp_sdk.agents import factory as agent_factory
 from aicomp_sdk.agents.gpt_oss_agent import build_gpt_oss_backend_config
 
 
@@ -33,6 +32,7 @@ def test_coerce_agent_selection_from_string() -> None:
     assert coerce_agent_selection("auto") is AgentSelection.AUTO
     assert coerce_agent_selection("gpt_oss") is AgentSelection.GPT_OSS
     assert coerce_agent_selection("gemma") is AgentSelection.GEMMA
+    assert coerce_agent_selection("gemma_4") is AgentSelection.GEMMA_4
 
 
 def test_coerce_agent_selection_from_enum() -> None:
@@ -302,4 +302,37 @@ def test_build_agent_factory_gemma_threads_debug_sink(
     agent = factory()
 
     assert isinstance(agent, GemmaAgent)
+    assert agent._delegate._debug_sink is debug_sink
+
+
+def test_build_agent_factory_gemma4_returns_fresh_agents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _BackendStub()
+
+    monkeypatch.setattr(agent_factory, "build_gemma4_backend", lambda: backend)
+
+    factory = build_agent_factory("gemma_4")
+    first = factory()
+    second = factory()
+
+    assert isinstance(first, Gemma4Agent)
+    assert isinstance(second, Gemma4Agent)
+    assert first is not second
+    assert first._delegate._backend is backend
+    assert second._delegate._backend is backend
+
+
+def test_build_agent_factory_gemma4_threads_debug_sink(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _BackendStub()
+    debug_sink = InMemoryAgentDebugSink()
+
+    monkeypatch.setattr(agent_factory, "build_gemma4_backend", lambda: backend)
+
+    factory = build_agent_factory("gemma_4", debug_sink=debug_sink)
+    agent = factory()
+
+    assert isinstance(agent, Gemma4Agent)
     assert agent._delegate._debug_sink is debug_sink

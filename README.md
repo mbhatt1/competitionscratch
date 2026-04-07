@@ -104,8 +104,8 @@ The public Kaggle leaderboard uses normalized attack score only. Package guardra
 
 - `SandboxEnv` is the default environment for local evaluator runs.
 - `GymAttackEnv` is available when you explicitly pass `--env gym` for Kaggle-style parity.
-- As of `2.0.0`, direct `SandboxEnv(...)` construction requires an explicit `agent=` instance.
-- `aicomp test` defaults to `3600` seconds total because it supports all three package workflows. That means `3600` attack seconds for `redteam`, `3600` defense seconds for `defense`, and `1800`/`1800` for `dual`.
+- Direct `SandboxEnv(...)` construction requires an explicit `agent=` instance.
+- `aicomp test` defaults to `1800` seconds for `redteam`, `1800` seconds for `defense`, and `3600` seconds total for `dual` (`1800`/`1800` split).
 
 ## Documentation
 

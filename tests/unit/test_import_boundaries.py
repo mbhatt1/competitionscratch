@@ -19,6 +19,13 @@ EXAMPLE_SUBMISSION_ROOTS: Final[tuple[Path, ...]] = (
 # The map is intentionally explicit so new repo-bootstrap sites or embedded
 # runners must be classified when they appear.
 PATH_BOOTSTRAP_CLASSIFICATIONS: Final[dict[str, str]] = {
+    "examples/hooks/complete_attack_scenario.py": "repo_script_boundary",
+    "examples/hooks/detection.py": "repo_script_boundary",
+    "examples/hooks/memory_state.py": "repo_script_boundary",
+    "examples/hooks/payload_injection.py": "repo_script_boundary",
+    "examples/hooks/tool_arg_rewrite.py": "repo_script_boundary",
+    "examples/hooks/triggered_guardrail_context.py": "repo_script_boundary",
+    "examples/hooks/vector_store_poisoning.py": "repo_script_boundary",
     "scripts/evaluate_all_guardrails.py": "repo_script_boundary",
     "scripts/evaluate_all_sample_attacks.py": "repo_script_boundary",
     "scripts/find_delete_chains.py": "repo_script_boundary",
@@ -38,7 +45,6 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "aicomp_sdk/attacks/baselines/attack_random.py": "library_demo_cleanup_target",
     "aicomp_sdk/attacks/baselines/attacker_goexplore.py": "library_demo_cleanup_target",
     "aicomp_sdk/cli/main.py": "supported_entrypoint",
-    "aicomp_sdk/guardrails/hooks_examples.py": "library_demo_cleanup_target",
     "run_attack_openai.py": "compat_shim_boundary",
     "scripts/add_injection_sources.py": "repo_script_boundary",
     "scripts/count_injection_sources.py": "repo_script_boundary",
@@ -57,6 +63,13 @@ MAIN_RUNNER_CLASSIFICATIONS: Final[dict[str, str]] = {
     "scripts/verify_findings_replay.py": "repo_script_boundary",
     "examples/test_attack_submission.py": "example_smoke_wrapper",
     "examples/test_submission.py": "example_smoke_wrapper",
+    "examples/hooks/complete_attack_scenario.py": "repo_script_boundary",
+    "examples/hooks/detection.py": "repo_script_boundary",
+    "examples/hooks/memory_state.py": "repo_script_boundary",
+    "examples/hooks/payload_injection.py": "repo_script_boundary",
+    "examples/hooks/tool_arg_rewrite.py": "repo_script_boundary",
+    "examples/hooks/triggered_guardrail_context.py": "repo_script_boundary",
+    "examples/hooks/vector_store_poisoning.py": "repo_script_boundary",
 }
 
 
@@ -184,7 +197,7 @@ def test_attacker_goexplore_imports_without_repo_root(tmp_path: Path) -> None:
 def test_demo_library_modules_import_without_repo_root(tmp_path: Path) -> None:
     module_names = [
         "aicomp_sdk.attacks.baselines.attack_random",
-        "aicomp_sdk.guardrails.hooks_examples",
+        "aicomp_sdk.hooks",
     ]
     for module_name in module_names:
         result = subprocess.run(
@@ -215,10 +228,62 @@ def test_aicomp_evaluate_help_completes_from_outside_repo_root(tmp_path: Path) -
 
 
 def test_evaluation_namespace_exports_typed_execution_api() -> None:
-    from aicomp_sdk.evaluation import EvaluationExecution, execute_evaluation
+    import aicomp_sdk.evaluation as evaluation
+    from aicomp_sdk.evaluation import (
+        EvaluationExecution,
+        ResolvedAgentConfig,
+        evaluate_defense,
+        evaluate_dual,
+        evaluate_redteam,
+    )
 
     assert EvaluationExecution.__name__ == "EvaluationExecution"
-    assert execute_evaluation.__name__ == "execute_evaluation"
+    assert ResolvedAgentConfig.__name__ == "ResolvedAgentConfig"
+    assert evaluate_defense.__name__ == "evaluate_defense"
+    assert evaluate_dual.__name__ == "evaluate_dual"
+    assert evaluate_redteam.__name__ == "evaluate_redteam"
+    assert "execute_evaluation" not in evaluation.__all__
+    assert "RedteamEvaluationRequest" not in evaluation.__all__
+    assert "DefenseEvaluationRequest" not in evaluation.__all__
+    assert "DualEvaluationRequest" not in evaluation.__all__
+    assert "eval_attack" not in evaluation.__all__
+    assert "eval_defense" not in evaluation.__all__
+    assert "AttackEvalOptions" not in evaluation.__all__
+    assert "DefenseRunOptions" not in evaluation.__all__
+    assert "AttackGuardrailSpec" not in evaluation.__all__
+    assert "DefenseHookSpec" not in evaluation.__all__
+    assert not hasattr(evaluation, "eval_attack")
+    assert not hasattr(evaluation, "eval_defense")
+    assert not hasattr(evaluation, "resolve_agent_factory")
+
+
+def test_package_root_keeps_advanced_hooks_and_evaluator_diagnostics_out_of_high_level_api() -> (
+    None
+):
+    import aicomp_sdk
+    from aicomp_sdk.evaluation import RunDiagnostics as EvaluatorRunDiagnostics
+    from aicomp_sdk.evaluation.diagnostics import RunDiagnostics as DiagnosticsRunDiagnostics
+
+    assert EvaluatorRunDiagnostics is DiagnosticsRunDiagnostics
+    assert "RunDiagnostics" not in aicomp_sdk.__all__
+    assert not hasattr(aicomp_sdk, "RunDiagnostics")
+
+    hook_exports = {
+        "HookRegistry",
+        "HookStage",
+        "HookContext",
+        "HookResult",
+        "HookCallback",
+        "create_payload_injection_hook",
+        "create_trigger_hook",
+        "create_detection_hook",
+        "create_memory_hook",
+        "create_lpci_vector_store_hook",
+        "create_lpci_tool_poisoning_hook",
+    }
+    assert hook_exports.isdisjoint(aicomp_sdk.__all__)
+    for export_name in hook_exports:
+        assert not hasattr(aicomp_sdk, export_name)
 
 
 def test_cli_command_modules_are_subcommand_plugins_not_process_entrypoints() -> None:
