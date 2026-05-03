@@ -5,19 +5,19 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from aicomp_sdk.agents.debug import AgentDebugSink
-from aicomp_sdk.agents.hf_chat_template.hf_agent import (
+from aicomp_sdk.agents.hf_chat_template.agent import (
     HFChatTemplateAgent,
     _relabel_hf_chat_template_snapshot,
     _unwrap_hf_chat_template_snapshot,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_backend import (
+from aicomp_sdk.agents.hf_chat_template.backends.transformers import (
     HFChatTemplateBackend,
     _build_hf_backend_config,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
+from aicomp_sdk.agents.hf_chat_template.response_parsing import (
     JsonEnvelopeToolCallParser,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFBackendConfig,
     HFGenerationBackendProtocol,
     HFGenerationRequest,

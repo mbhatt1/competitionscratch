@@ -5,6 +5,8 @@ Test Taint Tracking Guardrail against baseline attacker.
 
 from typing import Any
 
+import pytest
+
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.evaluation.ops import eval_defense
 from aicomp_sdk.scoring import score_defense
@@ -170,6 +172,7 @@ def run_taint_tracking_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any]
     return report, defense_score
 
 
+@pytest.mark.benchmark
 def test_taint_tracking_guardrail() -> None:
     report, defense_score = run_taint_tracking_guardrail()
     assert report["breach_count"] >= 0

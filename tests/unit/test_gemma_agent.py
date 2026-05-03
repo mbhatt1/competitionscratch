@@ -10,7 +10,7 @@ from aicomp_sdk.agents.gemma_agent import (
     GemmaAgent,
     build_gemma_backend_config,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFGenerationRequest,
     HFGenerationResponse,
 )

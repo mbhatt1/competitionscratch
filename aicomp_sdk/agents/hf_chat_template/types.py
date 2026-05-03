@@ -107,6 +107,7 @@ class HFGenerationResponse:
     text: str
     raw_text: str
     finish_reason: str | None = None
+    parsed_response: Mapping[str, Any] | None = None
 
 
 class HFGenerationBackendProtocol(Protocol):

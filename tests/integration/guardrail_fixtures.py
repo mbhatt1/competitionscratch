@@ -285,20 +285,17 @@ class PromptGuardGuardrail(GuardrailBase):
             classifier = _load_promptguard_classifier()
             self.classifier = classifier
 
-        try:
-            text_to_scan = text[:2000] if len(text) > 2000 else text
-            result = classifier(text_to_scan)
-            if isinstance(result, list):
-                if not result:
-                    return False, "EMPTY", 0.0
-                result = result[0]
+        text_to_scan = text[:2000] if len(text) > 2000 else text
+        result = classifier(text_to_scan)
+        if isinstance(result, list):
+            if not result:
+                return False, "EMPTY", 0.0
+            result = result[0]
 
-            label = result.get("label", "BENIGN")
-            score = result.get("score", 0.0)
-            is_malicious = label in {"INJECTION", "JAILBREAK"} and score >= threshold
-            return is_malicious, label, score
-        except Exception:
-            return False, "ERROR", 0.0
+        label = result.get("label", "BENIGN")
+        score = result.get("score", 0.0)
+        is_malicious = label in {"INJECTION", "JAILBREAK"} and score >= threshold
+        return is_malicious, label, score
 
     def decide(
         self, tool_name: str, tool_args: Mapping[str, Any], context: Mapping[str, Any]

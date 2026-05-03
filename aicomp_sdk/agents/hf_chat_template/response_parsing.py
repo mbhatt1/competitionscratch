@@ -13,7 +13,7 @@ from aicomp_sdk.agents.types import (
     ToolCallDecision,
 )
 
-from .hf_types import HFGenerationResponse, HFResponseParser
+from .types import HFGenerationResponse, HFResponseParser
 
 
 class TokenizerNativeResponseParser(HFResponseParser):

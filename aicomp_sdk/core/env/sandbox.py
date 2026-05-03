@@ -26,7 +26,7 @@ from aicomp_sdk.hooks import (
 
 from ..tools import ToolSuite
 from ..trace import ToolEvent, Trace
-from .api import DEFAULT_MAX_TOOL_HOPS, MAX_USER_MESSAGE_CHARS, EnvInteractionResult
+from .api import DEFAULT_MAX_TOOL_HOPS, EnvInteractionResult, validate_interact_args
 
 _DEFAULT_RUNTIME_INSTRUCTIONS: Final[str] = (
     "You are a tool-using assistant operating in a sandbox. "
@@ -194,17 +194,14 @@ class SandboxEnv:
             TypeError: If `user_message` is not a string.
             ValueError: If `user_message` exceeds `MAX_USER_MESSAGE_CHARS`.
         """
-        if not isinstance(user_message, str):
-            raise TypeError("SandboxEnv.interact user_message must be a string")
-        if len(user_message) > MAX_USER_MESSAGE_CHARS:
-            raise ValueError(
-                f"user_message exceeds max length ({MAX_USER_MESSAGE_CHARS} characters)"
-            )
-        resolved_max_tool_hops = (
-            self._default_max_tool_hops if max_tool_hops is None else int(max_tool_hops)
+        resolved_max_tool_hops = validate_interact_args(
+            user_message,
+            max_tool_hops,
+            default_max_tool_hops=self._default_max_tool_hops,
+            caller="SandboxEnv.interact",
         )
-        if resolved_max_tool_hops <= 0:
-            raise ValueError("max_tool_hops must be positive")
+        if resolved_max_tool_hops is None:
+            raise RuntimeError("SandboxEnv.interact requires a concrete max_tool_hops")
 
         self.trace.add_user(user_message)
         self._runtime_history = self._runtime_history.with_user_message(user_message)

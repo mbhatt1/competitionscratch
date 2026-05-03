@@ -18,19 +18,52 @@ _SKIPPABLE_PROMPTGUARD_ERRORS = (
     "gated repo",
     "401",
     "403",
+    "407",
     "cannot send a request, as the client has been closed",
     "connection",
+    "proxy",
+    "socks",
+    "socksio",
+    "package is not installed",
     "timed out",
     "temporary failure in name resolution",
     "name or service not known",
 )
 
 
+def _exception_messages(err: BaseException) -> list[str]:
+    messages: list[str] = []
+    current: BaseException | None = err
+    while current is not None:
+        messages.append(str(current).lower())
+        current = current.__cause__ or current.__context__
+    return messages
+
+
 def _should_skip_promptguard_error(err: BaseException) -> bool:
-    message = str(err).lower()
-    return any(token in message for token in _SKIPPABLE_PROMPTGUARD_ERRORS)
+    return any(
+        token in message
+        for message in _exception_messages(err)
+        for token in _SKIPPABLE_PROMPTGUARD_ERRORS
+    )
 
 
+def test_promptguard_skip_matcher_recognizes_missing_socks_dependency() -> None:
+    err = ImportError("Using SOCKS proxy, but the 'socksio' package is not installed")
+
+    assert _should_skip_promptguard_error(err)
+
+
+def test_promptguard_skip_matcher_checks_chained_exceptions() -> None:
+    root = TimeoutError("Timed out while downloading Prompt-Guard")
+    err = RuntimeError("failed to initialize classifier")
+    err.__cause__ = root
+
+    assert _should_skip_promptguard_error(err)
+
+
+@pytest.mark.benchmark
+@pytest.mark.external_model
 def test_promptguard_guardrail(budget_s: float = 30.0):
     """Test Prompt-Guard-86M guardrail against baseline attacker.
 

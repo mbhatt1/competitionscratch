@@ -6,6 +6,8 @@ Recent Taint Window (5 ops) + Ultra-Dangerous Target Detection
 
 from typing import Any
 
+import pytest
+
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.evaluation.ops import eval_defense
 from aicomp_sdk.scoring import score_defense
@@ -164,6 +166,7 @@ def run_optimal_guardrail(budget_s: float = 30.0) -> tuple[dict[str, Any], float
     return report, defense_score
 
 
+@pytest.mark.benchmark
 def test_optimal_guardrail() -> None:
     report, defense_score = run_optimal_guardrail()
     assert report["breach_count"] >= 0

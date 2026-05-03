@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from typing import Any, Self
 
-from .hf_types import HFBackendConfig, HFGenerationRequest, HFGenerationResponse
+from ..types import HFBackendConfig, HFGenerationRequest, HFGenerationResponse
 
 
 def _resolve_hf_optional_override(

@@ -1,14 +1,17 @@
-from .hf_agent import HFChatTemplateAgent
-from .hf_backend import HFChatTemplateBackend
-from .hf_processor_backend import HFProcessorChatTemplateBackend
-from .hf_response_parsing import (
+from .agent import HFChatTemplateAgent
+from .backends import (
+    HFChatTemplateBackend,
+    HFProcessorChatTemplateBackend,
+    LlamaCppChatTemplateBackend,
+)
+from .response_parsing import (
     JsonEnvelopeToolCallParser,
     TokenizerNativeResponseParser,
     build_hf_response_parser,
     normalize_parsed_response,
     normalize_tool_arguments,
 )
-from .hf_types import (
+from .types import (
     HFBackendConfig,
     HFGenerationBackendProtocol,
     HFGenerationRequest,
@@ -23,6 +26,7 @@ __all__ = [
     "HFChatTemplateAgent",
     "HFChatTemplateBackend",
     "HFProcessorChatTemplateBackend",
+    "LlamaCppChatTemplateBackend",
     "HFGenerationBackendProtocol",
     "HFGenerationRequest",
     "HFGenerationResponse",
