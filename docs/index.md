@@ -114,7 +114,7 @@ Why the return value is small: the evaluator does not trust attacker-supplied tr
 - Direct `SandboxEnv(...)` construction requires an explicit `agent=` instance.
 - The guardrail contract is `GuardrailBase.decide(...) -> Decision`; hook-based APIs are advanced harness-owned threat fixtures under `aicomp_sdk.hooks`, not submission APIs.
 - `RuntimeHistory` is the agent-provider-facing conversation/tool history; `Trace` is the scorer/export-facing event record used for replay validation, predicates, cells, and reports.
-- `aicomp_sdk.agents` is extension-facing: use it when selecting SDK backends or adding custom backend agents.
+- `aicomp_sdk.agents` is extension-facing: use it when selecting SDK backends, adding custom backend agents, or supplying a `LlamaCppChatTemplateBackend` around a `llama-cpp-python` model.
 - Current canonical tools are `web.search`, `web.open`, `fs.read`, `fs.write`, `fs.delete`, `shell.run`, `email.list`, `email.read`, `email.send`, and `http.post`.
 - If you construct environments directly, the evaluators resolve packaged fixtures automatically; direct SDK usage should point at a valid fixtures directory or call `resolve_fixtures_dir(...)`.
 

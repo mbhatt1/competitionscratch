@@ -268,9 +268,38 @@ Gemma 4 support is explicit rather than part of `auto`: use `--agent gemma_4`
 or `AgentSelection.GEMMA_4` after installing a recent Transformers release and
 making the model available locally. Configure the model source with
 `GEMMA4_MODEL_PATH` or `GEMMA4_MODEL_ID`, or pass explicit values to
-`build_gemma4_backend_config(...)`. It uses Gemma 4's native chat-template tool
-declarations, but the SDK sandbox still owns tool allowlisting, guardrail checks,
-hook fixtures, and tool execution.
+`build_gemma4_backend_config(...)`. The default Gemma 4 agent uses Gemma 4's
+native chat-template tool declarations, but the SDK sandbox still owns tool
+allowlisting, guardrail checks, hook fixtures, and tool execution.
+
+Backend authors can also use `LlamaCppChatTemplateBackend` from
+`aicomp_sdk.agents` when they want to run a chat-template backend through
+`llama-cpp-python`. The package does not install `llama-cpp-python` for you, so
+install that dependency separately before constructing the backend. This is a
+programmatic backend option, not a separate `--agent` selection.
+
+```python
+from aicomp_sdk.agents import (
+    Gemma4Agent,
+    LlamaCppChatTemplateBackend,
+    build_gemma4_backend_config,
+)
+
+backend = LlamaCppChatTemplateBackend.from_model_path(
+    model_path="/models/gemma-4-26b-it.gguf",
+    config=build_gemma4_backend_config(
+        model_path="/models/gemma-4-26b-it.gguf",
+        max_new_tokens=256,
+    ),
+    n_ctx=8192,
+    n_gpu_layers=-1,
+)
+agent = Gemma4Agent(backend=backend)
+```
+
+`LlamaCppChatTemplateBackend` forwards SDK tool definitions to
+`create_chat_completion(...)` by default. Pass `supports_tools=False` when the
+loaded llama.cpp model or chat format should receive messages only.
 
 Current canonical tools:
 

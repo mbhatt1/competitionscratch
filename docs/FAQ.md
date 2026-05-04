@@ -149,7 +149,14 @@ Current selections are:
 - `gemma_4`
 
 `gemma` is the existing prompt-driven Gemma 3 HF backend. `gemma_4` is the
-opt-in native tool-call backend for `google/gemma-4-26B-A4B-it`; it requires a
-recent Transformers install and local model availability. Use `GEMMA4_MODEL_PATH`
-or `GEMMA4_MODEL_ID` to override the default model source. `auto` does not load
+opt-in native tool-call backend for `google/gemma-4-26B-A4B-it`; the CLI
+selection uses the Transformers-backed loader and requires a recent Transformers
+install plus local model availability. Use `GEMMA4_MODEL_PATH` or
+`GEMMA4_MODEL_ID` to override the default model source. `auto` does not load
 Gemma 4.
+
+For programmatic integrations, `aicomp_sdk.agents` also exports
+`LlamaCppChatTemplateBackend`. Install `llama-cpp-python` separately, build the
+backend with `LlamaCppChatTemplateBackend.from_model_path(...)`, and pass it to
+`Gemma4Agent(backend=...)` or another `HFChatTemplateAgent` integration. This is
+not a separate `--agent` value.
