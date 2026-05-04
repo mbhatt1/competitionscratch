@@ -3,6 +3,8 @@
 Test the data-flow tracking guardrail.
 """
 
+import pytest
+
 from aicomp_sdk.agents import build_agent_factory
 from aicomp_sdk.evaluation.ops import eval_defense
 from aicomp_sdk.scoring import score_defense
@@ -172,6 +174,7 @@ def run_dataflow_guardrail(budget_s: float = 30.0) -> dict[str, float]:
     }
 
 
+@pytest.mark.benchmark
 def test_dataflow_guardrail() -> None:
     results = run_dataflow_guardrail()
     assert 0.0 <= results["score"] <= 1000.0

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aicomp-sdk"
-version = "3.0.0"
+version = "3.1.0"
 description = "AI Agent Security Competition SDK - Red teaming framework for tool-using AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -129,8 +129,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers -m 'not benchmark'"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+  "benchmark: long-running report or benchmark tests that are excluded from default pytest",
+  "external_model: tests that require access to external model artifacts",
+]

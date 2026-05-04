@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from .hf_types import HFBackendConfig, HFGenerationRequest, HFGenerationResponse
+from ..types import HFBackendConfig, HFGenerationRequest, HFGenerationResponse
 
 
 class HFProcessorChatTemplateBackend:

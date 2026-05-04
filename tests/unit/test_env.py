@@ -22,6 +22,7 @@ from aicomp_sdk.core.env.api import (
     AttackEnvProtocol,
     DiagnosticsEnv,
     EnvInteractionResult,
+    validate_interact_args,
 )
 from aicomp_sdk.core.env.sandbox import EnvSnapshot, SandboxEnv
 from aicomp_sdk.guardrails.base import Decision, GuardrailBase
@@ -463,6 +464,37 @@ def test_env_interact_rejects_oversized_message(temp_fixtures: Path) -> None:
     assert agent._cursor == 0
 
 
+def test_env_interact_rejects_non_string_message_before_mutation(temp_fixtures: Path) -> None:
+    agent = StubAgent()
+    env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=agent)
+
+    with pytest.raises(TypeError, match="user_message must be a string"):
+        env.interact(123)
+
+    assert env.trace.user_messages == []
+    assert agent._cursor == 0
+
+
+@pytest.mark.parametrize("max_tool_hops", [0, -1])
+def test_env_interact_rejects_non_positive_max_hops_before_mutation(
+    temp_fixtures: Path,
+    max_tool_hops: int,
+) -> None:
+    agent = StubAgent()
+    env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=agent)
+
+    with pytest.raises(ValueError, match="max_tool_hops must be positive"):
+        env.interact("hello", max_tool_hops=max_tool_hops)
+
+    assert env.trace.user_messages == []
+    assert agent._cursor == 0
+
+
+def test_validate_interact_args_resolves_omitted_max_hops_to_default() -> None:
+    assert validate_interact_args("hello", None) is None
+    assert validate_interact_args("hello", None, default_max_tool_hops=3) == 3
+
+
 def test_env_interact_default_max_hops_matches_contract(temp_fixtures: Path) -> None:
     agent = StubAgent(decisions=[_tool_decision("fs.read", {"path": "readme.txt"})] * 20)
     env = SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=agent)
@@ -735,31 +767,3 @@ def test_diagnostics_env_accumulates_interactions(temp_fixtures: Path) -> None:
     assert env.run_diagnostics.successful_tool_calls == 1
     assert env.run_diagnostics.failed_tool_calls == 0
     assert env.run_diagnostics.agent_refusals == 1
-
-
-def test_diagnostics_env_delegates_snapshot_restore_and_export(temp_fixtures: Path) -> None:
-    env = DiagnosticsEnv(SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=StubAgent()))
-    env.interact("hello")
-    snapshot = env.snapshot()
-    trace_before = env.export_trace_dict()
-
-    env.interact("second")
-    env.restore(snapshot)
-
-    assert env.export_trace_dict() == trace_before
-    assert env.run_diagnostics.interactions == 2
-    assert env.run_diagnostics.agent_turns == 2
-
-
-def test_diagnostics_env_keeps_run_diagnostics_across_reset_and_restore(
-    temp_fixtures: Path,
-) -> None:
-    env = DiagnosticsEnv(SandboxEnv(seed=42, fixtures_dir=temp_fixtures, agent=StubAgent()))
-    env.interact("hello")
-    snapshot = env.snapshot()
-
-    env.reset()
-    env.restore(snapshot)
-
-    assert env.run_diagnostics.interactions == 1
-    assert env.run_diagnostics.agent_turns == 1

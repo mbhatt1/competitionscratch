@@ -13,12 +13,16 @@ from aicomp_sdk.agents.gemma4_agent import (
     build_gemma4_backend_config,
     build_gemma4_parser,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFGenerationRequest,
     HFGenerationResponse,
 )
+from aicomp_sdk.agents.hf_chat_template.backends.llama_cpp import (
+    LlamaCppChatTemplateBackend,
+)
 from aicomp_sdk.agents.types import (
     AgentToolSpec,
+    FinalResponseDecision,
     InvalidModelOutputError,
     ToolCall,
     ToolCallDecision,
@@ -56,6 +60,15 @@ class _BackendStub:
             text="",
             raw_text='<|tool_call>call:fs.read{path:<|"|>secret.txt<|"|>}<tool_call|>',
         )
+
+
+class _FakeLlama:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def create_chat_completion(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        return {"choices": [{"message": {"content": "done"}}]}
 
 
 def test_build_gemma4_backend_config_prefers_env_and_default(
@@ -128,6 +141,79 @@ def test_gemma4_request_builder_renders_native_tool_transcript() -> None:
             "tool_calls": [{"function": {"name": "fs.read", "arguments": {"path": "a.txt"}}}],
             "tool_responses": [{"name": "fs.read", "response": "A"}],
         },
+    ]
+
+
+def test_gemma4_uses_default_hf_transcript_for_llama_cpp_backend() -> None:
+    llm = _FakeLlama()
+    backend = LlamaCppChatTemplateBackend(
+        llm=llm,
+        config=build_gemma4_backend_config(),
+    )
+    agent = Gemma4Agent(backend=backend)
+    history = (
+        RuntimeHistory()
+        .with_instruction("Base system prompt.")
+        .with_user_message("Read the file")
+        .with_tool_request(
+            ToolCall(call_id="call_1", tool_name="fs.read", arguments={"path": "a.txt"})
+        )
+        .with_tool_result(
+            ToolResult(
+                call_id="call_1",
+                tool_name="fs.read",
+                output_text="A",
+                is_error=False,
+            )
+        )
+    )
+
+    decision = agent.next_action(history=history, tools=_tools())
+
+    assert isinstance(decision, FinalResponseDecision)
+    assert decision.text == "done"
+    assert llm.calls == [
+        {
+            "messages": [
+                {"role": "system", "content": "Base system prompt."},
+                {"role": "user", "content": "Read the file"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": "fs.read",
+                                "arguments": '{"path": "a.txt"}',
+                            },
+                            "id": "call_1",
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "content": "A",
+                    "tool_call_id": "call_1",
+                },
+            ],
+            "max_tokens": backend.config.max_new_tokens,
+            "temperature": 0.0,
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "fs.read",
+                        "description": "Read a file.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"path": {"type": "string"}},
+                            "required": ["path"],
+                            "additionalProperties": False,
+                        },
+                    },
+                }
+            ],
+        }
     ]
 
 

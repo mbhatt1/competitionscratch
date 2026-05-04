@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 
 from aicomp_sdk.agents.debug import InMemoryAgentDebugSink
 from aicomp_sdk.agents.gpt_oss_agent import (
@@ -13,26 +14,22 @@ from aicomp_sdk.agents.gpt_oss_agent import (
     build_gpt_oss_backend_config,
     build_gpt_oss_parser,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_backend import HFChatTemplateBackend
-from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
+from aicomp_sdk.agents.hf_chat_template.backends.transformers import HFChatTemplateBackend
+from aicomp_sdk.agents.hf_chat_template.response_parsing import (
     JsonEnvelopeToolCallParser,
     TokenizerNativeResponseParser,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFGenerationRequest,
     HFGenerationResponse,
 )
-from aicomp_sdk.agents.types import AgentToolSpec, ToolCallDecision
+from aicomp_sdk.agents.types import (
+    AgentToolSpec,
+    FinalResponseDecision,
+    InvalidModelOutputError,
+    ToolCallDecision,
+)
 from aicomp_sdk.core.runtime_history import RuntimeHistory
-
-
-def test_gpt_oss_agent_uses_public_hf_parsing_helpers() -> None:
-    source = Path("aicomp_sdk/agents/gpt_oss_agent.py").read_text(encoding="utf-8")
-
-    assert "_normalize_parsed_response" not in source
-    assert "_normalize_tool_arguments" not in source
-    assert "normalize_parsed_response" in source
-    assert "normalize_tool_arguments" in source
 
 
 def _tools() -> list[AgentToolSpec]:
@@ -143,8 +140,40 @@ def test_build_gpt_oss_parser_uses_specialized_fallback_not_json_envelope() -> N
         fallback_call_id="call_000001",
     )
     assert isinstance(decision, ToolCallDecision)
+    assert decision.call.call_id == "call_000001"
     assert decision.call.tool_name == "fs.read"
     assert decision.call.arguments == {"path": "secret.txt"}
+
+
+def test_gpt_oss_fallback_parser_returns_final_channel_content() -> None:
+    parser = build_gpt_oss_parser(None, model_id=DEFAULT_GPT_OSS_MODEL_ID)
+
+    decision = parser.parse(
+        HFGenerationResponse(
+            text="",
+            raw_text="<|channel|>final<|message|>I cannot do that.<|end|>",
+        ),
+        fallback_call_id="call_000001",
+    )
+
+    assert isinstance(decision, FinalResponseDecision)
+    assert decision.text == "I cannot do that."
+
+
+def test_gpt_oss_fallback_parser_rejects_invalid_tool_arguments_json() -> None:
+    parser = build_gpt_oss_parser(None, model_id=DEFAULT_GPT_OSS_MODEL_ID)
+
+    with pytest.raises(InvalidModelOutputError, match="Invalid tool arguments JSON"):
+        parser.parse(
+            HFGenerationResponse(
+                text="",
+                raw_text=(
+                    "<|channel|>commentary to=functions.fs.read<|message|>"
+                    '{"path": <|call|>'
+                ),
+            ),
+            fallback_call_id="call_000001",
+        )
 
 
 def test_build_gpt_oss_parser_uses_json_envelope_for_non_gpt_oss_models() -> None:

@@ -32,7 +32,8 @@ from aicomp_sdk.agents.types import (
 )
 from aicomp_sdk.core.runtime_history import RuntimeHistory
 
-from .hf_types import (
+from .response_parsing import normalize_parsed_response
+from .types import (
     HFGenerationBackendProtocol,
     HFGenerationRequest,
     HFGenerationResponse,
@@ -337,6 +338,11 @@ class HFChatTemplateAgent(AgentProtocol):
         state: HFChatTemplateAgentState,
     ) -> AgentDecision:
         fallback_call_id = f"call_{state.next_generated_call_index:06d}"
+        if response.parsed_response is not None:
+            return normalize_parsed_response(
+                response.parsed_response,
+                fallback_call_id=fallback_call_id,
+            )
         return self._parser.parse(response, fallback_call_id=fallback_call_id)
 
     def _debug_provider_payload(

@@ -6,19 +6,25 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from aicomp_sdk.agents.debug import AgentDebugSink
-from aicomp_sdk.agents.hf_chat_template.hf_agent import (
+from aicomp_sdk.agents.hf_chat_template.agent import (
     HFChatTemplateAgent,
+    _build_default_hf_request,
     _relabel_hf_chat_template_snapshot,
     _unwrap_hf_chat_template_snapshot,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_backend import _build_hf_backend_config
-from aicomp_sdk.agents.hf_chat_template.hf_processor_backend import (
+from aicomp_sdk.agents.hf_chat_template.backends.llama_cpp import (
+    LlamaCppChatTemplateBackend,
+)
+from aicomp_sdk.agents.hf_chat_template.backends.processor import (
     HFProcessorChatTemplateBackend,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
+from aicomp_sdk.agents.hf_chat_template.backends.transformers import (
+    _build_hf_backend_config,
+)
+from aicomp_sdk.agents.hf_chat_template.response_parsing import (
     normalize_parsed_response,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFBackendConfig,
     HFGenerationBackendProtocol,
     HFGenerationRequest,
@@ -38,7 +44,6 @@ from aicomp_sdk.agents.types import (
     InvalidModelOutputError,
     JsonObject,
     JsonValue,
-    ToolCallDecision,
     ToolRequestEvent,
     ToolResultEvent,
     UserMessageEvent,
@@ -271,11 +276,14 @@ class Gemma4Agent(AgentProtocol):
             getattr(resolved_backend, "processor", None),
             model_id=resolved_backend.config.model_id,
         )
+        request_builder = _build_gemma4_request
+        if isinstance(resolved_backend, LlamaCppChatTemplateBackend):
+            request_builder = _build_default_hf_request
         self._delegate = HFChatTemplateAgent(
             backend=resolved_backend,
             profile=resolved_profile,
             parser=resolved_parser,
-            request_builder=_build_gemma4_request,
+            request_builder=request_builder,
             debug_sink=debug_sink,
             debug_backend_label="gemma_4",
         )

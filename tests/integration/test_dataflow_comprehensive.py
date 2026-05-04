@@ -5,6 +5,8 @@ Comprehensive test for data-flow guardrail with extensive benign test suite.
 
 from pathlib import Path
 
+import pytest
+
 from aicomp_sdk.agents import build_agent
 from aicomp_sdk.core.env.sandbox import SandboxEnv
 
@@ -89,11 +91,12 @@ def run_comprehensive_benign() -> dict[str, float]:
 
     fp_persistent = 0
     for cmd in benign:
+        starting_tool_count = len(env1.trace.tool_events)
         env1.interact(cmd)
         tr = env1.export_trace_dict()
         if any(
             (e.get("error") or "").startswith(("denied:", "confirm_required:"))
-            for e in tr["tool_events"]
+            for e in tr["tool_events"][starting_tool_count:]
         ):
             fp_persistent += 1
 
@@ -114,11 +117,12 @@ def run_comprehensive_benign() -> dict[str, float]:
     fp_dataflow = 0
     blocked_cmds = []
     for i, cmd in enumerate(benign, 1):
+        starting_tool_count = len(env2.trace.tool_events)
         env2.interact(cmd)
         tr = env2.export_trace_dict()
         denied = [
             e
-            for e in tr["tool_events"]
+            for e in tr["tool_events"][starting_tool_count:]
             if (e.get("error") or "").startswith(("denied:", "confirm_required:"))
         ]
         if denied:
@@ -202,6 +206,7 @@ def run_comprehensive_benign() -> dict[str, float]:
     }
 
 
+@pytest.mark.benchmark
 def test_comprehensive_benign() -> None:
     results = run_comprehensive_benign()
     assert results["fp_persistent"] >= 0

@@ -10,6 +10,29 @@ DEFAULT_MAX_TOOL_HOPS: Final[int] = 8
 MAX_USER_MESSAGE_CHARS: Final[int] = 2_000
 
 
+def validate_interact_args(
+    user_message: Any,
+    max_tool_hops: Any,
+    *,
+    default_max_tool_hops: int | None = None,
+    caller: str = "Env.interact",
+) -> int | None:
+    """Validate common AttackEnv.interact inputs and return resolved tool hops."""
+    if not isinstance(user_message, str):
+        raise TypeError(f"{caller} user_message must be a string")
+    if len(user_message) > MAX_USER_MESSAGE_CHARS:
+        raise ValueError(f"user_message exceeds max length ({MAX_USER_MESSAGE_CHARS} characters)")
+
+    resolved_max_tool_hops = default_max_tool_hops if max_tool_hops is None else max_tool_hops
+    if resolved_max_tool_hops is None:
+        return None
+
+    resolved_max_tool_hops = int(resolved_max_tool_hops)
+    if resolved_max_tool_hops <= 0:
+        raise ValueError("max_tool_hops must be positive")
+    return resolved_max_tool_hops
+
+
 class EnvSelection(StrEnum):
     SANDBOX = "sandbox"
     GYM = "gym"

@@ -7,17 +7,20 @@ from unittest.mock import Mock, call
 import pytest
 
 from aicomp_sdk.agents.debug import InMemoryAgentDebugSink
-from aicomp_sdk.agents.hf_chat_template.hf_agent import HFChatTemplateAgent
-from aicomp_sdk.agents.hf_chat_template.hf_backend import HFChatTemplateBackend
-from aicomp_sdk.agents.hf_chat_template.hf_processor_backend import (
+from aicomp_sdk.agents.hf_chat_template.agent import HFChatTemplateAgent
+from aicomp_sdk.agents.hf_chat_template.backends.processor import (
     HFProcessorChatTemplateBackend,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_response_parsing import (
+from aicomp_sdk.agents.hf_chat_template.backends.llama_cpp import (
+    LlamaCppChatTemplateBackend,
+)
+from aicomp_sdk.agents.hf_chat_template.backends.transformers import HFChatTemplateBackend
+from aicomp_sdk.agents.hf_chat_template.response_parsing import (
     JsonEnvelopeToolCallParser,
     TokenizerNativeResponseParser,
     build_hf_response_parser,
 )
-from aicomp_sdk.agents.hf_chat_template.hf_types import (
+from aicomp_sdk.agents.hf_chat_template.types import (
     HFBackendConfig,
     HFGenerationRequest,
     HFGenerationResponse,
@@ -125,6 +128,20 @@ class _SequentialBackend:
     def generate(self, request: HFGenerationRequest) -> HFGenerationResponse:
         self.requests.append(request)
         return self.responses.pop(0)
+
+
+class _FakeLlama:
+    def __init__(self, completion: object) -> None:
+        self.completion = completion
+        self.calls: list[dict[str, object]] = []
+        self.closed = False
+
+    def create_chat_completion(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        return self.completion
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class _StubParser(HFResponseParser):
@@ -389,6 +406,216 @@ def test_hf_processor_backend_generate_forwards_request_and_decodes_suffix() -> 
             clean_up_tokenization_spaces=False,
         ),
     ]
+
+
+def test_llama_cpp_backend_from_model_path_uses_injected_llama_class() -> None:
+    class FakeLlamaFactory:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    config = _backend_config(model_path="/models/hf")
+
+    backend = LlamaCppChatTemplateBackend.from_model_path(
+        model_path="/models/model.gguf",
+        config=config,
+        n_ctx=4096,
+        n_gpu_layers=12,
+        verbose=True,
+        supports_tools=False,
+        llama_cls=FakeLlamaFactory,
+        llama_kwargs={"chat_format": "chatml"},
+    )
+
+    assert backend.config == config
+    assert backend.supports_tools is False
+    assert backend.llm.kwargs == {
+        "model_path": "/models/model.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": 12,
+        "verbose": True,
+        "chat_format": "chatml",
+    }
+
+
+def test_llama_cpp_backend_converts_request_for_chat_completion() -> None:
+    llm = _FakeLlama(
+        {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "content": " done "},
+                }
+            ]
+        }
+    )
+    backend = LlamaCppChatTemplateBackend(llm=llm, config=_backend_config())
+    request = HFGenerationRequest(
+        messages=[
+            {"role": "user", "content": "Read the file"},
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {
+                            "name": "fs.read",
+                            "arguments": {"path": "a.txt"},
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "name": "fs.read",
+                "content": "A",
+                "tool_call_id": "call_1",
+            },
+        ],
+        tools=[{"type": "function", "function": {"name": "fs.read"}}],
+        chat_template="ignored-by-llama-cpp",
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=32,
+        generation_kwargs={"do_sample": False, "top_p": 0.9},
+    )
+
+    response = backend.generate(request)
+
+    assert response.text == "done"
+    assert response.raw_text == " done "
+    assert response.finish_reason == "stop"
+    assert llm.calls == [
+        {
+            "messages": [
+                {"role": "user", "content": "Read the file"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "function": {
+                                "name": "fs.read",
+                                "arguments": '{"path": "a.txt"}',
+                            },
+                            "type": "function",
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "content": "A",
+                    "tool_call_id": "call_1",
+                },
+            ],
+            "max_tokens": 32,
+            "top_p": 0.9,
+            "temperature": 0.0,
+            "tools": [{"type": "function", "function": {"name": "fs.read"}}],
+        }
+    ]
+
+
+def test_llama_cpp_backend_omits_tools_when_tool_forwarding_is_disabled() -> None:
+    llm = _FakeLlama({"choices": [{"message": {"content": "done"}}]})
+    backend = LlamaCppChatTemplateBackend(
+        llm=llm,
+        config=_backend_config(),
+        supports_tools=False,
+    )
+    request = HFGenerationRequest(
+        messages=[{"role": "user", "content": "Read the file"}],
+        tools=[{"type": "function", "function": {"name": "fs.read"}}],
+        chat_template=None,
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=16,
+        generation_kwargs={"do_sample": False},
+    )
+
+    backend.generate(request)
+
+    assert "tools" not in llm.calls[0]
+
+
+def test_llama_cpp_backend_extracts_parsed_tool_call_message() -> None:
+    tool_calls = [
+        {
+            "id": "call_1",
+            "type": "function",
+            "function": {"name": "fs.read", "arguments": '{"path":"a.txt"}'},
+        }
+    ]
+    llm = _FakeLlama(
+        {
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "message": {"role": "assistant", "content": None, "tool_calls": tool_calls},
+                }
+            ]
+        }
+    )
+    backend = LlamaCppChatTemplateBackend(llm=llm, config=_backend_config())
+    request = HFGenerationRequest(
+        messages=[{"role": "user", "content": "Read the file"}],
+        tools=[],
+        chat_template=None,
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=16,
+        generation_kwargs={},
+    )
+
+    response = backend.generate(request)
+
+    assert response.text == ""
+    assert response.raw_text == ""
+    assert response.finish_reason == "tool_calls"
+    assert response.parsed_response == {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": tool_calls,
+    }
+
+
+def test_llama_cpp_backend_rejects_malformed_completion() -> None:
+    backend = LlamaCppChatTemplateBackend(
+        llm=_FakeLlama({"choices": []}),
+        config=_backend_config(),
+    )
+    request = HFGenerationRequest(
+        messages=[{"role": "user", "content": "Read the file"}],
+        tools=[],
+        chat_template=None,
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=16,
+        generation_kwargs={},
+    )
+
+    with pytest.raises(ValueError, match="missing choices"):
+        backend.generate(request)
+
+
+def test_llama_cpp_backend_close_closes_llm_and_blocks_generation() -> None:
+    llm = _FakeLlama({"choices": [{"message": {"content": "done"}}]})
+    backend = LlamaCppChatTemplateBackend(llm=llm, config=_backend_config())
+    request = HFGenerationRequest(
+        messages=[{"role": "user", "content": "Read the file"}],
+        tools=[],
+        chat_template=None,
+        add_generation_prompt=True,
+        continue_final_message=False,
+        max_new_tokens=16,
+        generation_kwargs={},
+    )
+
+    backend.close()
+    backend.close()
+
+    assert llm.closed is True
+    with pytest.raises(RuntimeError, match="closed"):
+        backend.generate(request)
 
 
 def test_hf_generation_request_rejects_conflicting_generation_flags() -> None:
@@ -683,6 +910,43 @@ def test_json_envelope_tool_call_parser_handles_plain_text_response() -> None:
     assert decision == FinalResponseDecision(text="done")
 
 
+def test_hf_agent_prefers_backend_parsed_response() -> None:
+    backend = _RecordingBackend(
+        HFGenerationResponse(
+            text="",
+            raw_text="",
+            parsed_response={
+                "content": "",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "backend-call",
+                        "function": {
+                            "name": "fs.read",
+                            "arguments": {"path": "secret.txt"},
+                        },
+                    }
+                ],
+            },
+        )
+    )
+    fallback_parser = _StubParser(FinalResponseDecision(text="fallback"))
+    agent = HFChatTemplateAgent(
+        backend=backend,
+        profile=_profile(),
+        parser=fallback_parser,
+    )
+    history = RuntimeHistory().with_instruction("system").with_user_message("Read secret")
+
+    decision = agent.next_action(history=history, tools=_tools())
+
+    assert isinstance(decision, ToolCallDecision)
+    assert decision.call.call_id == "backend-call"
+    assert decision.call.tool_name == "fs.read"
+    assert decision.call.arguments == {"path": "secret.txt"}
+    assert fallback_parser.responses == []
+
+
 def test_hf_agent_snapshot_restore_preserves_call_id_counter() -> None:
     backend = _SequentialBackend(
         [
@@ -839,6 +1103,7 @@ def test_hf_agent_emits_debug_events_for_successful_turn() -> None:
         "text": '{"final":"done"}',
         "raw_text": '{"final":"done"}',
         "finish_reason": None,
+        "parsed_response": None,
     }
     assert debug_sink.events[2].decision_payload == {
         "type": "final_response",
@@ -870,4 +1135,5 @@ def test_hf_agent_emits_parse_error_debug_event() -> None:
         "text": "",
         "raw_text": "",
         "finish_reason": None,
+        "parsed_response": None,
     }
