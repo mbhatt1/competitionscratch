@@ -5,6 +5,9 @@ from __future__ import annotations
 import importlib
 import inspect
 import os
+import queue
+import threading
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -46,6 +49,38 @@ MAX_REPLAY_MESSAGES_PER_FINDING: Final[int] = 32
 EVALUATION_DEFAULT_MAX_TOOL_HOPS: Final[int] = 4
 DEFAULT_ATTACK_GUARDRAIL_ID: Final[str] = "optimal_public"
 DEFAULT_DEFENSE_HOOK_ID: Final[str] = "none_public"
+
+
+def _run_until_deadline(
+    operation: Callable[[], Any],
+    *,
+    deadline_s: float,
+    phase: str,
+) -> Any:
+    """Return an operation result only if it arrives before the phase deadline."""
+    remaining_s = deadline_s - time.monotonic()
+    if remaining_s <= 0:
+        raise TimeoutError(f"{phase} exceeded its time budget")
+
+    result_queue: queue.Queue[tuple[Any, BaseException | None]] = queue.Queue(maxsize=1)
+
+    def run() -> None:
+        try:
+            result = operation()
+        except BaseException as err:
+            result_queue.put((None, err))
+        else:
+            result_queue.put((result, None))
+
+    threading.Thread(target=run, daemon=True).start()
+    try:
+        result, error = result_queue.get(timeout=remaining_s)
+    except queue.Empty:
+        raise TimeoutError(f"{phase} exceeded its time budget") from None
+
+    if error is not None:
+        raise error
+    return result
 
 
 class ValidatedAttackFinding(TypedDict):
@@ -729,6 +764,9 @@ def eval_attack(
 ) -> list[ValidatedAttackFinding]:
     """Evaluate an attack submission via replay and canonicalized scoring traces.
 
+    Attack generation and evaluator replay each receive the configured attack
+    time budget. A timeout raises ``TimeoutError`` before findings are returned.
+
     ``options`` exposes attack-evaluation tuning for Python callers. Most scripts
     should use ``evaluate_redteam(...)`` or ``evaluate_dual(...)`` instead.
     """
@@ -762,12 +800,18 @@ def eval_attack(
         if output_controller is not None
         else nullcontext()
     )
+    generation_deadline_s = time.monotonic() + run_config.time_budget_s
     with run_capture_context:
-        candidates = attacker.run(run_env, run_config)
+        candidates = _run_until_deadline(
+            lambda: attacker.run(run_env, run_config),
+            deadline_s=generation_deadline_s,
+            phase="attack generation",
+        )
     if not isinstance(candidates, list):
         raise TypeError("AttackAlgorithm.run must return list[AttackCandidate]")
 
     validated: list[ValidatedAttackFinding] = []
+    replay_deadline_s = time.monotonic() + run_config.time_budget_s
     for idx, candidate in enumerate(candidates[:MAX_REPLAY_FINDINGS]):
         if not isinstance(candidate, AttackCandidate):
             raise TypeError(
@@ -775,17 +819,21 @@ def eval_attack(
                 "expected AttackCandidate"
             )
 
-        trace = _replay_candidate_trace(
-            candidate=candidate,
-            index=idx,
-            seed=resolved_options.env_seed,
-            fixtures_dir=resolved_fixtures_dir,
-            agent_factory=agent_factory,
-            guardrail=resolved_options.guardrail_factory(),
-            env_selection=env_selection,
-            max_tool_hops=run_config.max_tool_hops,
-            hook_registry_factory=HookRegistry,
-            output_controller=output_controller,
+        trace = _run_until_deadline(
+            lambda candidate=candidate, idx=idx: _replay_candidate_trace(
+                candidate=candidate,
+                index=idx,
+                seed=resolved_options.env_seed,
+                fixtures_dir=resolved_fixtures_dir,
+                agent_factory=agent_factory,
+                guardrail=resolved_options.guardrail_factory(),
+                env_selection=env_selection,
+                max_tool_hops=run_config.max_tool_hops,
+                hook_registry_factory=HookRegistry,
+                output_controller=output_controller,
+            ),
+            deadline_s=replay_deadline_s,
+            phase="attack replay",
         )
         predicates = eval_predicates(trace)
         if not predicates:
