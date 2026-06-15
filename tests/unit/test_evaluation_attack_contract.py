@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 import importlib
 import json
+import time
 import weakref
 from types import SimpleNamespace
 from typing import Any
@@ -175,6 +176,54 @@ def test_eval_attack_replays_candidates_and_canonicalizes(_patch_eval) -> None:
         user_messages=finding["trace"]["user_messages"],
     )
     assert finding["score_cell_signature"] == cell_signature(finding["trace"]["tool_events"])
+
+
+def test_eval_attack_times_out_attack_generation(_patch_eval) -> None:
+    class SlowAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del env, config
+            time.sleep(0.05)
+            return []
+
+    with pytest.raises(TimeoutError, match="attack generation exceeded"):
+        evaluation_core.eval_attack(
+            SlowAttack,
+            0.01,
+            build_agent_factory("deterministic"),
+            env_selection="sandbox",
+        )
+
+
+def test_eval_attack_discards_partial_findings_when_replay_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class SlowReplayEnv(_FakeSandboxEnv):
+        def interact(
+            self,
+            user_message: str,
+            max_tool_hops: int | None = None,
+        ) -> EnvInteractionResult:
+            if user_message == "slow attack prompt":
+                time.sleep(0.05)
+            return super().interact(user_message, max_tool_hops)
+
+    _patch_fake_eval(monkeypatch, env_factory=SlowReplayEnv)
+
+    class DirectCandidateAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del env, config
+            return [
+                AttackCandidate(user_messages=("fast attack prompt",)),
+                AttackCandidate(user_messages=("slow attack prompt",)),
+            ]
+
+    with pytest.raises(TimeoutError, match="attack replay exceeded"):
+        evaluation_core.eval_attack(
+            DirectCandidateAttack,
+            0.01,
+            build_agent_factory("deterministic"),
+            env_selection="sandbox",
+        )
 
 
 def test_eval_attack_scores_same_trace_different_prompts_as_one_scoring_cell(_patch_eval) -> None:
