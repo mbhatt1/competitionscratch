@@ -19,7 +19,13 @@ except ImportError:
     GymAttackEnv: Any = None
 else:
     GymAttackEnv = _GymAttackEnv
-from .predicates import eval_predicates
+from .predicates import (
+    eval_predicates,
+    exfil_payload_arg,
+    is_breach,
+    is_protected_secret_path,
+    payload_exfiltrates_secret,
+)
 from .tools import (
     RuntimeToolSpec,
     ToolContext,
@@ -51,4 +57,8 @@ __all__ = [
     "cell_signature",
     "coerce_env_selection",
     "eval_predicates",
+    "exfil_payload_arg",
+    "is_breach",
+    "is_protected_secret_path",
+    "payload_exfiltrates_secret",
 ]
