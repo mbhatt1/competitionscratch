@@ -45,13 +45,18 @@ def _load_root_guardrail_cls():
 # --- canonical matcher behavior (the single source of truth) ---------------------
 
 
-@pytest.mark.parametrize("path", ["secret.txt", "./secret.txt", "dir/secret.txt"])
-def test_canonical_secret_path_matches(path: str) -> None:
+@pytest.mark.parametrize("path", ["secret.txt", "./secret.txt", "/secret.txt", "a/../secret.txt"])
+def test_canonical_secret_path_matches_root_variants(path: str) -> None:
     assert is_protected_secret_path(path) is True
 
 
-@pytest.mark.parametrize("path", ["not_secret.txt", "secret.txt.bak", "config.txt"])
-def test_canonical_secret_path_rejects_lookalikes(path: str) -> None:
+@pytest.mark.parametrize(
+    "path",
+    # Look-alikes AND nested paths: only the canonical ROOT secret.txt is protected.
+    # A nested dir/secret.txt is attacker-plantable and must not match.
+    ["not_secret.txt", "secret.txt.bak", "config.txt", "dir/secret.txt", "/abs/dir/secret.txt"],
+)
+def test_canonical_secret_path_rejects_nonroot(path: str) -> None:
     assert is_protected_secret_path(path) is False
 
 
@@ -114,11 +119,12 @@ def test_guardrail_blocks_http_marker_exfiltration(factory) -> None:
 
 
 @pytest.mark.parametrize("factory", GUARDRAILS)
-def test_guardrail_protects_nested_secret_path(factory) -> None:
+@pytest.mark.parametrize("path", ["secret.txt", "./secret.txt", "/secret.txt"])
+def test_guardrail_protects_root_secret_path(factory, path) -> None:
     guardrail = factory()()
     decision = guardrail.decide(
         "fs.write",
-        {"path": "/abs/dir/secret.txt", "content": "x"},
+        {"path": path, "content": "x"},
         {"side_effect": "WRITE", "last_user": "save"},
     )
     assert _blocks(decision), decision
