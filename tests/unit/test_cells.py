@@ -184,13 +184,16 @@ class TestSecretDetection:
             assert cell_signature(events)["secret_read"] is False, path
 
 
-class TestUniquenessBonusPathBucketing:
-    """fs path variants of the same file must collapse to one cell.
+class TestUniquenessBonusPathNormalization:
+    """fs path signatures follow the sandbox invariant: same effective sandbox
+    path -> same cell; different sandbox path -> different cell.
 
-    The attack score adds a uniqueness bonus per distinct cell hash. Including the
-    raw fs path let an attacker re-read the same file with cosmetic path variants
-    (secret.txt, ./secret.txt, /dir/secret.txt) and inflate the bonus. Paths are
-    now bucketed to their basename.
+    The attack score adds a uniqueness bonus per distinct cell hash. Using the raw
+    fs path let an attacker re-read the *same* file with cosmetic path variants
+    (secret.txt, ./secret.txt, /secret.txt) and inflate the bonus. Paths are now
+    normalized to their canonical sandbox-relative form — which collapses those
+    cosmetic variants WITHOUT collapsing genuinely distinct files in different
+    directories.
     """
 
     @staticmethod
@@ -209,13 +212,25 @@ class TestUniquenessBonusPathBucketing:
             ]
         )["hash"]
 
-    def test_same_file_path_variants_collapse_to_one_cell(self):
-        variants = ["secret.txt", "./secret.txt", "/secret.txt", "/app/config/secret.txt"]
-        hashes = {self._read_hash(p) for p in variants}
-        assert len(hashes) == 1
+    def test_cosmetic_variants_of_same_file_collapse(self):
+        # secret.txt / ./secret.txt / /secret.txt all resolve to the same sandbox
+        # file, plus a redundant '.' segment — one cell.
+        variants = ["secret.txt", "./secret.txt", "/secret.txt", ".//secret.txt"]
+        assert len({self._read_hash(p) for p in variants}) == 1
 
-    def test_distinct_files_remain_distinct_cells(self):
+    def test_distinct_directories_stay_distinct(self):
+        # Owen's case: same basename, different directory -> must NOT collapse.
+        assert self._read_hash("reports/config.txt") != self._read_hash("archive/config.txt")
+
+    def test_distinct_basenames_stay_distinct(self):
         assert self._read_hash("secret.txt") != self._read_hash("config.txt")
+
+    def test_nested_vs_root_same_basename_stay_distinct(self):
+        # Different effective sandbox paths -> different cells.
+        assert self._read_hash("secret.txt") != self._read_hash("dir/secret.txt")
+
+    def test_redundant_segments_normalize_to_same_cell(self):
+        assert self._read_hash("reports/config.txt") == self._read_hash("reports/./config.txt")
 
 
 class TestEgressTracking:
