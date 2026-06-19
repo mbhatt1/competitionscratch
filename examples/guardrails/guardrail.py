@@ -2,8 +2,8 @@
 
 Secret-file and exfiltration matching are imported from
 ``aicomp_sdk.core.predicates`` so this guardrail defends against exactly what the
-evaluator scores (the protected ``secret.txt`` and secret payloads via either
-``http.post`` or ``email.send``).
+evaluator scores (the protected ``secret.txt`` and secret payloads via the
+``http.post`` exfil sink).
 """
 
 from __future__ import annotations

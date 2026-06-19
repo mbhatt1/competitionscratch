@@ -3,7 +3,7 @@
 Matching rules are imported from ``aicomp_sdk.core.predicates`` — the same code the
 evaluator scores with — so the guardrail defends against exactly what is scored:
 the protected ``secret.txt`` file (basename match) and secret payloads leaving via
-either exfil sink (``http.post`` data / ``email.send`` body).
+the exfil sink the scorer checks (``http.post`` data).
 """
 
 from __future__ import annotations
