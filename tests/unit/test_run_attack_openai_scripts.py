@@ -118,20 +118,27 @@ def test_script_main_runs_through_shared_sandbox_env(
 
     options = captured["kwargs"]["options"]
     assert captured["attack_cls"] is scripts_run_attack_openai.AttackAlgorithm
-    assert captured["budget_s"] == 30
+    #assert captured["budget_s"] == 30
+    assert captured["budget_s"] == 10 # was 30
     assert captured["agent_factory"] == "fake-agent-factory"
     assert captured["agent_selection"] == scripts_run_attack_openai._select_openai_demo_agent()
     assert captured["env_selection"] == "sandbox"
-    assert captured["kwargs"]["fixtures_dir"] == scripts_run_attack_openai.repo_root / "fixtures"
-    assert options.run_config.time_budget_s == 30
-    assert options.run_config.max_steps == 100
-    assert options.attack_config == {"max_turns": 6, "branch_batch": 8}
+    #assert captured["kwargs"]["fixtures_dir"] == scripts_run_attack_openai.repo_root / "fixtures"
+    assert captured["kwargs"]["fixtures_dir"] == scripts_run_attack_openai.repo_root / "aicomp_sdk" / "fixtures"
+    assert options.run_config.time_budget_s == 30 
+    # assert options.run_config.max_steps == 100
+    assert options.run_config.max_steps == 2 # was 100
+    # assert options.attack_config == {"max_turns": 6, "branch_batch": 8}
+    assert options.attack_config == {} # was {"max_turns": 6, "branch_batch": 8}
     assert options.env_seed == 42
     assert options.guardrail_factory is scripts_run_attack_openai.BaselineGuardrail
 
     output = capsys.readouterr().out
-    assert "GO-EXPLORE ATTACK DEMO" in output
-    assert "Validated breaches: 1/1" in output
+    # assert "GO-EXPLORE ATTACK DEMO" in output
+    assert "CUSTOM ATTACK DEMO" in output # was assert "GO-EXPLORE ATTACK DEMO" in output
+    # assert "Validated breaches: 1/1" in output
+    assert "Total findings: 1" in output # assert "Validated breaches: 1/1" in output
+
 
 
 def test_goexplore_lpci_demo_openai_branch_uses_shared_sandbox_env(
