@@ -95,7 +95,7 @@ def _relative_path(path: Path) -> str:
 def _find_text_matches(*markers: str) -> set[str]:
     matches: set[str] = set()
     for path in _iter_inventory_files():
-        contents = path.read_text()
+        contents = path.read_text(encoding='utf-8')
         if any(marker in contents for marker in markers):
             matches.add(_relative_path(path))
     return matches
@@ -104,7 +104,7 @@ def _find_text_matches(*markers: str) -> set[str]:
 def _import_violations(root: Path, *, forbidden_roots: set[str]) -> list[tuple[str, str, int]]:
     violations: list[tuple[str, str, int]] = []
     for path in sorted(root.rglob("*.py")):
-        tree = ast.parse(path.read_text(), filename=str(path))
+        tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -130,12 +130,14 @@ def _example_submission_files() -> list[Path]:
 
 
 def test_sys_path_bootstrap_inventory_is_complete() -> None:
-    actual = _find_text_matches("sys.path.insert", "sys.path.append")
+    # actual = _find_text_matches("sys.path.insert", "sys.path.append")
+    actual = {str(p).replace("\\", "/") for p in _find_text_matches("sys.path.insert", "sys.path.append")}
     assert actual == set(PATH_BOOTSTRAP_CLASSIFICATIONS)
 
 
 def test_main_runner_inventory_is_complete() -> None:
-    actual = _find_text_matches('if __name__ == "__main__":', "if __name__ == '__main__':")
+    # actual = _find_text_matches('if __name__ == "__main__":', "if __name__ == '__main__':")
+    actual = {str(p).replace("\\", "/") for p in _find_text_matches('if __name__ == "__main__":', "if __name__ == '__main__':")}
     assert actual == set(MAIN_RUNNER_CLASSIFICATIONS)
 
 
@@ -160,7 +162,8 @@ def test_example_submission_files_contain_no_repo_bootstrap() -> None:
     bootstrapped = [
         _relative_path(path)
         for path in _example_submission_files()
-        if "sys.path.insert" in path.read_text() or "sys.path.append" in path.read_text()
+        #if "sys.path.insert" in path.read_text(encoding='utf-8') or "sys.path.append" in path.path.read_text(encoding='utf-8')
+        if "sys.path.insert" in path.read_text(encoding='utf-8') or "sys.path.append" in path.read_text(encoding='utf-8')
     ]
     assert bootstrapped == []
 
@@ -169,8 +172,8 @@ def test_example_submission_files_have_no_inline_demo_runners() -> None:
     runners = [
         _relative_path(path)
         for path in _example_submission_files()
-        if 'if __name__ == "__main__":' in path.read_text()
-        or "if __name__ == '__main__':" in path.read_text()
+        if 'if __name__ == "__main__":' in path.read_text(encoding='utf-8')
+        or "if __name__ == '__main__':" in path.read_text(encoding='utf-8')
     ]
     assert runners == []
 

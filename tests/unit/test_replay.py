@@ -277,7 +277,9 @@ class TestReplayHarnessEdgeCases:
 
         # Should convert to Path
         assert isinstance(harness.fixtures_dir, Path)
-        assert str(harness.fixtures_dir) == "/path/to/fixtures"
+        # assert str(harness.fixtures_dir) == "/path/to/fixtures"
+        assert harness.fixtures_dir == Path("/path/to/fixtures")
+
 
     def test_fixtures_dir_as_path(self, tmp_path):
         """Test that fixtures_dir can be provided as Path."""
