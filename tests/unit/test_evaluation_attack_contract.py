@@ -16,12 +16,7 @@ from aicomp_sdk.attacks import AttackAlgorithmBase, AttackCandidate, AttackRunCo
 from aicomp_sdk.core.cells import cell_signature
 from aicomp_sdk.core.env.api import MAX_USER_MESSAGE_CHARS, EnvInteractionResult
 from aicomp_sdk.guardrails.base import GuardrailBase
-from aicomp_sdk.hooks import (
-    HookContext,
-    HookRegistry,
-    HookResult,
-    HookStage,
-)
+from aicomp_sdk.hooks import HookRegistry
 
 
 class _FakeSandboxEnv:
@@ -544,6 +539,74 @@ def test_eval_attack_applies_attack_eval_options(monkeypatch: pytest.MonkeyPatch
     assert [call["guardrail"] for call in build_calls] == guardrail_instances
     assert all(isinstance(call["hook_registry"], HookRegistry) for call in build_calls)
     assert len({id(call["hook_registry"]) for call in build_calls}) == 2
+
+
+def test_eval_attack_isolates_authoritative_config_from_attacker_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built_envs: list[_FakeSandboxEnv] = []
+    deadlines: list[tuple[str, float]] = []
+    attacker_run_configs: list[AttackRunConfig] = []
+
+    def fake_build_attack_env(**kwargs: Any) -> _FakeSandboxEnv:
+        env = _FakeSandboxEnv(
+            seed=kwargs["seed"],
+            fixtures_dir=kwargs["fixtures_dir"],
+            guardrail=kwargs["guardrail"],
+            max_tool_hops=kwargs.get("max_tool_hops", 8),
+        )
+        built_envs.append(env)
+        return env
+
+    def fake_run_until_deadline(operation, *, deadline_s: float, phase: str):  # noqa: ANN001
+        deadlines.append((phase, deadline_s))
+        return operation()
+
+    monkeypatch.setattr(evaluation_core, "build_attack_env", fake_build_attack_env)
+    monkeypatch.setattr(evaluation_core, "eval_predicates", _fake_eval_predicates)
+    monkeypatch.setattr(evaluation_core, "_run_until_deadline", fake_run_until_deadline)
+    monkeypatch.setattr(evaluation_core.time, "monotonic", lambda: 10.0)
+
+    options = evaluation_core.AttackEvalOptions(
+        run_config=AttackRunConfig(time_budget_s=30.0, max_steps=100, max_tool_hops=5),
+    )
+
+    class MutatingAttack(AttackAlgorithmBase):
+        def run(self, env, config):  # noqa: ANN001
+            del env
+            attacker_run_configs.append(config)
+            assert config is not options.run_config
+            object.__setattr__(config, "time_budget_s", 999.0)
+            object.__setattr__(config, "max_steps", 1)
+            object.__setattr__(config, "max_tool_hops", 1)
+            object.__setattr__(options.run_config, "time_budget_s", 777.0)
+            object.__setattr__(options.run_config, "max_steps", 2)
+            object.__setattr__(options.run_config, "max_tool_hops", 2)
+            return [AttackCandidate(user_messages=("attack prompt",))]
+
+    findings = evaluation_core.eval_attack(
+        MutatingAttack,
+        999.0,
+        build_agent_factory("deterministic"),
+        env_selection="sandbox",
+        options=options,
+    )
+
+    assert [finding["user_messages"] for finding in findings] == [["attack prompt"]]
+    assert options.run_config == AttackRunConfig(
+        time_budget_s=777.0,
+        max_steps=2,
+        max_tool_hops=2,
+    )
+    assert attacker_run_configs == [
+        AttackRunConfig(time_budget_s=999.0, max_steps=1, max_tool_hops=1)
+    ]
+    assert [env.default_max_tool_hops for env in built_envs] == [5, 5]
+    assert built_envs[1].interaction_hops == [5]
+    assert deadlines == [
+        ("attack generation", 40.0),
+        ("attack replay", 40.0),
+    ]
 
 
 def test_eval_attack_prefers_explicit_options_over_env_guardrail_override(
