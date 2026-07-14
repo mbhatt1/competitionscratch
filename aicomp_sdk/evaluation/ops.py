@@ -10,6 +10,7 @@ import threading
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import nullcontext
+from copy import deepcopy
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -753,7 +754,11 @@ def eval_attack(
         budget_s=budget_s,
         attack_env_seed=attack_env_seed,
     )
-    run_config = resolved_options.run_config
+    # A frozen dataclass can still be mutated through object.__setattr__. Keep an
+    # evaluator-owned copy for authoritative replay and give the attacker a
+    # separate copy so neither attacker-visible nor caller-owned aliases are trusted.
+    run_config = deepcopy(resolved_options.run_config)
+    attacker_run_config = deepcopy(run_config)
 
     run_env: AttackEnvProtocol = _OpaqueAttackEnv(
         build_attack_env(
@@ -780,7 +785,7 @@ def eval_attack(
     generation_deadline_s = time.monotonic() + run_config.time_budget_s
     with run_capture_context:
         candidates = _run_until_deadline(
-            lambda: attacker.run(run_env, run_config),
+            lambda: attacker.run(run_env, attacker_run_config),
             deadline_s=generation_deadline_s,
             phase="attack generation",
         )
